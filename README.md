@@ -162,7 +162,10 @@ Instructions:
           ./g3DPrint
 
 
-End-User License Agreement 
+License 
 ==========================
-Please refer to "Beta Software License Agreement.pdf"
+BSD 3-clause. Please refer to License.txt
+
+
+Rama Hoetzlein, NVIDIA
 
