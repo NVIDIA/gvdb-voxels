@@ -18,7 +18,7 @@ Created: Rama Hoetzlein, 2017
 - Samples: g3DPrint, gFluidSurface, gInteractiveGL, gInteractiveOptix,
    gJetsonTX, gRenderKernel, gRenderToFile, gSprayDeposit
 - Builds on Windows and Linux
-- Runs on JetsonTX1/2, and Tegra/GRID
+- Runs on Quadro, GeForce, JetsonTX1/2, and Tegra/GRID
 
 
 REQUIREMENTS
