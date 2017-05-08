@@ -167,5 +167,4 @@ License
 BSD 3-clause. Please refer to License.txt
 
 
-Rama Hoetzlein, NVIDIA
 
