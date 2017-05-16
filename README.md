@@ -57,39 +57,34 @@ A few samples have on-screen GUIs with features that can be toggled by clicking 
 
 ## WINDOWS - QUICK INSTALLATION
 
-1. Unpackage GVDB and samples
-    a. Unzip the GVDB SDK package to \gvdb\source
+### Install dependencies
+  1. Install cmake-gui 2.7 or later
+  2. Install CUDA Toolkit 8.0
+  3. Install OptiX 3.9.0 or later (for gInteractiveOptix sample)
 
-2. Install dependencies
-    a. Install cmake-gui 2.7 or later
-    b. Install CUDA Toolkit 8.0
-    c. Install OptiX 3.9.0 or later (for gInteractiveOptix sample)
+### Build GVDB Library
+  4. Unzip the package or clone the git repository
+  5. Run cmake-gui.
+   - Where is source code: /gvdb/source/gvdb_library
+   - Where to build bins:  /gvdb/build/gvdb_library
+   - Click Configure to prepare gvdb_library
+   - Click Generate
+   - Open /gvdb/build/gvdb_library/gvdb_library.sln in VS2010/2013
+   - Build the solution in Debug or Release mode.
+   - For whichever mode, you must build later samples with same build type.
+   - The gvdb_library must be built prior to running cmake for any sample.
 
-3. Build gvdb_library
-    a. Run cmake-gui.
-        Where is source code: /gvdb/source/gvdb_library
-        Where to build bins:  /gvdb/build/gvdb_library
-    b. Click Configure to prepare gvdb_library
-    c. Click Generate
-    d. Open /gvdb/build/gvdb_library/gvdb_library.sln in VS2010/2013
-    e. Build the solution in Debug or Release mode.
-       * For whichever mode, you must build later samples with same build type.
-    f. The gvdb_library must be built prior to running cmake for any sample.
-
-4. Build any sample, e.g. g3DPrint
-    a. Run cmake-gui.
-        Where is source code: /gvdb/source/g3DPrint
-        Where to build bins:  /gvdb/build/g3DPrint
-    b. Click Configure to prepare g3DPrint
-    c. You should see that cmake locates the GVDB Library paths automatically
-       * Specify any paths that cmake indicated are needed       
-    d. Click Generate
-    e. Open /gvdb/build/g3DPrint/g3DPrint.sln in VS2010/2013
-    f. Build the solution
-
-5. Run the sample!
-    a. Select g3DPrint as the start up project.
-    b. Click run/debug        
+### Build sample(s)
+  6. Run cmake-gui.
+   - Where is source code: /gvdb/source/g3DPrint
+   - Where to build bins:  /gvdb/build/g3DPrint
+   - Click Configure to prepare g3DPrint
+   - You should see that cmake locates the GVDB Library paths automatically
+   - Specify any paths that cmake indicated are needed       
+  7. Click Generate
+  8. Open /gvdb/build/g3DPrint/g3DPrint.sln in VS2010/2013
+  9. Build the solution
+ 10. Run the sample! Select g3DPrint as the start up project. Click run/debug        
 
 ## LINUX - QUICK INSTALLATION
 
