@@ -106,18 +106,18 @@ LINUX - QUICK INSTALLATION
 Instructions: 
 
 1. Pre-requisites
- 1.1. Install CMake
+ 1. Install CMake
    - sudo apt-get install cmake-qt-gui
- 1.2. Install the CUDA Toolkit 7.5 or later
+ 2. Install the CUDA Toolkit 7.5 or later
    - sudo ./cuda_7.5.18_linux.run
    - Must be done first, before you install NVIDIA drivers
- 1.3. Install the NVIDIA R367 drivers or later
+ 3. Install the NVIDIA R367 drivers or later
    - These can be downloaded from the NVIDIA website
- 1.4. Remove the symoblic libGL, which may incorrectly point to the libGL mesa driver.
+ 4. Remove the symoblic libGL, which may incorrectly point to the libGL mesa driver.
    - sudo rm -rf /usr/lib/x86_64-linux-gnu/libGL.so
- 1.5. Link the libGL to the NVIDIA driver
+ 5. Link the libGL to the NVIDIA driver
    - sudo ln -s /usr/lib/nvidia-367/libGL.so /usr/lib/x86_64-linux-gnu/libGL.so
- 1.6. Install additional developer dependencies.
+ 6. Install additional developer dependencies.
    - sudo apt-get install libxinerama-dev
    - sudo apt-get install libxrandr-dev
    - sudo apt-get install libxcursor-dev
