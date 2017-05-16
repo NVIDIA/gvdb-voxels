@@ -2,15 +2,13 @@
 NVIDIA(R) GVDB VOXELS
 Release 1.0
 
-OVERVIEW
-============
+## OVERVIEW
 NVIDIA GVDB is a new library and SDK for compute, simulation and rendering of 
 sparse volumetric data. Details on the GVDB technology can be 
 found at: 
    http://developer.nvidia.com/gvdb
 
-RELEASE NOTES
-=============
+## RELEASE NOTES
 5/1/2017, GVDB Voxels, Release 1.0 
 Created: Rama Hoetzlein, 2017
 - First public release
@@ -21,8 +19,7 @@ Created: Rama Hoetzlein, 2017
 - Runs on Quadro, GeForce, JetsonTX1/2, and Tegra/GRID
 
 
-REQUIREMENTS
-============
+## REQUIREMENTS
   NVIDIA Kepler generation or later GPU
   Windows 7, 8, 10 64-bit
   Microsoft Visual Studio 2010 or higher
@@ -33,8 +30,7 @@ REQUIREMENTS
 GVDB is released as a library with samples. 
 The library and each sample is built separately, using cmake.
 
-WHAT'S IN THE PACKAGE?
-======================
+## WHAT'S IN THE PACKAGE?
 	
    - GVDB VOXELS Library
    - Code Samples
@@ -51,8 +47,7 @@ WHAT'S IN THE PACKAGE?
    - GVDB Sample Descriptions
    - GVDB Programming Guide
 
-SAMPLES USAGE
-=============
+## SAMPLE USAGE
 All interactive samples use the following user input interface
    Camera rotation -> move mouse
    Change orientation -> left mouse click
@@ -60,11 +55,7 @@ All interactive samples use the following user input interface
    Panning -> hold middle button 
 A few samples have on-screen GUIs with features that can be toggled by clicking on them.
 
-
-WINDOWS - QUICK INSTALLATION
-============================
-
-Instructions:
+## WINDOWS - QUICK INSTALLATION
 
 1. Unpackage GVDB and samples
     a. Unzip the GVDB SDK package to \gvdb\source
@@ -100,12 +91,9 @@ Instructions:
     a. Select g3DPrint as the start up project.
     b. Click run/debug        
 
-LINUX - QUICK INSTALLATION
-==========================
+## LINUX - QUICK INSTALLATION
 
-Instructions: 
-
-1. Pre-requisites
+### Install Pre-requisites
   1. Install CMake
       - sudo apt-get install cmake-qt-gui
   2. Install the CUDA Toolkit 7.5 or later
@@ -124,51 +112,50 @@ Instructions:
       - sudo apt-get install libxi-dev
       - sudo apt-get install libx11-dev
 
-2. Install OptiX [optional, for gInteractiveOptiX sample only]
-   - OptiX is distributed as a .sh file, which extracts to the current dir.
-   - Create a directory for optix in /usr/lib and move the package there before extracting.
-   - $ sudo mkdir /usr/lib/optix
+### Install OptiX [optional]
+  7. OptiX is distributed as a .sh file, which extracts to the current dir.
+  8. Create a directory for optix in /usr/lib and move the package there before extracting.
+    - $ sudo mkdir /usr/lib/optix
    - $ sudo mv NVIDIA-OptiX-SDK-4.0.1-linux64.sh /usr/lib/optix
    - $ cd /usr/lib/optix
    - $ sudo ./NVIDIA-OptiX-SDK-4.0.1.-linux64.sh
 
-3. Set LD_LIBRARY_PATH in bashrc
-     a. Open .bashrc. For example: $ emacs ~/.bashrc
-     b. Add the following at the end:
-           export LD_LIBRARY_PATH=/usr/local/gvdb/lib:/usr/lib/optix/lib64
-           * The first path should be the location of libgvdb.so (once installed)
-           * The second path should be the location of optix.so
-     c. Source the bash (re-run it)
-          $ source ~/.bashrc
+### Set LD_LIBRARY_PATH in bashrc
+  9. Open .bashrc. For example: $ emacs ~/.bashrc
+  10. Add the following at the end:
+     - export LD_LIBRARY_PATH=/usr/local/gvdb/lib:/usr/lib/optix/lib64
+     - The first path should be the location of libgvdb.so (once installed)
+     - The second path should be the location of optix.so
+  11. Source the bash (re-run it)
+     - $ source ~/.bashrc
 
-4. Build the GVDB Library
-     a. Unpackage the source tar.gz file
-     b. mkdir ~/codes/build/gvdb_library   # make a folder for the build
-     c. cmake-gui                          # run cmake-gui with the following settings:
-         i.  source: ~/codes/source/gvdb_library
-         ii. build:  ~/codes/build/gvdb_library
-         iii. Click Configure, and the nGenerate
-         iv. cd ~/codes/build/gvdb_library
-         v.  sudo make  
-         vi. sudo make install             # default install is to /usr/local/gvdb
+### Build GVDB Library
+  12. Unpackage the source tar.gz file
+  13. mkdir ~/codes/build/gvdb_library   # make a folder for the build
+  14. cmake-gui                          # run cmake-gui with the following settings:
+    - source: ~/codes/source/gvdb_library
+    - build:  ~/codes/build/gvdb_library
+    - Click Configure, and the nGenerate
+    - cd ~/codes/build/gvdb_library
+    - sudo make  
+    - sudo make install             # default install is to /usr/local/gvdb
 
-5. Build a specific Sample
-     a. Unpackage the source tar.gz file
-     b. mkdir ~/codes/build/g3DPrint       # make a folder for the build
-     c. cmake-gui                          # run cmake-gui with the following settings:
-         i.  source: ~/codes/source/g3DPrint
-         ii. build:  ~/codes/build/g3DPrint
-         iii. Click Configure, and the nGenerate
-              * Note: If GVDB is not found, set the GVDB_ROOT_DIR to /usr/local/gvdb
-                or your preferred gvdb install location from step 4. 
-         iv. cd ~/codes/build/g3DPrint
-         v.  make
-         vi. make install                  # remember to do 'make install' to get all files
-     d. Run the sample!
-          ./g3DPrint
+### Build sample(s)
+  15. Unpackage the source tar.gz file
+  16. mkdir ~/codes/build/g3DPrint       # make a folder for the build
+  17. cmake-gui                          # run cmake-gui with the following settings:
+     - source: ~/codes/source/g3DPrint
+     - build:  ~/codes/build/g3DPrint
+     - Click Configure, and the nGenerate
+     - Note: If GVDB is not found, set the GVDB_ROOT_DIR to /usr/local/gvdb
+     -  or your preferred gvdb install location from step 4. 
+     - cd ~/codes/build/g3DPrint
+     - make
+     - make install                  # remember to do 'make install' to get all files
+  18. Run the sample! ./g3DPrint
 
 
-License 
+## License 
 ==========================
 BSD 3-clause. Please refer to License.txt
 
