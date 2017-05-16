@@ -117,6 +117,12 @@ Instructions:
           sudo rm -rf /usr/lib/x86_64-linux-gnu/libGL.so
     e. Link the libGL to the NVIDIA driver
           sudo ln -s /usr/lib/nvidia-367/libGL.so /usr/lib/x86_64-linux-gnu/libGL.so
+    f. Install additional developer dependencies.
+          sudo apt-get install libxinerama-dev
+          sudo apt-get install libxrandr-dev
+          sudo apt-get install libxcursor-dev
+          sudo apt-get install libxi-dev
+          sudo apt-get install libx11-dev
 
 2. Install OptiX [optional, for gInteractiveOptiX sample only]
       * OptiX is distributed as a .sh file, which extracts to the current dir.
