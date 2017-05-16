@@ -1198,8 +1198,16 @@ void nverror ()
 	nvprintf ( "Error. Application will exit." );
 	exit(-1);
 }
+bool getFileLocation ( char* filename, char* outpath )
+{
+	std::vector<std::string> paths;
+	paths.push_back ( "./");
+	paths.push_back ( ASSET_PATH );
+	bool result = getFileLocation ( filename, outpath, paths );
+	return result;
+}
 
-bool getFileLocation ( char* filename, char* outpath, char** searchPaths, int numPaths )
+bool getFileLocation ( char* filename, char* outpath, std::vector<std::string> searchPaths )
 {
 	bool found = false;
 	FILE* fp = fopen( filename, "rb" );
@@ -1207,10 +1215,9 @@ bool getFileLocation ( char* filename, char* outpath, char** searchPaths, int nu
 		found = true;
 		strcpy ( outpath, filename );		
 	} else {
-		for (int i=0; i < numPaths; i++) {
-			if (!searchPaths) break;        // If no valid search path list exit now
-			if (!searchPaths[i]) continue;  // If any search path in the list is NULL, contine.  Other entries may be valid			
-			sprintf ( outpath, "%s%s", searchPaths[i], filename );
+		for (int i=0; i < searchPaths.size(); i++) {			
+			if (searchPaths[i].empty() ) continue;  
+			sprintf ( outpath, "%s%s", searchPaths[i].c_str(), filename );
 			fp = fopen( outpath, "rb" );
 			if (fp)	{ found = true;	break; }
 		}		
@@ -1218,5 +1225,4 @@ bool getFileLocation ( char* filename, char* outpath, char** searchPaths, int nu
 	if ( found ) fclose ( fp );
 	return found;
 }
-
 //------------------------------------------------------------------------------

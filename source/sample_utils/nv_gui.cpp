@@ -1674,10 +1674,10 @@ void nvImg::Fill ( float r, float g, float b, float a )
 {
 	unsigned char* pix = mData;
 	for (int n=0; n < mXres*mYres; n++ ) {
-		*pix++ = unsigned char(r*255.0f); 
-		*pix++ = unsigned char(g*255.0f); 
-		*pix++ = unsigned char(b*255.0f); 
-		*pix++ = unsigned char(a*255.0f);
+	  *pix++ = (unsigned char) (r*255.0f); 
+	  *pix++ = (unsigned char) (g*255.0f); 
+	  *pix++ = (unsigned char) (b*255.0f); 
+	  *pix++ = (unsigned char) (a*255.0f);
 	}
 	UpdateTex ();
 }
