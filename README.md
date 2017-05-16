@@ -106,23 +106,23 @@ LINUX - QUICK INSTALLATION
 Instructions: 
 
 1. Pre-requisites
- a. Install CMake
-   sudo apt-get install cmake-qt-gui
- b. Install the CUDA Toolkit 7.5 or later
-   sudo ./cuda_7.5.18_linux.run
-    * Must be done first, before you install NVIDIA drivers
- c. Install the NVIDIA R367 drivers or later
-    * These can be downloaded from the NVIDIA website
- d. Remove the symoblic libGL, which may incorrectly point to the libGL mesa driver.
-     sudo rm -rf /usr/lib/x86_64-linux-gnu/libGL.so
- e. Link the libGL to the NVIDIA driver
-     sudo ln -s /usr/lib/nvidia-367/libGL.so /usr/lib/x86_64-linux-gnu/libGL.so
- f. Install additional developer dependencies.
-     sudo apt-get install libxinerama-dev
-     sudo apt-get install libxrandr-dev
-     sudo apt-get install libxcursor-dev
-     sudo apt-get install libxi-dev
-     sudo apt-get install libx11-dev
+ 1. Install CMake
+   * sudo apt-get install cmake-qt-gui
+ 2. Install the CUDA Toolkit 7.5 or later
+   * sudo ./cuda_7.5.18_linux.run
+   * Must be done first, before you install NVIDIA drivers
+ 3. Install the NVIDIA R367 drivers or later
+   * These can be downloaded from the NVIDIA website
+ 4. Remove the symoblic libGL, which may incorrectly point to the libGL mesa driver.
+   * sudo rm -rf /usr/lib/x86_64-linux-gnu/libGL.so
+ 5. Link the libGL to the NVIDIA driver
+   * sudo ln -s /usr/lib/nvidia-367/libGL.so /usr/lib/x86_64-linux-gnu/libGL.so
+ 6. Install additional developer dependencies.
+   * sudo apt-get install libxinerama-dev
+   * sudo apt-get install libxrandr-dev
+   * sudo apt-get install libxcursor-dev
+   * sudo apt-get install libxi-dev
+   * sudo apt-get install libx11-dev
 
 2. Install OptiX [optional, for gInteractiveOptiX sample only]
       * OptiX is distributed as a .sh file, which extracts to the current dir.
