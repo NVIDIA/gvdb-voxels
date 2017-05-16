@@ -106,31 +106,31 @@ LINUX - QUICK INSTALLATION
 Instructions: 
 
 1. Pre-requisites
- 1. Install CMake
-   * sudo apt-get install cmake-qt-gui
- 2. Install the CUDA Toolkit 7.5 or later
-   * sudo ./cuda_7.5.18_linux.run
-   * Must be done first, before you install NVIDIA drivers
- 3. Install the NVIDIA R367 drivers or later
-   * These can be downloaded from the NVIDIA website
- 4. Remove the symoblic libGL, which may incorrectly point to the libGL mesa driver.
-   * sudo rm -rf /usr/lib/x86_64-linux-gnu/libGL.so
- 5. Link the libGL to the NVIDIA driver
-   * sudo ln -s /usr/lib/nvidia-367/libGL.so /usr/lib/x86_64-linux-gnu/libGL.so
- 6. Install additional developer dependencies.
-   * sudo apt-get install libxinerama-dev
-   * sudo apt-get install libxrandr-dev
-   * sudo apt-get install libxcursor-dev
-   * sudo apt-get install libxi-dev
-   * sudo apt-get install libx11-dev
+ 1.1. Install CMake
+   - sudo apt-get install cmake-qt-gui
+ 1.2. Install the CUDA Toolkit 7.5 or later
+   - sudo ./cuda_7.5.18_linux.run
+   - Must be done first, before you install NVIDIA drivers
+ 1.3. Install the NVIDIA R367 drivers or later
+   - These can be downloaded from the NVIDIA website
+ 1.4. Remove the symoblic libGL, which may incorrectly point to the libGL mesa driver.
+   - sudo rm -rf /usr/lib/x86_64-linux-gnu/libGL.so
+ 1.5. Link the libGL to the NVIDIA driver
+   - sudo ln -s /usr/lib/nvidia-367/libGL.so /usr/lib/x86_64-linux-gnu/libGL.so
+ 1.6. Install additional developer dependencies.
+   - sudo apt-get install libxinerama-dev
+   - sudo apt-get install libxrandr-dev
+   - sudo apt-get install libxcursor-dev
+   - sudo apt-get install libxi-dev
+   - sudo apt-get install libx11-dev
 
 2. Install OptiX [optional, for gInteractiveOptiX sample only]
-      * OptiX is distributed as a .sh file, which extracts to the current dir.
-      * Create a directory for optix in /usr/lib and move the package there before extracting.
-      $ sudo mkdir /usr/lib/optix
-      $ sudo mv NVIDIA-OptiX-SDK-4.0.1-linux64.sh /usr/lib/optix
-      $ cd /usr/lib/optix
-      $ sudo ./NVIDIA-OptiX-SDK-4.0.1.-linux64.sh
+   - OptiX is distributed as a .sh file, which extracts to the current dir.
+   - Create a directory for optix in /usr/lib and move the package there before extracting.
+   - $ sudo mkdir /usr/lib/optix
+   - $ sudo mv NVIDIA-OptiX-SDK-4.0.1-linux64.sh /usr/lib/optix
+   - $ cd /usr/lib/optix
+   - $ sudo ./NVIDIA-OptiX-SDK-4.0.1.-linux64.sh
 
 3. Set LD_LIBRARY_PATH in bashrc
      a. Open .bashrc. For example: $ emacs ~/.bashrc
