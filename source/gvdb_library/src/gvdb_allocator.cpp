@@ -911,10 +911,10 @@ void StartCuda ( int devid, bool verbose )
 	cudaDeviceProp props;
 	memset ( &props, 0, sizeof(cudaDeviceProp) );
 	cudaGetDeviceCount ( &cnt );
-	if ( verbose ) gprintf ( "  Device List:\n" );
+	if (verbose) gprintf ( "  Device List:\n" );
 	for (int n=0; n < cnt; n++ ) {
 		cudaGetDeviceProperties ( &props, n );
-		if ( verbose ) gprintf ( "   %d. %s, Runtime Ver: %d.%d\n", n, props.name, props.major, props.minor );		
+		if (verbose) gprintf ( "   %d. %s, Runtime Ver: %d.%d\n", n, props.name, props.major, props.minor );
 	}	
 
 	if ( devid == -1 ) {
@@ -925,10 +925,10 @@ void StartCuda ( int devid, bool verbose )
 	}
 
 	cuCtxGetDevice ( &gcuDevice );	
-	if ( verbose ) gprintf ( "   Driver  Device: %d\n", (int) gcuDevice );	
+	if (verbose) gprintf( "   Driver  Device: %d\n", (int) gcuDevice );
 	
 	cudaGetDevice ( &devid );
-	if ( verbose ) gprintf ( "   Runtime Device: %d\n", devid );
+	if (verbose) gprintf( "   Runtime Device: %d\n", devid );
 
 	//Increase memory limits
 	size_t size_heap, size_stack;
@@ -940,8 +940,8 @@ void StartCuda ( int devid, bool verbose )
 	size_t free, total;
 	float MB = 1024.0*1024.0;
 	cudaMemGetInfo ( &free, &total );
-	if ( verbose ) gprintf( "   CUDA Total Mem:  %6.2f MB\n", float(total) / MB );
-	if ( verbose ) gprintf( "   CUDA  Free Mem:  %6.2f MB\n", float(free) / MB );
+	if (verbose) gprintf( "   CUDA Total Mem:  %6.2f MB\n", float(total) / MB );
+	if (verbose) gprintf( "   CUDA  Free Mem:  %6.2f MB\n", float(free) / MB );
 		
 }
 

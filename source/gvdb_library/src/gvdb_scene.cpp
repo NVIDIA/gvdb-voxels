@@ -447,8 +447,7 @@ void Scene::VolumeThresh ()
 	Vector3DF vec;
 	gParse->GetToken( val );	vec.x = atof(val);	
 	gParse->GetToken( val );	vec.y = atof(val);
-	gParse->GetToken( val );	vec.z = atof(val);
-	gprintf ( "thresh: %f\n", vec.x );
+	gParse->GetToken( val );	vec.z = atof(val);	
 	gScene->mVThreshold = vec;
 }
 
@@ -558,7 +557,7 @@ void Scene::LoadAnimation ()
 				str1 = strSplit ( str2, "," );		// read start and end values
 				strToVec3 ( str1, val1.Data() );
 				strToVec3 ( str2, val2.Data() );			// convert values to vec3
-				gprintf ( "%s: %f %f %f -> %f %f %f\n", obj.c_str(), val1.x, val1.y, val1.z, val2.x, val2.y, val2.z );
+				// gprintf ( "%s: %f %f %f -> %f %f %f\n", obj.c_str(), val1.x, val1.y, val1.z, val2.x, val2.y, val2.z );
 				gScene->AddKey ( obj, var, frames.x, frames.y, val1, val2 );
 			}
 		}
@@ -649,7 +648,7 @@ void Scene::Clear ()
 	mMaterials.clear ();
 }
 
-void Scene::LoadFile ( std::string filestr  )
+void Scene::LoadFile ( std::string filestr )
 {
 	// Create new parse
 	if ( gParse != 0x0 ) delete gParse;
@@ -660,7 +659,6 @@ void Scene::LoadFile ( std::string filestr  )
 		return;	
 
 	// Load model(s)
-	gprintf ( "Loading '%s'...\n", filepath );
 
 	// Set keywords & corresponding callbacks to process the data
 	gParse->SetCallback( "path",            &Scene::LoadPath );

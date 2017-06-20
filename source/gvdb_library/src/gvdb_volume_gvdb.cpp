@@ -248,7 +248,7 @@ bool VolumeGVDB::ImportVTK ( std::string fname, std::string field, Vector3DI& re
 	long cnt = 0, max_cnt = 0;
 	char status = 'X'; 
 
-	gprintf ( "Loading VTK: %s\n", buf );
+	verbosef ( "Loading VTK: %s\n", buf );
 
 	while ( !feof(fp) && status!='D' ) {
 		if ( fgets ( buf, 2048, fp ) == NULL ) break;
@@ -267,7 +267,7 @@ bool VolumeGVDB::ImportVTK ( std::string fname, std::string field, Vector3DI& re
 			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.x = f-1;
 			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.y = f-1;
 			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.z = f-1;
-			gprintf ( "  Res: %d, %d, %d\n", res.x, res.y, res.z );
+			verbosef ( "  Res: %d, %d, %d\n", res.x, res.y, res.z );
 			PrepareAux ( AUX_DATA3D, res.x*res.y*res.z, sizeof(float), false, true );
 			vox = (float*) mAux[AUX_DATA3D].cpu;
 			continue;
@@ -281,7 +281,7 @@ bool VolumeGVDB::ImportVTK ( std::string fname, std::string field, Vector3DI& re
 			if ( word.compare ( field ) == 0 ) status = 'R';
 			word = strSplit ( lin, " \n" );
 			word = strSplit ( lin, " \n" ); strIsNum(word, f); max_cnt = f;
-			gprintf ( "  Reading: %s, %ld\n", field.c_str(), max_cnt );			
+			verbosef ( "  Reading: %s, %ld\n", field.c_str(), max_cnt );
 			continue;
 		}
 		if ( word.compare("SPACING")==0 ) continue;
@@ -299,7 +299,7 @@ bool VolumeGVDB::ImportVTK ( std::string fname, std::string field, Vector3DI& re
 			if ( cnt >= max_cnt) status = 'D';		// done
 		}
 	}
-	gprintf ( "  Values Read: %d\n", cnt );
+	verbosef ( "  Values Read: %d\n", cnt );
 
 	// Commit data to GPU
 	CommitData ( mAux[AUX_DATA3D] );
@@ -316,8 +316,8 @@ bool VolumeGVDB::LoadVBX ( std::string fname )
 	
 	if ( mbProfile ) PERF_PUSH ( "Read VBX" );	
 	
-  	gprintf ( "LoadVBX: %s\n", fname.c_str() );
-        gprintf ( "Sizes: char %d, int %d, u64 %d, float %d\n", sizeof(char), sizeof(int), sizeof(uint64), sizeof(float) );
+	verbosef ( "LoadVBX: %s\n", fname.c_str() );
+		verbosef ( "Sizes: char %d, int %d, u64 %d, float %d\n", sizeof(char), sizeof(int), sizeof(uint64), sizeof(float) );
 
 	// Read VDB config
 	uchar major, minor;
@@ -548,7 +548,7 @@ void VolumeGVDB::SaveVBX ( std::string fname )
 	
 	if ( mbProfile ) PERF_PUSH ( "Saving VBX" );	
 
-	gprintf ( "  Saving VBX (ver %d.%d)\n", major, minor );
+	verbosef ( "  Saving VBX (ver %d.%d)\n", major, minor );
 
 	int levels = mPool->getNumLevels();
 
@@ -757,8 +757,7 @@ void VolumeGVDB::ComputeBounds ()
 	file.write ( grids );
 	file.close ();
 
-	gprintf ( "Done\n" );
-	gerror ();
+	verbosef ( "Done\n" );
 
 #endif
 
@@ -780,12 +779,12 @@ bool VolumeGVDB::LoadBRK ( std::string fname )
 	Volume3D vtemp ( mScene );
 
 	sprintf ( buf, "Reading BRK %s", fname.c_str() );
-	gprintf ( "  %s\n", buf );
+	verbosef ( "  %s\n", buf );
 	
 	if ( mbProfile ) PERF_PUSH ( buf );	
 	
 	fread ( &brkcnt, sizeof(int), 1, fp );
-	gprintf ( "    Number of bricks: %d\n", brkcnt );
+	verbosef ( "    Number of bricks: %d\n", brkcnt );
 
 	// Read first brick for res
 	fread ( &bndx, sizeof(Vector3DI), 1, fp );
@@ -803,7 +802,7 @@ bool VolumeGVDB::LoadBRK ( std::string fname )
 	int res = bres.x;
 	mVCFG[4] = 0;
 	while ( res >>= 1 ) ++mVCFG[4];
-	gprintf ( "    Leaf res: %d (leaf log2=%d)\n", bres.x, mVCFG[4] );
+	verbosef ( "    Leaf res: %d (leaf log2=%d)\n", bres.x, mVCFG[4] );
 
 	// Initialize VDB
 	Vector3DF voxelsize ( 1, 1, 1 );
@@ -870,9 +869,9 @@ bool VolumeGVDB::LoadBRK ( std::string fname )
 	}
 	if ( mbProfile ) PERF_POP ();
 
-	gprintf ( "    Read Brk: %f ms\n", t.x );
-	gprintf ( "    Activate: %f ms\n", t.y );
-	gprintf ( "    To Atlas: %f ms\n", t.z );	
+	verbosef( "    Read Brk: %f ms\n", t.x );
+	verbosef( "    Activate: %f ms\n", t.y );
+	verbosef( "    To Atlas: %f ms\n", t.z );
 
 	mVoxsize = voxelsize;
 	ComputeBounds ();
@@ -921,7 +920,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 
 	// Read .vdb file	
 
-	gprintf ( "   Reading OpenVDB file.\n" );
+	verbosef ( "   Reading OpenVDB file.\n" );
 	openvdb::io::File* vdbfile = new openvdb::io::File ( fname );
 	vdbfile->open();	
 	
@@ -930,10 +929,10 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	openvdb::io::File::NameIterator nameIter = vdbfile->beginName();	
 	std::string name = vdbfile->beginName().gridName();
 	for ( openvdb::io::File::NameIterator nameIter = vdbfile->beginName(); nameIter != vdbfile->endName(); ++nameIter ) {
-		gprintf ( "   Grid: %s\n", nameIter.gridName().c_str() );
+		verbosef ( "   Grid: %s\n", nameIter.gridName().c_str() );
 		if ( nameIter.gridName().compare( getScene()->mVName ) == 0 ) name = getScene()->mVName;
 	}	
-	gprintf ( "   Loading Grid: %s\n", name.c_str() );
+	verbosef ( "   Loading Grid: %s\n", name.c_str() );
 	baseGrid = vdbfile->readGrid ( name ); 
 	
 	if ( mbProfile ) PERF_POP ();
@@ -944,7 +943,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 
 	bool isFloat = false;
 
-	gprintf ( "   Configuring GVDB.\n");
+	verbosef ( "   Configuring GVDB.\n");
 	if ( baseGrid->isType< FloatGrid543 >() ) {
 		gridtype = 0;
 		isFloat = true;
@@ -977,7 +976,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	SetApron ( 1 );
 
 	float pused = MeasurePools ();
-	gprintf ( "   Topology Used: %6.2f MB\n", pused );
+	verbosef( "   Topology Used: %6.2f MB\n", pused );
 	
 	slong leaf;
 	int leaf_start = 0;				// starting leaf		gScene.mVLeaf.x;		
@@ -987,7 +986,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	vclipmax = getScene()->mVClipMax;	
 
 	// Determine Volume bounds
-	gprintf ( "   Compute volume bounds.\n");
+	verbosef( "   Compute volume bounds.\n");
 	vdbSkip ( mOVDB, leaf_start, gridtype, isFloat );
 	for (leaf_max=0; vdbCheck ( mOVDB, gridtype, isFloat ); ) {
 		vdbOrigin ( mOVDB, orig, gridtype, isFloat );
@@ -1012,7 +1011,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	// Activate Space
 	if ( mbProfile ) PERF_PUSH ( "Activate" );	
 	n = 0;
-	gprintf ( "   Activating space.\n");
+	verbosef ( "   Activating space.\n");
 
 	vdbSkip ( mOVDB, leaf_start, gridtype, isFloat );
 	for (leaf_max=0; vdbCheck ( mOVDB, gridtype, isFloat ) ; ) {
@@ -1030,7 +1029,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 			leaf_pos.push_back ( p0 );
 			if ( leaf_max==0 ) { 
 				mVoxMin = p0; mVoxMax = p0; 
-				gprintf ( "   First leaf: %d  (%f %f %f)\n", leaf_start+n, p0.x, p0.y, p0.z );
+				verbosef ( "   First leaf: %d  (%f %f %f)\n", leaf_start+n, p0.x, p0.y, p0.z );
 			}
 			leaf_max++;				
 		}
@@ -1044,13 +1043,13 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	if ( mbProfile ) PERF_POP ();		// Activate
 
 	// Resize Atlas
-	gprintf ( "   Create Atlas. Free before: %6.2f MB\n", cudaGetFreeMem() );	
+	verbosef ( "   Create Atlas. Free before: %6.2f MB\n", cudaGetFreeMem() );
 	if ( mbProfile ) PERF_PUSH ( "Atlas" );		
 	DestroyChannels ();
 	AddChannel ( 0, T_FLOAT, mApron );
 	UpdateAtlas ();
 	if ( mbProfile ) PERF_POP ();
-	gprintf ( "   Create Atlas. Free after:  %6.2f MB, # Leaf: %d\n", cudaGetFreeMem(), leaf_max );
+	verbosef ( "   Create Atlas. Free after:  %6.2f MB, # Leaf: %d\n", cudaGetFreeMem(), leaf_max );
 
 	// Resize temp 3D texture to match leaf res
 	int res0 = getRes ( 0 );	
@@ -1076,7 +1075,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 
 	// Fill atlas from leaf data
 	int percl = 0, perc = 0;
-	gprintf ( "   Loading bricks.\n");
+	verbosef ( "   Loading bricks.\n");
 	for (leaf_cnt=0; vdbCheck ( mOVDB, gridtype, isFloat ); ) {
 
 		// read leaf position
@@ -1114,13 +1113,13 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 			
 			// Progress percent
 			leaf_cnt++; perc = int(leaf_cnt*100 / leaf_max);
-			if ( perc != percl ) { gprintf ( "%d%%%% ", perc ); percl = perc; }			
+			if ( perc != percl ) { verbosef ( "%d%%%% ", perc ); percl = perc; }
 		}
 		vdbNext ( mOVDB, gridtype, isFloat );
 	}
 
 	if ( mbProfile ) PERF_POP ();
-	gprintf ( "    Value Range: %f %f\n", mValMin, mValMax );
+	verbosef ( "    Value Range: %f %f\n", mValMin, mValMax );
 
 	UpdateApron ();
 
@@ -1192,7 +1191,7 @@ void VolumeGVDB::SaveVDB ( std::string fname )
 
 		memcpy ( leafbuf, p.cpu, sz );			// set leaf voxels
 	}			
-	gprintf ( "  Leaf count: %d\n", tree->leafCount() );
+	verbosef( "  Leaf count: %d\n", tree->leafCount() );
 
 	// create a vdb grid
 	if ( mbProfile ) PERF_PUSH ( "Creating grid" );	
@@ -1202,7 +1201,7 @@ void VolumeGVDB::SaveVDB ( std::string fname )
 	mOVDB->grid34F->setTransform ( openvdb::math::Transform::createLinearTransform(1.0) );	
 	mOVDB->grid34F->addStatsMetadata ();
 	openvdb::tools::foreach ( mOVDB->grid34F->beginValueAll(), Activator ::op);
-	gprintf ( "  Leaf count: %d\n", mOVDB->grid34F->tree().leafCount() );
+	verbosef( "  Leaf count: %d\n", mOVDB->grid34F->tree().leafCount() );
 	if ( mbProfile ) PERF_POP ();
 
 	if ( mbProfile ) PERF_PUSH ( "Writing grids" );	
@@ -1940,10 +1939,10 @@ void VolumeGVDB::WriteObj ( char* fname )
 	fprintf(fp,     "# %ld vertices.\n", numverts); 		
 	fprintf(fp,     "# %ld faces.\n", numfaces); 				
 	
-	gprintf ( "Write OBJ complete: %s\n", fname );
-	gprintf ( "  %lld voxels.\n", numvox ); 		
-	gprintf ( "  %lld vertices.\n", numverts); 	
-	gprintf ( "  %lld faces.\n", numfaces); 	
+	verbosef( "Write OBJ complete: %s\n", fname );
+	verbosef( "  %lld voxels.\n", numvox ); 		
+	verbosef( "  %lld vertices.\n", numverts); 	
+	verbosef( "  %lld faces.\n", numfaces); 	
 
 	fclose(fp);	
 
@@ -2248,7 +2247,7 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, ucha
 			FinishTopology();					
 			UpdateAtlas();			
 		}		
-		gprintf ("Voxelized.. lev: %d, nodes: %d, new: %d\n", lev, node_cnt, cnt );
+		verbosef("Voxelized.. lev: %d, nodes: %d, new: %d\n", lev, node_cnt, cnt );
 	}	
 
 	// Update apron
@@ -2260,7 +2259,7 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, ucha
 	AuxGeometryUnmap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );
 
 	float msec = TimerStop();
-	gprintf ( "Voxelize Complete: %4.2f\n", msec );
+	verbosef( "Voxelize Complete: %4.2f\n", msec );
 }
 
 // Insert triangles into auxiliary bins
@@ -2294,7 +2293,7 @@ Vector3DI VolumeGVDB::InsertTriangles ( Model* model, Matrix4F* xform, float& yd
 
 	// Prepare output triangle buffer
 	PrepareAux ( AUX_TRI_BUF, tri_cnt, sizeof(Vector3DF)*3, false, false );
-	// gprintf ( "ybins: %d, tri_cnt: %d\n", ybins, tri_cnt );
+	// verbosef ( "ybins: %d, tri_cnt: %d\n", ybins, tri_cnt );
 
 	// Deep copy sorted tris into output buffer
 	block.Set ( 512, 1, 1 );
@@ -2347,7 +2346,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 	// Resize temporary volume to level 1
 	vtemp.Resize ( T_FLOAT, vres1, 0x0, true );		// use opengl
 	
-	gprintf ( "  L1 range: %d %d %d, %d %d %d\n", vstart.x, vstart.y, vstart.z, vstop.x, vstop.y, vstop.z);
+	verbosef( "  L1 range: %d %d %d, %d %d %d\n", vstart.x, vstart.y, vstart.z, vstop.x, vstop.y, vstop.z);
 
 	vtemp.PrepareRasterGL ( true );
 
@@ -2439,7 +2438,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 
 	vtemp.PrepareRasterGL ( false );				
 
-	gprintf ( "  # of leaves: %d\n", leaf_ptr.size() );	
+	verbosef( "  # of leaves: %d\n", leaf_ptr.size() );
 	if ( leaf_ptr.size()==0 ) {
 		gprintf ( "  ERROR: No data generated.\n" );
 		free ( vdat );
@@ -3219,6 +3218,12 @@ void VolumeGVDB::CommitData ( DataPtr& dat, int cnt, char* cpubuf, int offs, int
 	dat.max = cnt;
 	dat.stride = stride;
 	dat.subdim.Set ( offs, stride, 0 );
+
+	if (dat.gpu == 0x0) {
+		gprintf( "ERROR: Buffer not allocated on GPU. May be missing call to AllocData.\n");
+		gerror();
+		return; 
+	}
 
 	if ( mbProfile ) PERF_PUSH ( "Commit Data" );	
 	mPool->CommitMem ( dat );

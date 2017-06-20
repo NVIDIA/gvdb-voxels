@@ -403,12 +403,13 @@
 			Vector3DI getRes3DI(int lv)	{ int r = (1 << mLogDim[lv]); return Vector3DI(r,r,r); }
 			Vector3DF getClrDim(int lv) { return mClrDim[lv]; }
 
-			void gprintf(const char * fmt, ...)	{
-					if ( !mbVerbose ) return;		// check if verbose
-					va_list  vlist;
-					va_start(vlist, fmt);
-					gprintf2(vlist, fmt, 0 );
+			void verbosef(const char * fmt, ...) {
+				if (!mbVerbose) return;			// check if verbose
+				va_list  vlist;
+				va_start(vlist, fmt);
+				gprintf2(vlist, fmt, 0);
 			}
+
 			int		getNumNodes ( int lev );
 			Node*	getNodeAtLevel ( int n, int lev );
 			Vector3DF getWorldMin ( Node* node );

@@ -85,8 +85,6 @@ void Model::UniqueNormals ()
 	int v1, v2, v3;
 	Vector3DF a, b, c, n;
 
-	gprintf  ( "Generating unique normals..\n" );
-
 	// Create new vert/normal buffers
 	Vector3DF* vert_buf = (Vector3DF*) malloc ( (9*elemCount) * 2*3*sizeof(float) );	
 	Vector3DF* vert_dest = vert_buf;		

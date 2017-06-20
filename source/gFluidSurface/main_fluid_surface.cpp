@@ -42,6 +42,8 @@ VolumeGVDB	gvdb;
 
 FluidSystem fluid;
 
+//#define USE_CPU_COPY		// by default use data already on GPU (no CPU copy)
+
 struct TPnt {				// offset	size
 	Vector3DF pos;			// 0		12
 	uint	  pnode;		// 12		4
@@ -185,6 +187,13 @@ bool Sample::init()
 	nvprintf ( "Starting Fluid System.\n" );
 	m_numpnts = 500000;
 	m_origin = Vector3DF(450, 100, 450);
+	
+	#ifdef USE_CPU_COPY
+		// Do not assume there is a GPU buffer. Create some.
+		gvdb.AllocData(m_pntpos, m_numpnts, sizeof(Vector3DF), false );
+		gvdb.AllocData(m_pntclr, m_numpnts, sizeof(uint), false);
+	#endif
+
 	fluid.Initialize ();
 	fluid.Start ( m_numpnts );
 
@@ -259,16 +268,20 @@ void Sample::simulate()
 	gvdb.ClearAtlas ();	
 
 	// Insert and splat fluid particles into volume	
+		
+	#ifdef USE_CPU_COPY
+		//-- transfer point data from cpu
+		// common use case: reading data from disk, import from a device
+		gvdb.CommitData ( m_pntpos, m_numpnts, (char*) fluid.getPos(0), 0, sizeof(Vector3DF) );
+		gvdb.CommitData ( m_pntclr, m_numpnts, (char*) fluid.getClr(0), 0, sizeof(uint) );
+	#else 
+		//-- assign data already on gpu
+		// common use case: simulation already on gpu
+		gvdb.SetDataGPU ( m_pntpos, m_numpnts, fluid.getBufferGPU(FPOS), 0, sizeof(Vector3DF) );	
+		gvdb.SetDataGPU ( m_pntclr, m_numpnts, fluid.getBufferGPU(FCLR), 0, sizeof(uint) );		
+	#endif	
 	
-	//-- transfer fluid from cpu
-	//gvdb.CommitData ( m_pntpos, m_numpnts, (char*) fluid.getPos(0), 0, sizeof(Vector3DF) );
-	//gvdb.CommitData ( m_pntclr, m_numpnts, (char*) fluid.getClr(0), 0, sizeof(uint) );
-	
-	//-- use data already on gpu
-	gvdb.SetDataGPU ( m_pntpos, m_numpnts, fluid.getBufferGPU(FPOS), 0, sizeof(Vector3DF) );	
-	gvdb.SetDataGPU ( m_pntclr, m_numpnts, fluid.getBufferGPU(FCLR), 0, sizeof(uint) );
-	gvdb.SetPoints ( m_pntpos, m_use_color ? m_pntclr : DataPtr() );
-	
+	gvdb.SetPoints(m_pntpos, m_use_color ? m_pntclr : DataPtr());
 
 	if ( m_surface == 0 ) {
 		// Scatter & Smooth
@@ -281,7 +294,7 @@ void Sample::simulate()
 	} else {
 		// Gather
 		gvdb.InsertPoints ( m_numpnts, m_origin, true );			// true = prefix sum into node bins
-		gvdb.GatherPointDensity ( m_numpnts, 2.0, 0 );
+		gvdb.GatherPointDensity ( m_numpnts, 5.0, 0 );
 		gvdb.UpdateApron ();
 	}
 

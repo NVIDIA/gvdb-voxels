@@ -74,8 +74,6 @@ bool OBJReader::isMyFile( const char* filename )
 
 bool OBJReader::LoadFile ( Model* model, char *filename, char** searchPaths, int numPaths )
 {
-	gprintf ("Loading and parsing model '%s'...\n", filename);
-
 	ParseFile ( filename, searchPaths, numPaths );
 
 	// For clarity (later), we have a pointer to the Read_???_Token() method we will
@@ -185,7 +183,7 @@ bool OBJReader::LoadFile ( Model* model, char *filename, char** searchPaths, int
 	//	m_vertArr->EnableAttribute( IGLU_ATTRIB_NORMAL, 3, GL_FLOAT, m_vertStride, BUFFER_OFFSET(m_normOff));
 	//}
 
-	gprintf ( " Model reading completed successfully! (%d verts, %d tris)\n", m_numVertices, m_numTris );
+	// gprintf( " Model reading completed successfully! (%d verts, %d tris)\n", m_numVertices, m_numTris );
 
 	return true;
 }
@@ -437,7 +435,7 @@ void OBJReader::GetCompactArrayBuffer( Model* model )
 	m_vertStride = numComponents * sizeof( float );
 	m_vertOff    = 0 * sizeof( float );
 	m_normOff    = (m_hasNormals||m_guessNorms? 3 : 0) * sizeof( float );
-	gprintf ("    (*) Stride: %d, Offsets: v %d, m %d, o %d, n %d t %d\n", m_vertStride, m_vertOff, 0, 0, m_normOff, 0);
+	// gprintf ("    (*) Stride: %d, Offsets: v %d, m %d, o %d, n %d t %d\n", m_vertStride, m_vertOff, 0, 0, m_normOff, 0);
 
 	// Add a vertex buffer to the model
 	if ( model->vertBuffer != 0x0 )		free ( model->vertBuffer );
