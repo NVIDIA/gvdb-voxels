@@ -41,7 +41,7 @@ The library and each sample is built separately, using cmake.
 	- gInteractiveOptiX - Interactive rendering of a volume and a polygonal model, with poly-to-poly and poly-to-voxel interactions.
 	- g3DPrint          - Demonstrates generating cross section slices for 3D printing from a polygonal model
 	- gSprayDeposit     - Demostrates simulated spray deposition onto a 3D part
-	- gFluidSim         - Demostrates a dynamic simulation with surface rendering by GVDB
+	- gFluidSurface     - Demostrates a dynamic simulation with surface rendering by GVDB (also point clouds from CPU)
         - gJetsonTX         - Simple 3D Printing Driver for the JetsonTX1/2 with volume slicing on Tegra chip
    - GVDB VBX File Specfication
    - GVDB Sample Descriptions
