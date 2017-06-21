@@ -43,6 +43,7 @@ The library and each sample is built separately, using cmake.
 	- gSprayDeposit     - Demostrates simulated spray deposition onto a 3D part
 	- gFluidSurface     - Demostrates a dynamic simulation with surface rendering by GVDB (also point clouds from CPU)
         - gJetsonTX         - Simple 3D Printing Driver for the JetsonTX1/2 with volume slicing on Tegra chip
+
    - GVDB VBX File Specfication
    - GVDB Sample Descriptions
    - GVDB Programming Guide
