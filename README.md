@@ -9,6 +9,13 @@ found at:
    http://developer.nvidia.com/gvdb
 
 ## RELEASE NOTES
+9/19/2017, GVDB Voxels, Incremental fix
+- Fixed Depth map integrated raycasting
+- Fixed Resample function
+- New gDepthMap sample, shows how to render OpenGL and GVDB volumes with proper depth integration.
+- New gResample sample, shows how to load a dense RAW file into GVDB as sparse data.
+[RAW data courtesy of the Visible Human (Male), National Library of Medicine, National Institutes of Health, USA]
+
 5/1/2017, GVDB Voxels, Release 1.0 
 Created: Rama Hoetzlein, 2017
 - First public release
