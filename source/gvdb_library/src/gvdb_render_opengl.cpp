@@ -30,6 +30,20 @@ int GLS_SCREENTEX = -1;
 
 #ifdef BUILD_OPENGL
 
+
+	int getShaderID (int i)
+	{
+		switch (i) {
+		case 0:	return GLS_SIMPLE;
+		case 1: return GLS_OUTLINE;
+		case 2: return GLS_SLICE;
+		case 3: return GLS_VOXELIZE;
+		case 4: return GLS_RAYCAST;
+		case 5: return GLS_INSTANCE;
+		case 6: return GLS_SCREENTEX;
+		};
+	}
+
 	void checkGL( char* msg )
 	{
 		GLenum errCode;
@@ -41,7 +55,7 @@ int GLS_SCREENTEX = -1;
 		}
 	}
 
-	void renderAddShaderGL ( Scene* scene, char* vertname, char* fragname )
+	void makeSimpleShader ( Scene* scene, char* vertname, char* fragname )
 	{
 		GLS_SIMPLE = scene->AddShader ( vertname, fragname );
 		scene->AddParam ( GLS_SIMPLE, UVIEW, "uView" );

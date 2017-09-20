@@ -249,7 +249,7 @@ __device__ void raySurfaceBrick ( char shade, int nodeid, float3 t, float3 pos, 
 				float3 voxmin = p * gvdb.vdel[0] +vmin;
 				t = rayBoxIntersect ( pos, dir, voxmin, voxmin + gvdb.voxelsize );		
 				if (t.z == NOHIT) {
-					hit.x = NOHIT;
+					hit.z = NOHIT;
 					continue;
 				}
 				hit = getRayPoint ( pos, dir, t.x );				
@@ -262,7 +262,7 @@ __device__ void raySurfaceBrick ( char shade, int nodeid, float3 t, float3 pos, 
 				t.x = length( (p* gvdb.vdel[0] +vmin) + (gvdb.voxelsize*0.5) - pos);		// find t value at center of voxel								
 				//t.x = SCN_PSTEP * ceil ( t.x / SCN_PSTEP );
 				hit = rayTrilinear ( p, o, pos, dir, vmin, gvdb.vdel[0] );		// p updated here
-				if ( hit.x != NOHIT ) {					
+				if ( hit.z != NOHIT ) {					
 					norm = getGradient ( p+o );					
 					if ( gvdb.clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb.clr_chan, p+o );	
 					return;
@@ -272,7 +272,7 @@ __device__ void raySurfaceBrick ( char shade, int nodeid, float3 t, float3 pos, 
 				t.x = length( (p* gvdb.vdel[0] +vmin) +(gvdb.voxelsize*0.5) - pos);		// find t value at center of voxel											
 				//t.x = PSTEP * ceil ( t.x/PSTEP );
 				hit = rayTricubic ( p, o, pos, dir, vmin, gvdb.vdel[0] );				
-				if ( hit.x != NOHIT ) {					
+				if ( hit.z != NOHIT ) {					
 					//norm = getGradient ( p+o );
 					norm = getGradientTricubic ( hit, o, vmin, make_float3(gvdb.noderange[0])*gvdb.voxelsize/(gvdb.res[0]-1)  );					
 					if ( gvdb.clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb.clr_chan, p+o );					
@@ -306,7 +306,7 @@ __device__ void raySurfaceVoxelBrick ( char shade, int nodeid, float3 t, float3 
 			vmin += p * gvdb.vdel[0];		// voxel location in world
 			t = rayBoxIntersect ( pos, dir, vmin, vmin + gvdb.voxelsize );		
 			if (t.z == NOHIT) {
-				hit.x = NOHIT;
+				hit.z = NOHIT;
 				continue;
 			}
 			hit = getRayPoint ( pos, dir, t.x );				
@@ -401,38 +401,35 @@ __device__ void raySurfaceTricubicBrick ( char shade, int nodeid, float3 t, floa
 
 inline __device__ float getLinearDepth( float* depthBufFloat )
 {
-	// Find x y pixel coordinates
-	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int x = blockIdx.x * blockDim.x + threadIdx.x;					// Pixel coordinates
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
-  
-	// Decode depth from Z-buffer with depth_24_stencil_8
-	float tmpfval = depthBufFloat[(SCN_HEIGHT - 1 - y) * SCN_WIDTH + x];
-	uint tmpival = __float_as_int(tmpfval);
-	tmpival = (tmpival & 0xFFFFFF00) >> 8;
-	float z = __saturatef(static_cast< float >(tmpival) / 16777215.0f);
 
-	/* 
-	// Dont understand why this doesn't work, it is slightly off, had to do a full reprojection below
+	float z = depthBufFloat[(SCN_HEIGHT - 1 - y) * SCN_WIDTH + x];	// Get depth value
 	float n = scn.camnear;
 	float f = scn.camfar;
-	return (-n * f / (f - n)) / (z - (f / (f - n)));
-	*/
-
-	float xx = (float(x + 0.5f) / float(SCN_WIDTH)) * 2.0f - 1.0f;
-	float yy = (float(y + 0.5f) / float(SCN_HEIGHT)) * 2.0f - 1.0f;
-	float zz = (z * 2.0f - 1.0f);
-	float4 p = make_float4(xx, yy, zz, 1.0f);
-	
-	float4 wp;
-#ifdef CUDA_PATHWAY			// Temporary. camivprow does not work w Optix. See SCN_DBUF
-	wp.x = scn.camivprow0.x * p.x + scn.camivprow1.x * p.y + scn.camivprow2.x * p.z + scn.camivprow3.x;
-	wp.y = scn.camivprow0.y * p.x + scn.camivprow1.y * p.y + scn.camivprow2.y * p.z + scn.camivprow3.y;
-	wp.z = scn.camivprow0.z * p.x + scn.camivprow1.z * p.y + scn.camivprow2.z * p.z + scn.camivprow3.z;
-	wp.w = scn.camivprow0.w * p.x + scn.camivprow1.w * p.y + scn.camivprow2.w * p.z + scn.camivprow3.w;
-#endif
-	float3 viewPos = make_float3(wp.x / wp.w, wp.y / wp.w, wp.z / wp.w);
-	return sqrt(viewPos.x * viewPos.x + viewPos.y * viewPos.y + viewPos.z * viewPos.z);
+	return (-n * f / (f - n)) / (z - (f / (f - n)));				// Return linear depth
 }
+
+//----- Decode depth from Z-buffer with depth_24_stencil_8
+/*float tmpfval = depthBufFloat[(SCN_HEIGHT - 1 - y) * SCN_WIDTH + x];
+uint tmpival = __float_as_int(tmpfval);
+tmpival = (tmpival & 0xFFFFFF00) >> 8;
+float z = __saturatef(static_cast< float >(tmpival) / 16777215.0f);*/
+
+//----- Retrieve depth by point reprojection
+/*float xx = (float(x + 0.5f) / float(SCN_WIDTH)) * 2.0f - 1.0f;
+float yy = (float(y + 0.5f) / float(SCN_HEIGHT)) * 2.0f - 1.0f;
+float zz = (z * 2.0f - 1.0f);
+float4 p = make_float4(xx, yy, zz, 1.0f);
+float4 wp;
+// NOTE: camivprow does not work w Optix.
+wp.x = scn.camivprow0.x * p.x + scn.camivprow1.x * p.y + scn.camivprow2.x * p.z + scn.camivprow3.x;
+wp.y = scn.camivprow0.y * p.x + scn.camivprow1.y * p.y + scn.camivprow2.y * p.z + scn.camivprow3.y;
+wp.z = scn.camivprow0.z * p.x + scn.camivprow1.z * p.y + scn.camivprow2.z * p.z + scn.camivprow3.z;
+wp.w = scn.camivprow0.w * p.x + scn.camivprow1.w * p.y + scn.camivprow2.w * p.z + scn.camivprow3.w;
+float3 viewPos = make_float3(wp.x / wp.w, wp.y / wp.w, wp.z / wp.w);
+return sqrt(viewPos.x * viewPos.x + viewPos.y * viewPos.y + viewPos.z * viewPos.z); */
+
 
 // SurfaceDepthBrick - Trace into brick to find surface, with early termination based on depth buffer
 __device__ void raySurfaceDepthBrick ( char shade, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& hclr )
@@ -457,11 +454,11 @@ __device__ void raySurfaceDepthBrick ( char shade, int nodeid, float3 t, float3 
 				float3 voxmin = p * gvdb.vdel[0] +vmin;
 				t = rayBoxIntersect ( pos, dir, voxmin, voxmin + gvdb.voxelsize );		
 				if (t.z == NOHIT) {
-					hit.x = NOHIT;
+					hit.z = NOHIT;
 					continue;
 				}
 				if (t.x > getLinearDepth( SCN_DBUF)) {
-					hit.x = NOHIT;
+					hit.z = NOHIT;
 					return;
 				}
 				hit = getRayPoint ( pos, dir, t.x );				
@@ -474,7 +471,7 @@ __device__ void raySurfaceDepthBrick ( char shade, int nodeid, float3 t, float3 
 				t.x = length( (p* gvdb.vdel[0] +vmin) + (gvdb.voxelsize*0.5) - pos);		// find t value at center of voxel								
 				//t.x = SCN_PSTEP * ceil ( t.x / SCN_PSTEP );
 				hit = rayTrilinear ( p, o, pos, dir, vmin, gvdb.vdel[0] );		// p updated here
-				if ( hit.x != NOHIT ) {					
+				if ( hit.z != NOHIT ) {					
 					norm = getGradient ( p );
 					//norm = getGradient ( o, hit, vmin,  make_float3(gvdb.noderange[0])*gvdb.voxelsize/(gvdb.res[0]-1) );
 					if ( gvdb.clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb.clr_chan, p+o );					
@@ -485,7 +482,7 @@ __device__ void raySurfaceDepthBrick ( char shade, int nodeid, float3 t, float3 
 				t.x = length( (p* gvdb.vdel[0] +vmin) +(gvdb.voxelsize*0.5) - pos);		// find t value at center of voxel											
 				//t.x = PSTEP * ceil ( t.x/PSTEP );
 				hit = rayTricubic ( p, o, pos, dir, vmin, gvdb.vdel[0] );
-				if ( hit.x != NOHIT ) {					
+				if ( hit.z != NOHIT ) {					
 					norm = getGradientTricubic ( p, o, vmin, make_float3(gvdb.noderange[0])*gvdb.voxelsize/(gvdb.res[0]-1)  );
 					if ( gvdb.clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb.clr_chan, p+o );	
 					return;
@@ -517,7 +514,7 @@ __device__ void rayLevelSetBrick ( char shade, int nodeid, float3 t, float3 pos,
 		if ( tex3D ( volTexIn, p.x+o.x+.5, p.y+o.y+.5, p.z+o.z+.5 ) < 0 ) {			// test atlas for zero crossing
 			t.x = length( (p* gvdb.vdel[0] +vmin) +(gvdb.voxelsize*0.5) - pos);		// find t value at center of voxel								
 			hit = rayLevelSet ( t.x, o, pos, dir, vmin, gvdb.vdel[0] );				
-			if ( hit.x != NOHIT ) {
+			if ( hit.z != NOHIT ) {
 				norm = getGradientLevelSet ( o, hit, vmin, make_float3(gvdb.noderange[0])*gvdb.voxelsize/(gvdb.res[0]-1) );
 				return;
 			}
@@ -583,12 +580,20 @@ __device__ void rayDeepBrick ( char shade, int nodeid, float3 t, float3 pos, flo
 		t.x += SCN_PSTEP;
 	}
 	// record front hit point at first significant voxel
-	if ( hit.z == NOHIT ) {
-		hit = make_float3( length( wp - pos ), 0, 0 );
-	}
+	hit.x = length(wp - pos);
 
 	// accumulate remaining voxels
 	for (; clr.w > SCN_ALPHACUT && iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb.res[0] && p.y < gvdb.res[0] && p.z < gvdb.res[0]; iter++) {			
+		
+		// depth buffer test [optional]
+		if (SCN_DBUF != 0x0) {
+			if (t.x > getLinearDepth(SCN_DBUF)) {
+				hit.y = length(wp - pos);
+				hit.z = 0;
+				clr = make_float4(fmin(clr.x, 1.f), fmin(clr.y, 1.f), fmin(clr.z, 1.f), fmax(clr.w, 0.f));
+				return;
+			}
+		}
 		val = transfer ( tex3D ( volTexIn, p.x+o.x, p.y+o.y, p.z+o.z ) );			
 		val.w = exp ( SCN_EXTINCT * val.w * SCN_PSTEP );
 		hclr = (gvdb.clr_chan==CHAN_UNDEF) ? make_float4(1,1,1,1) : getColorF ( gvdb.clr_chan, p+o );
@@ -667,10 +672,11 @@ __device__ void rayCast ( char shade, int lev, int rootid, float3 pos, float3 di
 		// depth buffer test [optional]
 		if ( SCN_DBUF != 0x0 ) {
 			if ( t.x > getLinearDepth ( SCN_DBUF ) ) {
-				hit.x = NOHIT;
+				hit.z = 0;
 				return;
 			}
-		}			
+		}
+
 		// node active test
 		b = (((int(p.z) << gvdb.dim[lev]) + int(p.y)) << gvdb.dim[lev]) + int(p.x);
 		if ( isBitOn ( node, b ) ) {							// check vdb bitmask for voxel occupancy						
@@ -679,7 +685,7 @@ __device__ void rayCast ( char shade, int lev, int rootid, float3 pos, float3 di
 				// gvdbBrickFunc_t ( char shade, int nodeid, float3 t, float3 pos, float3 dir, float3& pstep, float3& hit, float3& norm, float4& clr );
 				(*brickFunc) ( shade, nodeid[0], t, pos, dir, pStep, hit, norm, clr );				
 				if ( clr.w <= 0) {clr.w = 0; return; }			// deep termination
-				if ( hit.x != NOHIT && shade != SHADE_VOLUME ) return;		// surface termination				
+				if ( hit.z != NOHIT ) return;					// surface termination				
 				STEP_DDA										// leaf node empty, step DDA
 			} else {				
 				lev--;											// step down tree
@@ -700,6 +706,5 @@ __device__ void rayCast ( char shade, int lev, int rootid, float3 pos, float3 di
 			}
 		}
 	}
-	hit.x = NOHIT;
 }
 

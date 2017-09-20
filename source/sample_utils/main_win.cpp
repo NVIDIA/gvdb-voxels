@@ -173,6 +173,7 @@ void checkGL( char* msg )
 	if (errCode != GL_NO_ERROR) {
 		nvprintf ( "%s, GL ERROR: 0x%x\n", msg, errCode );
 	}
+	errCode = glGetError();
 }
 
 
@@ -755,23 +756,32 @@ static const char *g_screenquad_vert =
 	"layout(location = 2) in vec3 texcoord;\n"
 	"uniform vec4 uCoords;\n"  
 	"uniform vec2 uScreen;\n"  
-	"out vec3 vtexcoord;\n"	
+	"out vec3 vtc;\n"	
 	"void main() {\n"
-	"   vtexcoord = texcoord*0.5+0.5;\n"
+	"   vtc = texcoord*0.5+0.5;\n"
 	"   gl_Position = vec4( -1.0 + (uCoords.x/uScreen.x) + (vertex.x+1.0f)*(uCoords.z-uCoords.x)/uScreen.x,\n"
 	"                       -1.0 + (uCoords.y/uScreen.y) + (vertex.y+1.0f)*(uCoords.w-uCoords.y)/uScreen.y,\n"
 	"                       0.0f, 1.0f );\n"						    
 	"}\n";
 
-static const char *g_screenquad_frag = 
-	"#version 440\n"	
-	"uniform sampler2D uTex;\n"
-	"in vec3 vtexcoord;\n"
+	static const char *g_screenquad_frag =
+	"#version 440\n"
+	"uniform sampler2D uTex1;\n"
+	"uniform sampler2D uTex2;\n"
+	"uniform int uTexFlags;\n"
+	"in vec3 vtc;\n"
 	"out vec4 outColor;\n"
 	"void main() {\n"
-    "   outColor = vec4( texture ( uTex, vtexcoord.xy).xyz, 1 );\n"	
+	"   vec4 op1 = ((uTexFlags & 0x01)==0) ? texture ( uTex1, vtc.xy) : texture ( uTex1, vec2(vtc.x, 1.0-vtc.y));\n"
+	"   if ( (uTexFlags & 0x02) != 0 ) {\n"
+	"		vec4 op2 = ((uTexFlags & 0x04)==0) ? texture ( uTex2, vtc.xy) : texture ( uTex2, vec2(vtc.x, 1.0-vtc.y));\n"
+	"		outColor = vec4( op1.xyz*(1.0-op2.w) + op2.xyz * op2.w, 1 );\n"
+	"   } else { \n"
+	"		outColor = vec4( op1.xyz, 1 );\n"
+	"   }\n"
 	"}\n";
 
+	// "  outColor = texture(uTex, vtexcoord.xy);\n"
 
 struct nvVertex {
 	nvVertex(float x1, float y1, float z1, float tx1, float ty1, float tz1) { x=x1; y=y1; z=z1; tx=tx1; ty=ty1; tz=tz1; }
@@ -807,7 +817,7 @@ void NVPWindow::initScreenQuadGL ()
 	glCompileShader ( fShader );
 	glGetShaderiv( fShader, GL_COMPILE_STATUS, &status );
 	if (!status) {
-		glGetShaderInfoLog ( vShader, maxLog, &lenLog, log );		
+		glGetShaderInfoLog ( fShader, maxLog, &lenLog, log );		
 		nvprintf ("*** Compile Error in init_screenquad fShader\n"); 
 		nvprintf ("  %s\n", log );				
 	}
@@ -820,10 +830,13 @@ void NVPWindow::initScreenQuadGL ()
 	}
 	checkGL ( "glLinkProgram (init_screenquad)" );
 	
-	// Get texture parameter
-	m_screenquad_utex = glGetUniformLocation ( m_screenquad_prog, "uTex" );
+	// Get texture params
+	m_screenquad_utex1 = glGetUniformLocation (m_screenquad_prog, "uTex1" );
+	m_screenquad_utex2 = glGetUniformLocation (m_screenquad_prog, "uTex2");
+	m_screenquad_utexflags = glGetUniformLocation(m_screenquad_prog, "uTexFlags");
 	m_screenquad_ucoords = glGetUniformLocation ( m_screenquad_prog, "uCoords" );
 	m_screenquad_uscreen = glGetUniformLocation ( m_screenquad_prog, "uScreen" );
+
 
 	// Create a screen-space quad VBO
 	std::vector<nvVertex> verts;
@@ -884,7 +897,17 @@ void NVPWindow::clearScreenGL ()
 	glClear ( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 }
 
-void NVPWindow::renderScreenQuadGL ( int glid, float x1, float y1, float x2, float y2 )
+void NVPWindow::renderScreenQuadGL(int glid, char inv1)
+{
+	renderScreenQuadGL ( glid, -1, (float)0, (float)0, (float)getWidth(), (float)getHeight(), inv1); 
+}
+
+void NVPWindow::compositeScreenQuadGL(int glid1, int glid2, char inv1, char inv2)
+{
+	renderScreenQuadGL( glid1, glid2, (float)0, (float)0, (float)getWidth(), (float)getHeight(), inv1, inv2 );
+}
+
+void NVPWindow::renderScreenQuadGL ( int glid1, int glid2, float x1, float y1, float x2, float y2, char inv1, char inv2 )
 {
 	// Prepare pipeline
 	glDisable ( GL_DEPTH_TEST );
@@ -906,11 +929,24 @@ void NVPWindow::renderScreenQuadGL ( int glid, float x1, float y1, float x2, flo
 	checkGL ( "glBindBuffer" );
 	// Select texture
 	glEnable ( GL_TEXTURE_2D );
-	glProgramUniform1i ( m_screenquad_prog, m_screenquad_utex, 0 );
 	glProgramUniform4f ( m_screenquad_prog, m_screenquad_ucoords, x1, y1, x2, y2 );
 	glProgramUniform2f ( m_screenquad_prog, m_screenquad_uscreen, (float) getWidth(), (float) getHeight() );
+	
 	glActiveTexture ( GL_TEXTURE0 );
-	glBindTexture ( GL_TEXTURE_2D, glid );
+	glBindTexture ( GL_TEXTURE_2D, glid1 );
+	glProgramUniform1i(m_screenquad_prog, m_screenquad_utex1, 0);
+	int flags = 0;
+	if (inv1 > 0) flags |= 1;												// y-invert tex1
+
+	if (glid2 >= 0) {
+		flags |= 2;															// enable tex2 compositing
+		if (inv2 > 0) flags |= 4;											// y-invert tex2
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, glid2);
+		glProgramUniform1i(m_screenquad_prog, m_screenquad_utex2, 1);
+	}
+	glProgramUniform1i(m_screenquad_prog, m_screenquad_utexflags, flags );	
+
 	// Draw
 	glDrawElementsInstanced ( GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1);	
 	checkGL ( "glDraw" );
@@ -918,6 +954,7 @@ void NVPWindow::renderScreenQuadGL ( int glid, float x1, float y1, float x2, flo
 	
 	glDepthMask ( GL_TRUE );
 }
+
 
 bool NVPWindow::create(const char* title, const ContextFlags* cflags, int width, int height)
 {

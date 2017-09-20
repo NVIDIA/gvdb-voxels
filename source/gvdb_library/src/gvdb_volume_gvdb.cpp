@@ -166,6 +166,7 @@ void VolumeGVDB::SetCudaDevice ( int devid )
 	LoadFunction ( FUNC_GATHER_DENSITY,		"gvdbGatherPointDensity",		MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 	LoadFunction ( FUNC_GATHER_VELOCITY,	"gvdbGatherPointVelocity",		MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 	LoadFunction ( FUNC_RESAMPLE,			"gvdbResample",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_DOWNSAMPLE,			"gvdbDownsample",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 
 	LoadFunction ( FUNC_ADD_SUPPORT_VOXEL,	"gvdbAddSupportVoxel",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 	LoadFunction ( FUNC_INSERT_SUPPORT_POINTS, "gvdbInsertSupportPoints",	MODL_PRIMARY, "cuda_gvdb_module.ptx" );
@@ -1981,7 +1982,8 @@ void VolumeGVDB::StartRasterGL ()
 {
 	#ifdef BUILD_OPENGL
 		ValidateOpenGL ();
-		makeVoxelizeShader  ( mScene, "voxelize.vert.glsl", "voxelize.frag.glsl", "voxelize.geom.glsl" );
+		makeSimpleShader ( mScene, "simple.vert.glsl", "simple.frag.glsl");
+		makeVoxelizeShader ( mScene, "voxelize.vert.glsl", "voxelize.frag.glsl", "voxelize.geom.glsl" );
 	#endif
 }
 
@@ -2025,8 +2027,8 @@ Extents VolumeGVDB::ComputeExtents ( int lev, Vector3DF obj_min, Vector3DF obj_m
 	e.vmax = obj_max;
 	e.cover = getCover(lev-1);
 	e.imin = e.vmin / e.cover;							// absolute index-space extents of children
-	e.imax = e.vmax / e.cover + Vector3DI(1,1,1);	
-	e.ires = e.imax; e.ires -= e.imin;	
+	e.imax = (e.vmax / e.cover) - Vector3DI(1,1,1);
+	e.ires = e.imax; e.ires -= e.imin; e.ires += Vector3DI(1, 1, 1);
 	e.icnt = e.ires.x * e.ires.y * e.ires.z;
 	return e;		
 }
@@ -2083,15 +2085,15 @@ void VolumeGVDB::AuxGeometryUnmap ( Model* model, int vertaux, int elemaux )
 }
 
 // Activate a region of space
-int VolumeGVDB::ActivateRegion ( int lev, Extents& e )
+int VolumeGVDB::ActivateRegion ( Extents& e )
 {
 	Vector3DF pos;
 	uint64 leaf;		
 	int cnt = 0;
-	assert ( lev == e.lev-1 );		// make sure extens match desired level
-	for (int z=e.imin.z; z < e.imax.z; z++ )
-		for (int y=e.imin.y; y < e.imax.y; y++ )
-			for (int x=e.imin.x; x < e.imax.x; x++ ) {
+	
+	for (int z=e.imin.z; z <= e.imax.z; z++ )
+		for (int y=e.imin.y; y <= e.imax.y; y++ )
+			for (int x=e.imin.x; x <= e.imax.x; x++ ) {
 				pos.Set(x,y,z); pos *= e.cover;
 				leaf = ActivateSpaceAtLevel ( e.lev-1, pos );
 				cnt++;
@@ -2101,7 +2103,7 @@ int VolumeGVDB::ActivateRegion ( int lev, Extents& e )
 }
 
 // Activate a region of space from an auxiliary byte buffer
-int VolumeGVDB::ActivateRegionFromAux ( Extents& e, int auxid, uchar dt )
+int VolumeGVDB::ActivateRegionFromAux ( Extents& e, int auxid, uchar dt, float vthresh )
 {
 	Vector3DF pos;
 	uint64 leaf;	
@@ -2110,23 +2112,21 @@ int VolumeGVDB::ActivateRegionFromAux ( Extents& e, int auxid, uchar dt )
 	
 	switch (dt) {
 	case T_UCHAR: {
-		for (int z=e.imin.z; z < e.imax.z; z++ )
-			for (int y=e.imin.y; y < e.imax.y; y++ )
-				for (int x=e.imin.x; x < e.imax.x; x++ ) {
-					pos.Set(x,y,z); pos *= e.cover;
-					pos += mVoxsize;
+		for (int z=e.imin.z; z <= e.imax.z; z++ )
+			for (int y=e.imin.y; y <= e.imax.y; y++ )
+				for (int x=e.imin.x; x <= e.imax.x; x++ ) {
+					pos.Set(x,y,z); pos *= e.cover;					
 					uchar vset = *(vdat + ((z-e.imin.z)*e.ires.y + (y-e.imin.y))*e.ires.x + (x-e.imin.x));
-					if ( vset > 0 ) { leaf = ActivateSpaceAtLevel ( e.lev-1, pos ); cnt++; }
+					if ( vset > vthresh ) { leaf = ActivateSpaceAtLevel ( e.lev-1, pos ); cnt++; }
 				}
 		} break;
 	case T_FLOAT: {
-		for (int z=e.imin.z; z < e.imax.z; z++ )
-			for (int y=e.imin.y; y < e.imax.y; y++ )
-				for (int x=e.imin.x; x < e.imax.x; x++ ) {
-					pos.Set(x,y,z); pos *= e.cover;
-					pos += mVoxsize;
+		for (int z=e.imin.z; z <= e.imax.z; z++ )
+			for (int y=e.imin.y; y <= e.imax.y; y++ )
+				for (int x=e.imin.x; x <= e.imax.x; x++ ) {
+					pos.Set(x,y,z); pos *= e.cover;					
 					float vset = *( ((float*) vdat) + ((z-e.imin.z)*e.ires.y + (y-e.imin.y))*e.ires.x + (x-e.imin.x));
-					if ( vset >=0.4 && vset <=0.6 ) {			// note: vset may be #DEN (close to 0)
+					if ( vset > vthresh) {
 						leaf = ActivateSpaceAtLevel ( e.lev-1, pos ); cnt++; 
 					}
 				}
@@ -2134,6 +2134,7 @@ int VolumeGVDB::ActivateRegionFromAux ( Extents& e, int auxid, uchar dt )
 	};
 	return cnt;
 }
+
 
 // Check data returned from GPU
 void VolumeGVDB::CheckData ( std::string msg, CUdeviceptr ptr, int dt, int stride, int cnt )
@@ -2225,7 +2226,7 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, ucha
 	// Voxelize all nodes in bounding box at starting level		
 	int N = 3;
 	Extents e = ComputeExtents ( N, mObjMin, mObjMax );			// start - level N
-	ActivateRegion ( N-1, e );									// activate - level N-1
+	ActivateRegion ( e );									// activate - level N-1
 	PrepareV3D ( Vector3DI(8,8,8), 0 );
 
 	// Voxelize at each level	
@@ -2717,11 +2718,12 @@ void VolumeGVDB::WriteDepthTexGL(int chan, int glid)
 	glBindFramebuffer(GL_FRAMEBUFFER, mDummyFrameBuffer);
 
 	// Setup frame buffer so that we can copy depth info from the depth target bound
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, glid, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, glid, 0);
 
 	// Copy contents of depth target into _depthBuffer for use in CUDA rendering:
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, mRenderBuf[chan].glid);
-	glReadPixels(0, 0, mRenderBuf[chan].stride, mRenderBuf[chan].max / mRenderBuf[chan].stride, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0);
+	//glReadPixels(0, 0, mRenderBuf[chan].stride, mRenderBuf[chan].max / mRenderBuf[chan].stride, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0);
+	glReadPixels(0, 0, mRenderBuf[chan].stride, mRenderBuf[chan].max / mRenderBuf[chan].stride, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 	glCheck();
 
@@ -2946,7 +2948,7 @@ void VolumeGVDB::RenderKernel ( uchar rbuf, CUfunction user_kernel, char shading
 	PrepareVDB ();												
 
 	// Run CUDA User-Kernel
-	Vector3DI block ( 8, 8, 1 );
+	Vector3DI block ( 16, 16, 1 );
 	Vector3DI grid ( int(width/block.x)+1, int(height/block.y)+1, 1);		
 	void* args[1] = { &mRenderBuf[rbuf].gpu };
 	cudaCheck ( cuLaunchKernel ( user_kernel, grid.x, grid.y, 1, block.x, block.y, 1, 0, NULL, args, NULL ), "cuLaunch(user)", "RenderKernel" );
@@ -2973,7 +2975,7 @@ void VolumeGVDB::Render ( uchar rbuf, char shading, char filtering, int frame, i
 	PrepareVDB ();												
 
 	// Prepare kernel
-	Vector3DI block ( 8, 8, 1);
+	Vector3DI block ( 16, 16, 1);
 	Vector3DI grid ( int(width/block.x)+1, int(height/block.y)+1, 1);		
 	void* args[1] = { &mRenderBuf[rbuf].gpu };
 	int kern;
@@ -2987,7 +2989,6 @@ void VolumeGVDB::Render ( uchar rbuf, char shading, char filtering, int frame, i
 	case SHADE_LEVELSET:	kern = FUNC_RAYLEVELSET;	break;
 	case SHADE_VOLUME:		kern = FUNC_RAYDEEP;		break;
 	}
-	if (mScnInfo.dbuf != NULL) kern = FUNC_RAYSURFACE_DEPTH;
 	
 	// Run Raytracing kernel
 	cudaCheck ( cuLaunchKernel ( cuFunc[kern], grid.x, grid.y, 1, block.x, block.y, 1, 0, NULL, args, NULL ), "cuRaycast", "Render" );
@@ -3112,6 +3113,32 @@ void VolumeGVDB::Compute ( int effect, uchar chan, int iter, Vector3DF parm, boo
 	}
 		
 	if ( mbProfile ) PERF_POP();
+}
+
+void VolumeGVDB::ActiveRegionSparse(Extents& e, float* srcbuf)
+{
+	ActivateRegionFromAux(e, AUX_VOXELIZE, T_FLOAT);
+}
+
+
+void VolumeGVDB::DownsampleCPU(Matrix4F xform, Vector3DI in_res, char in_aux, Vector3DI out_res, Vector3DF out_max, char out_aux, Vector3DF inr, Vector3DF outr)
+{
+	PrepareAux(out_aux, out_res.x*out_res.y*out_res.z, sizeof(float), true, true);
+	
+	// Determine grid and block dims
+	Vector3DI block(8, 8, 8);	
+	Vector3DI grid(int(out_res.x / block.x) + 1, int(out_res.y / block.y) + 1, int(out_res.z / block.z) + 1);
+	
+	// Send transform matrix to cuda
+	PrepareAux(AUX_MATRIX4F, 16, sizeof(float), true, true);
+	memcpy(mAux[AUX_MATRIX4F].cpu, xform.GetDataF(), 16 * sizeof(float));
+	CommitData(mAux[AUX_MATRIX4F]);
+
+	void* args[8] = { &in_res, &mAux[in_aux].gpu, &out_res, &out_max, &mAux[out_aux].gpu, &mAux[AUX_MATRIX4F].gpu, &inr, &outr };
+	cudaCheck(cuLaunchKernel(cuFunc[FUNC_DOWNSAMPLE], grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL), "cuLaunch(Downsample)", "DownsampleCPU");
+	
+	// Retrieve data back to CPU
+	RetrieveData( mAux[out_aux] );
 }
 
 void VolumeGVDB::Resample ( uchar chan, Matrix4F xform, Vector3DI in_res, char in_aux, Vector3DF inr, Vector3DF outr )

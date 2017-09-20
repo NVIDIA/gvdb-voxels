@@ -258,6 +258,45 @@ extern "C" __global__ void gvdbResample ( int3 res, uchar chan, int3 srcres, flo
 	surf3Dwrite ( v, volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
 }
 
+
+extern "C" __global__ void gvdbDownsample( int3 srcres, float* src, int3 destres, float3 destmax, float* dest, float* xform, float3 inr, float3 outr)
+{
+	uint3 vox = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;
+	if (vox.x >= destres.x || vox.y >= destres.y || vox.z >= destres.z) return;
+
+	float3 dmin, dmax;
+	dmin = make_float3(vox) * destmax / make_float3(destres);
+	dmax = (make_float3(vox.x + 1, vox.y + 1, vox.z + 1) * destmax / make_float3(destres)) - make_float3(1, 1, 1);
+
+	// transform to src index
+	int3 smin, smax;
+	smin.x = (int)(dmin.x * xform[0] + dmin.y * xform[4] + dmin.z * xform[8] + xform[12]);
+	smin.y = (int)(dmin.x * xform[1] + dmin.y * xform[5] + dmin.z * xform[9] + xform[13]);
+	smin.z = (int)(dmin.x * xform[2] + dmin.y * xform[6] + dmin.z * xform[10] + xform[14]);
+	smax.x = (int)(dmax.x * xform[0] + dmax.y * xform[4] + dmax.z * xform[8] + xform[12]);
+	smax.y = (int)(dmax.x * xform[1] + dmax.y * xform[5] + dmax.z * xform[9] + xform[13]);
+	smax.z = (int)(dmax.x * xform[2] + dmax.y * xform[6] + dmax.z * xform[10] + xform[14]);
+
+	smin.x = (smin.x < 0) ? 0 : ((smin.x > srcres.x-1) ? srcres.x - 1 : smin.x);
+	smin.y = (smin.y < 0) ? 0 : ((smin.y > srcres.y - 1) ? srcres.y - 1 : smin.y);
+	smin.z = (smin.z < 0) ? 0 : ((smin.z > srcres.z - 1) ? srcres.z - 1 : smin.z);
+	smax.x = (smax.x < smin.x) ? smin.x : ((smax.x > srcres.x - 1) ? srcres.x - 1 : smax.x);
+	smax.y = (smax.y < smin.y) ? smin.y : ((smax.y > srcres.y - 1) ? srcres.y - 1 : smax.y);
+	smax.z = (smax.z < smin.z) ? smin.z : ((smax.z > srcres.z - 1) ? srcres.z - 1 : smax.z);
+
+	// downsample
+	float v = 0;
+	for (int z=smin.z; z <= smax.z; z++)
+		for (int y = smin.y; y <= smax.y; y++)
+			for (int x = smin.x; x <= smax.x; x++) {				
+				v += outr.x + (src[(z*srcres.y + y)*srcres.x + x] - inr.x)*(outr.y - outr.x) / (inr.y - inr.x);    
+			}
+	v /= (smax.x - smin.x+1)*(smax.y - smin.y+1)*(smax.z - smin.z+1);
+	
+	// output value
+	dest[(vox.z*destres.y + vox.y)*destres.x + vox.x] = v;
+}
+
 extern "C" __global__ void gvdbOpFillF  ( int3 res, uchar chan, float p1, float p2, float p3 )
 {
 	GVDB_VOX	

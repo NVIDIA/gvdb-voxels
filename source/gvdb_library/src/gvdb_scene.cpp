@@ -336,8 +336,8 @@ int	Scene::AddParam ( int prog, int id, char* name )
 	int ndx = glGetProgramResourceIndex ( prog, GL_UNIFORM, name );	
 	int slot = getSlot ( prog );
 	if ( slot == -1 || ndx == -1 ) {
-		gprintf ( "ERROR: Unable to access %s in %s. Active uniforms = %d\n", name, mLastShader.c_str(), active );
-		gerror ();
+		gprintf ( "WARNING: Unable to access %s in %s. Active uniforms = %d\n", name, mLastShader.c_str(), active );
+		return -1;
 	}
 	mParams[slot].p[id] = ndx;
 	return ndx;

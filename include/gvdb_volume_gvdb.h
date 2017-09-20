@@ -160,6 +160,7 @@
 	#define FUNC_RESAMPLE			61
 	#define FUNC_ADD_SUPPORT_VOXEL	62
 	#define FUNC_INSERT_SUPPORT_POINTS  63
+	#define FUNC_DOWNSAMPLE			64
 
 	#define FUNC_UPDATEAPRON_F		100		// apron updates
 	#define FUNC_UPDATEAPRON_F3		101
@@ -205,6 +206,7 @@
 	#define AUX_PNTDIR				16
 	#define AUX_DATA3D				17
 	#define AUX_MATRIX4F			18
+	#define AUX_DOWNSAMPLED			19
 
 	#define MAX_AUX					64
 		
@@ -254,6 +256,7 @@
 			void Compute ( int effect, uchar chan, int iter, Vector3DF parm, bool bUpdateApron );
 			void ComputeKernel ( CUmodule user_module, CUfunction user_kernel, uchar chan, bool bUpdateApron );
 			void Resample ( uchar chan, Matrix4F xform, Vector3DI in_res, char in_aux, Vector3DF inr, Vector3DF outr );			
+			void DownsampleCPU(Matrix4F xform, Vector3DI in_res, char in_aux, Vector3DI out_res, Vector3DF out_max, char out_aux, Vector3DF inr, Vector3DF outr);
 			
 			// File I/O
 			bool LoadBRK ( std::string fname );
@@ -325,8 +328,9 @@
 			Extents ComputeExtents ( int lev, Vector3DF obj_min, Vector3DF obj_max );			
 			void SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, uchar val_surf, uchar val_inside );
 			int VoxelizeNode ( Node* node, uchar chan, Matrix4F* xform, float bdiv, uchar val_surf, uchar val_inside );
-			int ActivateRegion ( int lev, Extents& e );
-			int ActivateRegionFromAux ( Extents& e, int auxid, uchar dt );
+			int ActivateRegion ( Extents& e );
+			int ActivateRegionFromAux ( Extents& e, int auxid, uchar dt, float vthresh=0.0f );
+			void ActiveRegionSparse(Extents& s, float* srcbuf);
 			void SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform );   // OpenGL voxelize
 			void AuxGeometryMap ( Model* model, int vertaux, int elemaux );
 			void AuxGeometryUnmap ( Model* model, int vertaux, int elemaux );
@@ -359,6 +363,7 @@
 			void InsertPoints ( int num_pnts, Vector3DF trans, bool bPrefix=false );		
 			void ScatterPointDensity ( int num_pnts, float radius, float amp, Vector3DF trans, bool expand = true, bool avgColor = false );			
 			void GatherPointDensity ( int num_pnts, float radius, int chan );
+
 			Vector3DI InsertTriangles ( Model* model, Matrix4F* xform, float& ydiv );
 
 			// Kui
@@ -402,6 +407,7 @@
 			}
 			Vector3DI getRes3DI(int lv)	{ int r = (1 << mLogDim[lv]); return Vector3DI(r,r,r); }
 			Vector3DF getClrDim(int lv) { return mClrDim[lv]; }
+			DataPtr& getAux(int id) { return mAux[id];  }
 
 			void verbosef(const char * fmt, ...) {
 				if (!mbVerbose) return;			// check if verbose

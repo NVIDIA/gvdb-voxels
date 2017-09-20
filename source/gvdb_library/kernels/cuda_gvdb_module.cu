@@ -1,3 +1,4 @@
+
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
 // Copyright 2017, NVIDIA Corporation. 
@@ -79,23 +80,21 @@ extern "C" __global__ void gvdbRayDeep ( uchar4* outBuf )
 	if ( x >= scn.width || y >= scn.height ) return;
 
 	float4 clr = make_float4(0,0,0,1);
-	float3 hit = make_float3(NOHIT,NOHIT,NOHIT);
+	float3 hit = make_float3(0,0, NOHIT);
 	float3 norm;
 	float3 rdir = getViewRay(float(x + 0.5f) / float(scn.width), float(y + 0.5f) / float(scn.height));
 
 	// ray deep sampling	
 	rayCast ( SHADE_VOLUME, gvdb.top_lev, 0, scn.campos, rdir, hit, norm, clr, rayDeepBrick );
-	if ( hit.z != NOHIT) 
-		clr = lerp4 ( SCN_BACKCLR, clr, 1.0-clr.w );	// final color
-	else
-		clr = SCN_BACKCLR;
+	clr = lerp4 ( SCN_BACKCLR, clr, 1.0-clr.w );	// final color
 	
-	outBuf [ y*scn.width + x ] = make_uchar4( clr.x*255, clr.y*255, clr.z*255, 255 );	
+	outBuf [ y*scn.width + x ] = make_uchar4( clr.x*255, clr.y*255, clr.z*255, (1.0-clr.w)*255 );	
 }
 
 
 
 // Render the volume data by raycasting
+
 extern "C" __global__ void gvdbRaySurfaceVoxel ( uchar4* outBuf )
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -179,7 +178,7 @@ extern "C" __global__ void gvdbRaySurfaceDepth ( uchar4* outBuf )
 	} else {		
 		clr = SCN_BACKCLR;					// background color
 	}
-	
+
 	outBuf[y*scn.width + x] = make_uchar4(clr.x*255, clr.y*255, clr.z*255, clr.w*255 );
 }
 
@@ -190,7 +189,7 @@ extern "C" __global__ void gvdbRayLevelSet ( uchar4* outBuf )
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 	if ( x >= scn.width || y >= scn.height ) return;
 	
-	float3 hit = make_float3(NOHIT,1,1);	
+	float3 hit = make_float3(NOHIT, NOHIT, NOHIT);
 	float4 clr = make_float4(1,1,1,1);
 	float3 norm;
 	float3 rdir = getViewRay(float(x + 0.5f) / float(scn.width), float(y + 0.5f) / float(scn.height));
@@ -198,7 +197,7 @@ extern "C" __global__ void gvdbRayLevelSet ( uchar4* outBuf )
 	// Raycast Level Set
 	rayCast ( 0, gvdb.top_lev, 0, scn.campos, rdir, hit, norm, clr, rayLevelSetBrick );
 
-	if ( hit.x != NOHIT) {		
+	if ( hit.z != NOHIT) {		
 		float3 lightdir = normalize ( scn.light_pos - hit );
 
 		// shading		
