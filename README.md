@@ -14,7 +14,7 @@ found at:
 - Fixed Resample function
 - New gDepthMap sample, shows how to render OpenGL and GVDB volumes with proper depth integration.
 - New gResample sample, shows how to load a dense RAW file into GVDB as sparse data.
-- RAW data courtesy of the Visible Human (Male), National Library of Medicine, National Institutes of Health, USA
+- RAW data courtesy of the [Visible Human Project, National Library of Medicine, National Institutes of Health, USA](https://www.nlm.nih.gov/research/visible/getting_data.html)
 
 5/1/2017, GVDB Voxels, Release 1.0 
 Created: Rama Hoetzlein, 2017
