@@ -21,6 +21,7 @@ public:
 
 	void	prepare_depth(int w, int h);
 	void	render_depth(int w, int h);
+	void	update_camera_gl();
 
 	int		mFBO;				// Framebuffer object
 	int		mDepthInputID;		// GVDB render buffer being used for depth input
@@ -30,6 +31,7 @@ public:
 	int     m_gvdb_tex;			// Texture holding GL color /w alpha for GVDB volume 
 
 	int		mouse_down;
+	bool	m_use_opengl_cam;
 };
 
 
@@ -41,6 +43,7 @@ bool Sample::init()
 	m_polys_tex = -1;
 	m_gvdb_tex = -1;
 	mouse_down = -1;
+	m_use_opengl_cam = true;
 
 	// Initialize GVDB
 	int devid = -1;
@@ -150,6 +153,56 @@ void Sample::prepare_depth(int w, int h )
 	checkGL("prepare_depth");
 }
 
+
+void Sample::update_camera_gl ()
+{
+	// Manually setup an OpenGL camera
+	// - Normally, GVDB will automatically use the camera specified by gvdb.getScene()->SetCamera.
+	// - This code demonstrates use of an OpenGL camera with GVDB. 
+	// - Here, the Camera3D is only used to hold camera position and target.
+	// - The matrices are created by OpenGL, then loaded into the GVDB camera.
+	// - *Note* This introduces a pipeline stall as it performs readback from OpenGL of the matrices to CPU.
+	//   Better way is to explicitly construct the matrices and then send to GVDB camera.
+		
+	Camera3D* cam = gvdb.getScene()->getCamera();
+	Vector3DF pos = cam->getPos();	
+	double znear = 0.1;
+	double zfar = 5000.0;
+	double fov = 50.0;
+	double aspect = 1.3333333333333;
+	GLfloat proj_mtx[16];
+	GLfloat view_mtx[16];
+	GLfloat invmodel_mtx[16];
+
+	// construct & read back projection matrix 
+	glMatrixMode ( GL_PROJECTION );
+	glLoadIdentity();
+	double xmax = 0.5f * znear * tan( fov * DEGtoRAD/2.0f );
+	glFrustum( -xmax, xmax, -xmax/aspect, xmax/aspect, znear, zfar );	
+	glGetFloatv ( GL_PROJECTION_MATRIX, proj_mtx );    // (introduces pipeline stall)	
+	
+	// construct & read back modelview matrix 
+	Matrix4F rotation;
+	Vector3DF side, up, dir;
+	dir = cam->getToPos(); dir -= cam->getPos(); dir.Normalize();		// direction vector
+	side = dir; side.Cross ( Vector3DF(0,1,0) ); side.Normalize();		// side vector
+	up = side; up.Cross ( dir ); up.Normalize(); dir *= -1;				// up vector
+	rotation.Basis ( side, up, dir );									// create a viewing matrix 
+
+	glMatrixMode ( GL_MODELVIEW );
+	glLoadIdentity ();
+	glMultMatrixf ( rotation.GetDataF() );	
+	glTranslatef ( -pos.x, -pos.y, -pos.z );
+	glGetFloatv ( GL_MODELVIEW_MATRIX, view_mtx );		// (introduces pipeline stall)
+
+	// volume position
+	Vector3DF vol_pos ( 0, 0, 0 );
+
+	// Assign OpenGL matrices to GVDB camera
+	cam->setMatrices ( view_mtx, proj_mtx, vol_pos );
+}
+
+
 void Sample::render_depth (int w, int h)
 {
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);		
@@ -209,6 +262,9 @@ void Sample::reshape (int w, int h)
 void Sample::display() 
 {
 	int w = getWidth(), h = getHeight();			// window width & height
+
+	if ( m_use_opengl_cam )
+		update_camera_gl ();				// Use OpenGL camera matrices
 
 	render_depth(w, h);
 	

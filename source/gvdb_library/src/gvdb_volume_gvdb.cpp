@@ -2905,10 +2905,10 @@ void VolumeGVDB::PrepareRender ( int w, int h, char shading, char filtering, int
 	mScnInfo.height		= h;				
 	mScnInfo.camnear	= cam->getNear ();
 	mScnInfo.camfar 	= cam->getFar();
-	mScnInfo.campos		= cam->getPos();
-  mScnInfo.cams = cam->tlRayWorld;
-  mScnInfo.camu = cam->trRayWorld; mScnInfo.camu -= mScnInfo.cams;
-  mScnInfo.camv = cam->blRayWorld; mScnInfo.camv -= mScnInfo.cams;
+	mScnInfo.campos		= cam->origRayWorld;
+	mScnInfo.cams		= cam->tlRayWorld;
+	mScnInfo.camu		= cam->trRayWorld; mScnInfo.camu -= mScnInfo.cams;
+	mScnInfo.camv		= cam->blRayWorld; mScnInfo.camv -= mScnInfo.cams;
 	mScnInfo.camivprow0 = cam->invviewproj_matrix.GetRowVec(0);
 	mScnInfo.camivprow1 = cam->invviewproj_matrix.GetRowVec(1);
 	mScnInfo.camivprow2 = cam->invviewproj_matrix.GetRowVec(2);

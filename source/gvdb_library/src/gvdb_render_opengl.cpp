@@ -42,6 +42,7 @@ int GLS_SCREENTEX = -1;
 		case 5: return GLS_INSTANCE;
 		case 6: return GLS_SCREENTEX;
 		};
+		return -1;
 	}
 
 	void checkGL( char* msg )

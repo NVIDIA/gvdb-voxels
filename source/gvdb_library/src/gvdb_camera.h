@@ -105,7 +105,7 @@ using namespace nvdb;
 		void setModelMatrix ( float* mtx );
 		void setViewMatrix ( float* mtx, float* invmtx );
 		void setProjMatrix ( float* mtx, float* invmtx );
-		void setMatrices ( const float* view_mtx, const float* proj_mtx );
+		void setMatrices (const float* view_mtx, const float* proj_mtx, Vector3DF model_pos );
 		
 		// Camera motion
 		void setOrbit  ( float ax, float ay, float az, Vector3DF tp, float dist, float dolly );
@@ -180,6 +180,7 @@ using namespace nvdb;
 		bool			mOps[8];
 		int				mWire;
 				
+		Vector3DF	origRayWorld;
 		Vector4DF   tlRayWorld;
     	Vector4DF   trRayWorld;
     	Vector4DF   blRayWorld;
