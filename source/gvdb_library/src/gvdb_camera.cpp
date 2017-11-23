@@ -507,7 +507,8 @@ void Camera3D::setMatrices(const float* view_mtx, const float* proj_mtx, Vector3
 	Vector3DF from ( tmp(0,3), tmp(1,3), tmp(2,3) );
 
 	// Construct inverse matrices
-	invrot_matrix.InverseView ( view_matrix.GetDataF(), Vector3DF(0,0,0) );		// Computed using rule: "Inverse of a basis rotation matrix is its transpose." (So long as translation is taken out)
+    Vector3DF zero(0, 0, 0);
+	invrot_matrix.InverseView ( view_matrix.GetDataF(), zero );		// Computed using rule: "Inverse of a basis rotation matrix is its transpose." (So long as translation is taken out)
 	invproj_matrix.InverseProj ( tileproj_matrix.GetDataF() );		
 
 	Matrix4F view_matrix_notranslation = view_matrix;
