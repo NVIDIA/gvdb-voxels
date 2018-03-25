@@ -9,79 +9,51 @@ Message(STATUS "-------------------------------")
 Message(STATUS "Processing Project ${PROJNAME}:")
 
 #####################################################################################
-# offer the choice of having shared_sources as a sub-folder... good for packaging a sample
-#
-# if BASE_DIRECTORY not defined, it means this cmake file was called as the first entry point and not included
+# Included Cmakes
 
 if(NOT BASE_DIRECTORY)
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-    Message(STATUS "found sub-folder cmake")
-    SET(BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-    INCLUDE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeLists_include.txt)    
-  elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake)
-    SET(BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..)
-    INCLUDE(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/CMakeLists_include.txt)    
-  else()
-    SET(BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
-    INCLUDE(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/CMakeLists_include.txt)    
-  endif()
+  SET(BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
-
-include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/src")    
-
 include ( "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Helpers.cmake" )    
+include ( "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Packages.cmake" )  
+include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/src")    
 
 _add_project_definitions(${PROJNAME})
 
 #####################################################################################
-# Find CUDA
-
-find_package(CUDA)
-
-if ( CUDA_FOUND )
-    message( STATUS "--> Using package CUDA (ver ${CUDA_VERSION})") 
-    add_definitions(-DUSECUDA)    
-    include_directories(${CUDA_TOOLKIT_INCLUDE})
-    LIST(APPEND LIBRARIES_OPTIMIZED ${CUDA_CUDA_LIBRARY} ${CUDA_CUDART_LIBRARY} )
-    LIST(APPEND LIBRARIES_DEBUG ${CUDA_CUDA_LIBRARY} ${CUDA_CUDART_LIBRARY} )
-    LIST(APPEND PACKAGE_SOURCE_FILES ${CUDA_TOOLKIT_INCLUDE} )    
-    source_group(CUDA FILES ${CUDA_TOOLKIT_INCLUDE} ) 
-else()
-	message ( FATAL_ERROR "---> Unable to find package CUDA")
+# GVDB Options
+#
+set ( USE_BITMASKS OFF CACHE BOOL "Use Bitmasks" )
+if ( USE_BITMASKS ) 
+   add_definitions(-DUSE_BITMASKS)
 endif()
 
+set ( USE_SIMULATION OFF CACHE BOOL "Use GVDB 2.0 Simulation" )
+if ( USE_SIMULATION ) 
+   add_definitions(-DSIM_CODE)
+endif()
+
+set ( USE_OPENVDB OFF CACHE BOOL "Use OpenVDB" FORCE)
+
+set ( USE_NVTX OFF CACHE BOOL "Use NSIGHT Markers" )
+if ( USE_NVTX ) 
+   add_definitions(-DUSE_NVTX)
+endif()
 
 #####################################################################################
-# Find OPENVDB Library (optional)
+# Add CUDA
 #
+_add_package_CUDA()
 
-if ( NOT DEFINED USE_OPENVDB )	  
-	SET(USE_OPENVDB OFF CACHE BOOL "Use OpenVDB" FORCE) 
-endif ()
+#####################################################################################
+# Add CUDPP Library
+#
+_add_package_CUDPP()
 
-_add_package_OpenVDB ()
-
-if ( OPENVDB_FOUND )
-
-	if ( USE_OPENVDB ) 
-		#---- Add OpenVDB to project build flags   
-		add_definitions(-DBUILD_OPENVDB)	 
-		add_definitions(-DOPENVDB_STATICLIB)
-		add_definitions(-DOPENVDB_USE_BLOSC)
-   
-		#---- Include paths to headers & library that OpenVDB depends on (comes with)
-		message ( STATUS "Adding OpenVDB includes: ${OPENVDB_INCLUDE_DIR}" )
-		include_directories ("${OPENVDB_INCLUDE_DIR}")
-		include_directories ("${OPENVDB_INCLUDE_DIR}/IlmBase")
-		include_directories ("${OPENVDB_INCLUDE_DIR}/tbb")         
-
-		# add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)   
-	
-	endif ()
-else ()
-   SET(USE_OPENVDB OFF CACHE BOOL "Use OpenVDB") 
-endif()
-
+#####################################################################################
+# Add OPENVDB Library (optional)
+#
+_add_package_OpenVDB()
  
 #####################################################################################
 # Source files for this project
@@ -89,10 +61,9 @@ endif()
 file(GLOB SOURCE_FILES src/*.cpp src/*.hpp src/*.inl src/*.h src/*.c)
 
 #####################################################################################
-# additional files for tools/helpers
+# Additional files for tools/helpers
 #
-SET(COMMON_SOURCE_FILES ${GLEW_SOURCE}
-)
+SET(COMMON_SOURCE_FILES ${GLEW_SOURCE} )
 
 #####################################################################################
 # Library paths
@@ -100,8 +71,8 @@ SET(COMMON_SOURCE_FILES ${GLEW_SOURCE}
 # CMAKE_INSTALL_PREFIX -- path where library will be installed to
 
 if ( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
-   if (WIN32)
-      get_filename_component ( _instpath "${CMAKE_CURRENT_SOURCE_DIR}/../.." REALPATH )
+   if ( WIN32 )
+      get_filename_component ( _instpath "${CMAKE_CURRENT_SOURCE_DIR}/../../_output" REALPATH )
    else()
       get_filename_component ( _instpath "/usr/local/gvdb" REALPATH )
    endif()
@@ -126,7 +97,7 @@ if ( NOT DEFINED CUDA_ARCH )
    SET( CUDA_CODE "sm_30" CACHE STRING "CUDA Code target")
 endif ()
 
-_COMPILEPTX ( SOURCES ${CUDA_FILES} TARGET_PATH ${LIB_OUTPUT_PATH} GENERATED PTX_FILES INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/kernels" OPTIONS -arch=${CUDA_ARCH} -code=${CUDA_CODE} --ptxas-options=-v -O3 --use_fast_math --maxrregcount=64 )
+_COMPILEPTX ( SOURCES ${CUDA_FILES} TARGET_PATH ${LIB_OUTPUT_PATH} GENERATED CUDA_PTX GENPATHS CUDA_PTX_PATHS INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/kernels" OPTIONS -DSIM_CODE -arch=${CUDA_ARCH} -code=${CUDA_CODE} --ptxas-options=-v -O3 --use_fast_math --maxrregcount=64 )
 
 #####################################################################################
 # Executable
@@ -138,7 +109,6 @@ list( APPEND ALL_SOURCE_FILES ${PACKAGE_SOURCE_FILES} )
 
 # Definitions
 add_definitions(-DGVDB_EXPORTS)					# Export dll symbols
-
 
 # Set the library type
 OPTION (BUILD_SHARED_LIBS "Build Shared Libraries" ON)
@@ -176,85 +146,52 @@ message ( STATUS "Share:   ${SHARE_PATH}" )
 #####################################################################################
 # Linkage
 #
-set_property(GLOBAL PROPERTY DEBUG_CONFIGURATIONS Debug) 
-
-foreach (loop_var IN ITEMS ${LIBRARIES_OPTIMIZED} )   
-   target_link_libraries ( ${PROJNAME} optimized ${loop_var} )
-endforeach()
-
-foreach (loop_var IN ITEMS ${LIBRARIES_DEBUG} )
-   target_link_libraries ( ${PROJNAME} debug ${loop_var} )
-endforeach()
-
-target_link_libraries( ${PROJNAME} general ${PLATFORM_LIBRARIES} )
-
-string (REPLACE ";" "\n   " OUTSTR "${LIBRARIES_DEBUG}")
-message ( STATUS "Libraries used:\n  ${OUTSTR}" )
+_LINK ( PROJECT ${PROJNAME} OPT ${LIBRARIES_OPTIMIZED} DEBUG ${LIBRARIES_DEBUG} PLATFORM ${PLATFORM_LIBRARIES} )
 
 ################################################################
-# Install Library
+# Windows specific
 #
-#--- Install public headers
+if ( WIN32 )    
+	# instruct CMake to automatically build INSTALL project in Visual Studio 
+	set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
+	# generate an import library
+	set ( GVDB_LINK_FLAGS "/implib:${LIB_OUTPUT_PATH}/$(Configuration)/libgvdb.lib" )
+	set_target_properties ( ${PROJNAME} PROPERTIES LINK_FLAGS "${GVDB_LINK_FLAGS}" )
+	message ( STATUS "Import Library: ${GVDB_LINK_FLAGS}" )  
+	# visual studio source groups
+	source_group(common FILES 
+		${COMMON_SOURCE_FILES}  
+	)
+	source_group(CUDA FILES 
+		${CUDA_FILES}
+	)
+	source_group(PTX FILES 
+		${PTX_FILES}
+	)
+endif()
+
+################################################################
+# Install Binaries, Shaders and PTX
+#
+if ( USE_OPENVDB ) 
+    package_openvdb_binaries()
+   _INSTALL ( FILES ${OPENVDB_BINARIES} SOURCE ${OPENVDB_LIB_DIR} DESTINATION ${EXECUTABLE_OUTPUT_PATH} OUTPUT INSTALL_LIST  )
+endif()
+file( GLOB SHADERS shaders/*.glsl)
 file( GLOB HEADER_FILES src/*.h )
 file( GLOB CUH_FILES kernels/*.cuh )
-_INSTALL ( FILES ${HEADER_FILES} DESTINATION ${INCLUDE_PATH} )   
-_INSTALL ( FILES ${CUH_FILES} DESTINATION ${INCLUDE_PATH} )  
 
-#--- Install binaries (.so/.dll/.lib)
-if ( WIN32 )    
-    set ( GVDB_LINK_FLAGS "/implib:${LIB_OUTPUT_PATH}/$(Configuration)/libgvdb.lib" )
-	set_target_properties ( ${PROJNAME} PROPERTIES LINK_FLAGS "${GVDB_LINK_FLAGS}" )
-	message ( STATUS "Import Library: ${GVDB_LINK_FLAGS}" )
-   _INSTALL ( FILES "${LIB_OUTPUT_PATH}/$(Configuration)/libgvdb.dll" DESTINATION ${LIB_INSTALL_PATH} )   
-   _INSTALL ( FILES "${LIB_OUTPUT_PATH}/$(Configuration)/libgvdb.lib" DESTINATION ${LIB_INSTALL_PATH} )   
-   if ( USE_OPENVDB )
-	  _INSTALL ( FILES "${OPENVDB_DLL}" DESTINATION ${LIB_INSTALL_PATH} )
-   endif ()
-else()
-   install ( TARGETS ${PROJNAME} DESTINATION ${LIB_INSTALL_PATH} )
-endif()
+_INSTALL ( FILES ${SHADERS} SOURCE "" DESTINATION ${EXECUTABLE_OUTPUT_PATH} OUTPUT INSTALL_LIST )
+_INSTALL ( FILES ${CUDPP_DLL} SOURCE ${CUDPP_LIB_DIR} DESTINATION ${EXECUTABLE_OUTPUT_PATH} OUTPUT INSTALL_LIST )
+_INSTALL_PTX ( FILES ${CUDA_PTX_PATHS} DESTINATION ${EXECUTABLE_OUTPUT_PATH} OUTPUT INSTALL_LIST )
 
-#--- Install Shaders
-file(GLOB SHADERS shaders/*.glsl)
-message ( STATUS "Shaders used: ${SHADERS}" )
-_INSTALL ( FILES ${SHADERS} DESTINATION ${SHARE_PATH} )
+install ( FILES ${HEADER_FILES} DESTINATION ${INCLUDE_PATH} )
+install ( FILES ${CUH_FILES} DESTINATION ${INCLUDE_PATH} )
+install ( FILES ${INSTALL_LIST} DESTINATION ${LIB_INSTALL_PATH} )
+install ( TARGETS ${PROJNAME} DESTINATION ${LIB_INSTALL_PATH} )
 
-#--- Install PTX files
-unset ( PTX_FIXED )
-if ( WIN32 )   
-  foreach ( _file IN ITEMS ${PTX_FILES} )
-     list ( APPEND PTX_FIXED "${LIB_OUTPUT_PATH}/$(Configuration)/${_file}" )
-  endforeach() 
-else()
-  foreach ( _file IN ITEMS ${PTX_FILES} )
-    get_filename_component ( _ptxpath ${_file} DIRECTORY )
-    get_filename_component ( _ptxbase ${_file} NAME_WE )
-    string ( SUBSTRING ${_ptxbase} 27 -1 _ptxname )
-    set ( _fixed "${_ptxpath}/${_ptxname}.ptx" )
-    add_custom_command ( TARGET ${PROJNAME} PRE_LINK
-      COMMAND ${CMAKE_COMMAND} -E copy  ${_file} ${_fixed}
-      )      
-    list ( APPEND PTX_FIXED ${_fixed} )
-  endforeach()
-endif()
-message ( STATUS "PTX files: ${PTX_FIXED}" )
-_INSTALL ( FILES ${PTX_FIXED} DESTINATION ${SHARE_PATH} )
-
-
-
-#####################################################################################
-# Source groups for Visual Studio
-#
-source_group(common FILES 
-  ${COMMON_SOURCE_FILES}  
-)
-source_group(CUDA FILES 
-  ${CUDA_FILES}
-)
-source_group(PTX FILES 
-  ${PTX_FILES}
-)
-
+#################################
+# Done
 message ( STATUS "\nGVDB INSTALL PATH: ${CMAKE_INSTALL_PREFIX}" )
 message ( STATUS "GVDB will be installed to this path post-build (win32) or during make install (linux)")
 

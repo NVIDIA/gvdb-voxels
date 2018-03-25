@@ -1,0 +1,96 @@
+
+
+points
+  path: c:/videos/col_data/
+  file: pnt%04d.dat
+  fstep: 0
+  mat: 0
+
+model
+  file: cylinder_5.obj
+  scale: 351.5625
+  offset: <193.3594, 131.8359, 123.0469>
+  mat: 1
+
+model
+  file: ground.obj
+  scale: 1.0
+  offset: <0,1,0>
+  mat: 2
+
+render
+  width: 800
+  height: 600
+  samples: 128
+  backclr: <.1, .2, .4>
+  envmap: sky.png
+  outpath: c:/videos/col1/
+  outfile: img%04d.png
+
+volume
+  scale: 2.0
+  steps: <.5, 16, .5>
+  extinct: <-1, 1.1, 0.0>
+  range: <0, -1, 3>
+  cutoff: <0.005, 0.001, 0.0>
+  smooth: 1
+  smoothp: <1.0, +0.0, 0.0>
+
+camera
+  angs: <0, 40, 0>
+  target: <240, 0, 30>
+  dist: 1840
+  fov: 50
+
+light
+  angs: <80, 70, 0>
+  target: <240, 0, 0>
+  dist: 2000
+
+material
+  lightwid: 0.9
+  shwid: 0.1
+  shbias: 0.5
+  ambient: <0.1, 0.15, 0.15>
+  diffuse: <0.1, 0.12, 0.18>
+  spec: <1.2, 1.2, 1.2>
+  spow: 200
+  env: <0,0,0>
+  reflwid: 0.2
+  reflbias: 0.5
+  reflcolor: <0.3, 0.3, 0.3>
+  refrwid: 0.1
+  refrcolor: <0.1, 0.1, 0.2>
+  refrior: 1.1
+  reframt: 0.8
+  refroffs: 50
+  refrbias: 0.5
+
+material
+  lightwid: 0.9
+  shwid: 0.1
+  shbias: 0.5
+  ambient: <0.1, 0.1, 0.1>
+  diffuse: <1.0, 1.0, 1.0>
+  spec: <0.1, 0.1, 0.1>
+  spow: 20
+  env: <0,0,0>
+  reflwid: 0.8
+  reflbias: 0.5
+  reflcolor: <0.5, 0.5, 0.5>
+  refrwid: 0.0 
+
+material
+  lightwid: 0.9
+  shwid: 0.1
+  shbias: 0.5
+  ambient: <0.1, 0.1, 0.1>
+  diffuse: <1.0, 1.0, 1.0>
+  spec: <0.0, 0.0, 0.0>
+  spow: 20
+  env: <1, 100, 0.5>
+  reflwid: 0.0
+  reflbias: 0.5
+  reflcolor: <0.5, 0.5, 0.5>
+  refrwid: 0.0 
+

@@ -58,6 +58,11 @@ inline __host__ __device__ void fminmax3 (float a, float b, float c, float& mn, 
 	if ( c > mx ) mx = c;
 }
 
+inline __device__ float3 getViewPos ()
+{
+	return mmult ( scn.campos, SCN_INVXFORM );  
+}
+
 inline __device__ float3 getViewRay ( float x, float y )
 {
   #ifdef CUDA_PATHWAY
@@ -65,7 +70,7 @@ inline __device__ float3 getViewRay ( float x, float y )
   #else
 	float3 v = make_float3(0,0,0);
   #endif
-  return normalize(v);
+  return mmult(normalize(v), SCN_INVXROT);
 }
 
 

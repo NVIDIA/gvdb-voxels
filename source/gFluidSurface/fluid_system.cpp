@@ -47,15 +47,34 @@ extern bool gProfileRend;
 
 // #define FLUID_INTEGRITY						// debugging, enable this to check fluid integrity 
 
-bool cuCheck ( CUresult status, char* msg )
+bool cuCheck (CUresult launch_stat, char* method, char* apicall, char* arg, bool bDebug)
 {
-	if ( status != CUDA_SUCCESS ) {
-		const char* stat = "";
-		cuGetErrorString ( status, &stat );
-		nvprintf ( "CUDA ERROR: %s\n", stat );
-		abort();
+	CUresult kern_stat = CUDA_SUCCESS;
+
+	if (bDebug) {
+		kern_stat = cuCtxSynchronize();
+	}
+	if (kern_stat != CUDA_SUCCESS || launch_stat != CUDA_SUCCESS) {
+		const char* launch_statmsg = "";
+		const char* kern_statmsg = "";
+		cuGetErrorString(launch_stat, &launch_statmsg);
+		cuGetErrorString(kern_stat, &kern_statmsg);
+		nvprintf("FLUID SYSTEM, CUDA ERROR:\n");
+		nvprintf("  Launch status: %s\n", launch_statmsg);
+		nvprintf("  Kernel status: %s\n", kern_statmsg);
+		nvprintf("  Caller: FluidSystem::%s\n", method);
+		nvprintf("  Call:   %s\n", apicall);
+		nvprintf("  Args:   %s\n", arg);
+
+		if (bDebug) {
+			nvprintf("  Generating assert to examine call stack.\n");
+			assert(0);		// debug - trigger break (see call stack)
+		}
+		else {
+			nverror();		// exit - return 0
+		}
 		return false;
-	} 
+	}
 	return true;
 
 }
@@ -85,13 +104,13 @@ void FluidSystem::LoadKernel ( int fid, std::string func )
 	char cfn[512];		strcpy ( cfn, func.c_str() );
 
 	if ( m_Func[fid] == (CUfunction) -1 )
-		cuCheck ( cuModuleGetFunction ( &m_Func[fid], m_Module, cfn ), cfn );	
+		cuCheck ( cuModuleGetFunction ( &m_Func[fid], m_Module, cfn ), "LoadKernel", "cuModuleGetFunction", cfn, mbDebug );	
 }
 
 // Must have a CUDA context to initialize
 void FluidSystem::Initialize ()
 {
-	cuCheck ( cuModuleLoad ( &m_Module, "fluid_system_cuda.ptx" ), "cuModuleLoad" );		
+	cuCheck ( cuModuleLoad ( &m_Module, "fluid_system_cuda.ptx" ), "LoadKernel", "cuModuleLoad", "fluid_system_cuda.ptx", mbDebug);
 
 	LoadKernel ( FUNC_INSERT,			"insertParticles" );
 	LoadKernel ( FUNC_COUNTING_SORT,	"countingSortFull" );
@@ -106,9 +125,9 @@ void FluidSystem::Initialize ()
 	LoadKernel ( FUNC_FPREFIXFIXUP,		"prefixFixup" );
 
 	size_t len = 0;
-	cuCheck ( cuModuleGetGlobal ( &cuFBuf, &len,		m_Module, "fbuf" ),		"cuModuleGetGlobal" );
-	cuCheck ( cuModuleGetGlobal ( &cuFTemp, &len,		m_Module, "ftemp" ),		"cuModuleGetGlobal" );
-	cuCheck ( cuModuleGetGlobal ( &cuFParams, &len,	m_Module, "fparam" ),		"cuModuleGetGlobal" );
+	cuCheck ( cuModuleGetGlobal ( &cuFBuf, &len,		m_Module, "fbuf" ),		"LoadKernel", "cuModuleGetGlobal", "cuFBuf", mbDebug);
+	cuCheck ( cuModuleGetGlobal ( &cuFTemp, &len,		m_Module, "ftemp" ),	"LoadKernel", "cuModuleGetGlobal", "cuFTemp", mbDebug);
+	cuCheck ( cuModuleGetGlobal ( &cuFParams, &len,	m_Module, "fparam" ),		"LoadKernel", "cuModuleGetGlobal", "cuFParams", mbDebug);
 
 	// Clear all buffers
 	memset ( &m_Fluid, 0,		sizeof(FBufs) );
@@ -116,7 +135,7 @@ void FluidSystem::Initialize ()
 	memset ( &m_FParams, 0,		sizeof(FParams) );
 	//m_Param [ PMODE ]		= RUN_VALIDATE;			// debugging
 	m_Param [ PMODE ]		= RUN_GPU_FULL;		
-	m_Param [ PEXAMPLE ]	= 1;
+	m_Param [ PEXAMPLE ]	= 2;
 	m_Param [ PGRID_DENSITY ] = 2.0;
 	m_Param [ PNUM ]		= 65536 * 128;
 
@@ -219,12 +238,12 @@ void FluidSystem::AllocateBuffer ( int buf_id, int stride, int cpucnt, int gpucn
 		m_Fluid.setBuf(buf_id, dest_buf);
 	}
 	if (gpumode == GPU_SINGLE || gpumode == GPU_DUAL )	{
-		if (m_Fluid.gpuptr(buf_id) != 0x0) cuCheck(cuMemFree(m_Fluid.gpu(buf_id)), "cuMemFree");
-		cuCheck( cuMemAlloc(m_Fluid.gpuptr(buf_id), stride*gpucnt), "cuMemAlloc");
+		if (m_Fluid.gpuptr(buf_id) != 0x0) cuCheck(cuMemFree(m_Fluid.gpu(buf_id)), "AllocateBuffer", "cuMemFree", "Fluid.gpu", mbDebug);
+		cuCheck( cuMemAlloc(m_Fluid.gpuptr(buf_id), stride*gpucnt), "AllocateBuffer", "cuMemAlloc", "Fluid.gpu", mbDebug);
 	}
 	if (gpumode == GPU_TEMP || gpumode == GPU_DUAL ) {
-		if (m_FluidTemp.gpuptr(buf_id) != 0x0) cuCheck(cuMemFree(m_FluidTemp.gpu(buf_id)), "cuMemFree");
-		cuCheck( cuMemAlloc(m_FluidTemp.gpuptr(buf_id), stride*gpucnt), "cuMemAlloc");
+		if (m_FluidTemp.gpuptr(buf_id) != 0x0) cuCheck(cuMemFree(m_FluidTemp.gpu(buf_id)), "AllocateBuffer", "cuMemFree", "FluidTemp.gpu", mbDebug);
+		cuCheck( cuMemAlloc(m_FluidTemp.gpuptr(buf_id), stride*gpucnt), "AllocateBuffer", "cuMemAlloc", "FluidTemp.gpu", mbDebug);
 	}
 }
 
@@ -248,10 +267,10 @@ void FluidSystem::AllocateParticles ( int cnt )
 	AllocateBuffer ( FSTATE,	sizeof(uint),		cnt,	m_FParams.szPnts,	GPU_DUAL, CPU_YES );
 	
 	// Update GPU access pointers
-	cuCheck( cuMemcpyHtoD(cuFBuf, &m_Fluid, sizeof(FBufs)), "cuMemcpyHtoD (fbuf)");
-	cuCheck( cuMemcpyHtoD(cuFTemp, &m_FluidTemp, sizeof(FBufs)), "cuMemcpyHtoD (ftemp)");
-	cuCheck( cuMemcpyHtoD(cuFParams, &m_FParams, sizeof(FParams)), "cuMemcpyHtoD (fparams)");
-	cuCheck(cuCtxSynchronize(), "Sync");
+	cuCheck( cuMemcpyHtoD(cuFBuf, &m_Fluid, sizeof(FBufs)),			"AllocateParticles", "cuMemcpyHtoD", "cuFBuf", mbDebug);
+	cuCheck( cuMemcpyHtoD(cuFTemp, &m_FluidTemp, sizeof(FBufs)),	"AllocateParticles", "cuMemcpyHtoD", "cuFTemp", mbDebug);
+	cuCheck( cuMemcpyHtoD(cuFParams, &m_FParams, sizeof(FParams)),  "AllocateParticles", "cuMemcpyHtoD", "cuFParams", mbDebug);
+	cuCheck(cuCtxSynchronize(), "AllocateParticles", "cuCtxSynchronize", "", mbDebug );
 
 	m_Param[PSTAT_PMEM] = 68.0f * 2 * cnt;
 }
@@ -267,8 +286,8 @@ void FluidSystem::AllocateGrid()
 	AllocateBuffer ( FGRIDACT,	sizeof(uint),		cnt,	m_FParams.szGrid,	GPU_SINGLE, CPU_YES );
 
 	// Update GPU access pointers
-	cuCheck(cuMemcpyHtoD(cuFBuf, &m_Fluid, sizeof(FBufs)), "cuMemcpyHtoD (fbuf)");
-	cuCheck(cuCtxSynchronize(), "Sync");
+	cuCheck(cuMemcpyHtoD(cuFBuf, &m_Fluid, sizeof(FBufs)), "AllocateGrid", "cuMemcpyHtoD", "cuFBuf", mbDebug);
+	cuCheck(cuCtxSynchronize(), "AllocateParticles", "cuCtxSynchronize", "", mbDebug);
 }
 
 int FluidSystem::AddParticle ()
@@ -323,7 +342,7 @@ void FluidSystem::SetupAddVolume ( Vector3DF min, Vector3DF max, float spacing, 
 				
 				Vector3DF clr ( (pos.x-min.x)/dx, 0, (pos.z-min.z)/dz );				
 				clr *= 0.8; clr += 0.2;				
-				clr.Clamp (0, 1.0);
+				clr.Clamp (0, 1.0);				
 				m_Fluid.bufI(FCLR) [p] = COLORA( clr.x, clr.y, clr.z, 1); 				
 				// = COLORA( 0.25, +0.25 + (y-min.y)*.75/dy, 0.25 + (z-min.z)*.75/dz, 1);  // (x-min.x)/dx
 			}
@@ -2371,21 +2390,19 @@ void FluidSystem::SetupExampleParams ()
 		m_Param [PSIMSCALE ] = 1.0f;
 	
 		} break;
-	case 1:		// Wave pool						
-		m_Vec [ PVOLMIN ].Set ( -250, 0, -250 );
-		m_Vec [ PVOLMAX ].Set (  250, 150, 250 );
-		m_Vec [ PINITMIN ].Set ( -200, 80, -200 );
-		m_Vec [ PINITMAX ].Set (  200, 140, 200 );
-		m_Param [ PFORCE_MIN ] = 40.0f;	
-		m_Param [ PFORCE_FREQ ] = 16.0f;
-		m_Param [ PGROUND_SLOPE ] = 0.10f;
+	case 1:		// Tower
+		m_Vec [ PVOLMIN ].Set (   0,   0,   0 );
+		m_Vec [ PVOLMAX ].Set (  256, 128, 256 );
+		m_Vec [ PINITMIN ].Set (  5,   5,  5 );
+		m_Vec [ PINITMAX ].Set ( 256*0.3, 128*0.9, 256*0.3 );		
 		break;
-	case 2:		// Large coast						
-		m_Vec [ PVOLMIN ].Set ( -200, 0, -40 );
-		m_Vec [ PVOLMAX ].Set (  200, 200, 40 );
-		m_Vec [ PINITMIN ].Set ( -120, 40, -30 );
-		m_Vec [ PINITMAX ].Set (  190, 190,  30 );
-		m_Param [ PFORCE_MIN ] = 20.0f;	
+	case 2:		// Wave pool
+		m_Vec [ PVOLMIN ].Set (   0,   0,   0 );
+		m_Vec [ PVOLMAX ].Set (  400, 200, 400 );
+		m_Vec [ PINITMIN ].Set ( 100, 80,  100 );
+		m_Vec [ PINITMAX ].Set ( 300, 190, 300 );
+		m_Param [ PFORCE_MIN ] = 100.0f;	
+		m_Param [ PFORCE_FREQ ] = 6.0f;
 		m_Param [ PGROUND_SLOPE ] = 0.10f;
 		break;
 	case 3:		// Small dam break
@@ -2526,7 +2543,7 @@ void computeNumBlocks (int numPnts, int minThreads, int &numBlocks, int &numThre
 
 void FluidSystem::TransferToTempCUDA ( int buf_id, int sz )
 {
-	cuCheck ( cuMemcpyDtoD ( m_FluidTemp.gpu(buf_id), m_Fluid.gpu(buf_id), sz ), "cuMemcpyDtoD" );
+	cuCheck ( cuMemcpyDtoD ( m_FluidTemp.gpu(buf_id), m_Fluid.gpu(buf_id), sz ), "TransferToTempCUDA", "cuMemcpyDtoD", "m_FluidTemp", mbDebug);
 }
 
 
@@ -2591,7 +2608,7 @@ void FluidSystem::FluidSetupCUDA ( int num, int gsrch, int3 res, float3 size, fl
 				m_FParams.gridAdj [ cell++]  = ( y * m_FParams.gridRes.z+ z )*m_FParams.gridRes.x +  x ;			
 	
 	// Compute number of blocks and threads
-	int threadsPerBlock = 192;	
+	int threadsPerBlock = 512;
 
     computeNumBlocks ( m_FParams.pnum, threadsPerBlock, m_FParams.numBlocks, m_FParams.numThreads);				// particles
     computeNumBlocks ( m_FParams.gridTotal, threadsPerBlock, m_FParams.gridBlocks, m_FParams.gridThreads);		// grid cell
@@ -2644,46 +2661,45 @@ void FluidSystem::FluidParamCUDA ( float ss, float sr, float pr, float mass, flo
 	m_FParams.vterm = m_FParams.lapkern * m_FParams.pvisc;
 
 	// Transfer sim params to device
-	cuCheck ( cuMemcpyHtoD ( cuFParams,	&m_FParams,		sizeof(FParams) ), "cuMemcpyHtoD (fparams)" );	
+	cuCheck ( cuMemcpyHtoD ( cuFParams,	&m_FParams,		sizeof(FParams) ), "FluidParamCUDA", "cuMemcpyHtoD", "cuFParams", mbDebug);
 }
 
 void FluidSystem::TransferToCUDA ()
 {
-	// Send particle buffers
-	int numPoints = m_FParams.pnum;
-	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FPOS),	m_Fluid.bufC(FPOS),		numPoints*sizeof(float)*3 ), 	"Memcpy" );	
-	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FVEL),	m_Fluid.bufC(FVEL),		numPoints*sizeof(float)*3 ), 	"Memcpy" );	
-	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FVEVAL),	m_Fluid.bufC(FVEVAL),	numPoints*sizeof(float)*3 ), 	"Memcpy" );	
-	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FFORCE),	m_Fluid.bufC(FFORCE),	numPoints*sizeof(float)*3 ), 	"Memcpy" );	
-	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FPRESS),	m_Fluid.bufC(FPRESS),	numPoints*sizeof(float) ), 		"Memcpy" );	
-	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FDENSITY), m_Fluid.bufC(FDENSITY), numPoints*sizeof(float) ), 	"Memcpy" );	
-	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FCLR),	m_Fluid.bufC(FCLR),		numPoints*sizeof(uint) ), 		"Memcpy" );
+	// Send particle buffers	
+	cuCheck(cuMemcpyHtoD(m_Fluid.gpu(FPOS), m_Fluid.bufC(FPOS),				mNumPoints *sizeof(float) * 3),			"TransferToCUDA", "cuMemcpyHtoD", "FPOS", mbDebug);
+	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FVEL),	m_Fluid.bufC(FVEL),			mNumPoints *sizeof(float)*3 ),	"TransferToCUDA", "cuMemcpyHtoD", "FVEL", mbDebug);
+	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FVEVAL),	m_Fluid.bufC(FVEVAL),	mNumPoints *sizeof(float)*3 ), "TransferToCUDA", "cuMemcpyHtoD", "FVELAL", mbDebug);
+	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FFORCE),	m_Fluid.bufC(FFORCE),	mNumPoints *sizeof(float)*3 ), "TransferToCUDA", "cuMemcpyHtoD", "FFORCE", mbDebug);
+	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FPRESS),	m_Fluid.bufC(FPRESS),	mNumPoints *sizeof(float) ),	"TransferToCUDA", "cuMemcpyHtoD", "FPRESS", mbDebug);
+	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FDENSITY), m_Fluid.bufC(FDENSITY),	mNumPoints *sizeof(float) ),	"TransferToCUDA", "cuMemcpyHtoD", "FDENSITY", mbDebug);
+	cuCheck( cuMemcpyHtoD ( m_Fluid.gpu(FCLR),	m_Fluid.bufC(FCLR),			mNumPoints *sizeof(uint) ),		"TransferToCUDA", "cuMemcpyHtoD", "FCLR", mbDebug);
 }
 
 void FluidSystem::TransferFromCUDA ()
 {
-	// Return particle buffers
-	int numPoints = m_FParams.pnum;
-	cuCheck( cuMemcpyDtoH ( m_Fluid.bufC(FPOS),	m_Fluid.gpu(FPOS),	numPoints*sizeof(float)*3 ), 	"Memcpy" );	
-	cuCheck( cuMemcpyDtoH ( m_Fluid.bufC(FVEL),	m_Fluid.gpu(FVEL),	numPoints*sizeof(float)*3 ), 	"Memcpy" );	
-	cuCheck( cuMemcpyDtoH ( m_Fluid.bufC(FCLR),	m_Fluid.gpu(FCLR),	numPoints*sizeof(uint) ), 		"Memcpy" );		
+	// Return particle buffers	
+	cuCheck( cuMemcpyDtoH ( m_Fluid.bufC(FPOS),	m_Fluid.gpu(FPOS),	mNumPoints *sizeof(float)*3 ), "TransferFromCUDA", "cuMemcpyDtoH", "FPOS", mbDebug);
+	cuCheck( cuMemcpyDtoH ( m_Fluid.bufC(FVEL),	m_Fluid.gpu(FVEL),	mNumPoints *sizeof(float)*3 ), "TransferFromCUDA", "cuMemcpyDtoH", "FVEL", mbDebug);
+	cuCheck( cuMemcpyDtoH ( m_Fluid.bufC(FCLR),	m_Fluid.gpu(FCLR),	mNumPoints *sizeof(uint) ),	"TransferFromCUDA", "cuMemcpyDtoH", "FCLR", mbDebug);
 }
 
 
 
 void FluidSystem::InsertParticlesCUDA ( uint* gcell, uint* gndx, uint* gcnt )
 {
-	cuCheck ( cuMemsetD8 ( m_Fluid.gpu(FGRIDCNT), 0,	m_GridTotal*sizeof(int) ), "cuMemsetD8" );
-	cuCheck ( cuMemsetD8 ( m_Fluid.gpu(FGRIDOFF), 0,	m_GridTotal*sizeof(int) ), "cuMemsetD8" );
+	cuCheck ( cuMemsetD8 ( m_Fluid.gpu(FGRIDCNT), 0,	m_GridTotal*sizeof(int) ), "InsertParticlesCUDA", "cuMemsetD8", "FGRIDCNT", mbDebug );
+	cuCheck ( cuMemsetD8 ( m_Fluid.gpu(FGRIDOFF), 0,	m_GridTotal*sizeof(int) ), "InsertParticlesCUDA", "cuMemsetD8", "FGRIDOFF", mbDebug );
 
-	void* args[1] = { &m_FParams.pnum };
-	cuCheck ( cuLaunchKernel ( m_Func[FUNC_INSERT], m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL ), "cuLaunch(insertParticles");
+	void* args[1] = { &mNumPoints };
+	cuCheck(cuLaunchKernel(m_Func[FUNC_INSERT], m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL),
+		"InsertParticlesCUDA", "cuLaunch", "FUNC_INSERT", mbDebug);
 
 	// Transfer data back if requested (for validation)
 	if (gcell != 0x0) {
-		cuCheck( cuMemcpyDtoH ( gcell,	m_Fluid.gpu(FGCELL),		m_FParams.pnum*sizeof(uint) ),  "DtoH mgcell");		
-		cuCheck( cuMemcpyDtoH ( gndx,		m_Fluid.gpu(FGNDX),			m_FParams.pnum*sizeof(uint) ),  "DtoH mgcell");		
-		cuCheck( cuMemcpyDtoH ( gcnt,		m_Fluid.gpu(FGRIDCNT),		m_GridTotal*sizeof(uint) ),  "DtoH mgridcnt" );		
+		cuCheck( cuMemcpyDtoH ( gcell,	m_Fluid.gpu(FGCELL),		mNumPoints *sizeof(uint) ), "InsertParticlesCUDA", "cuMemcpyDtoH", "FGCELL", mbDebug );
+		cuCheck( cuMemcpyDtoH ( gndx,		m_Fluid.gpu(FGNDX),		mNumPoints *sizeof(uint) ), "InsertParticlesCUDA", "cuMemcpyDtoH", "FGNDX", mbDebug);
+		cuCheck( cuMemcpyDtoH ( gcnt,		m_Fluid.gpu(FGRIDCNT),	m_GridTotal*sizeof(uint) ), "InsertParticlesCUDA", "cuMemcpyDtoH", "FGRIDCNT", mbDebug);
 		cuCtxSynchronize ();
 	}
 }
@@ -2738,26 +2754,26 @@ void FluidSystem::PrefixSumCellsCUDA ( uint* goff, int zero_offsets )
 		}
 
 		void* argsA[5] = {&array1, &scan1, &array2, &numElem1, &zero_offsets }; // sum array1. output -> scan1, array2
-		cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXSUM], numElem2, 1, 1, threads, 1, 1, 0, NULL, argsA, NULL ), "cuPrefixSumA" );		
+		cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXSUM], numElem2, 1, 1, threads, 1, 1, 0, NULL, argsA, NULL ), "PrefixSumCellsCUDA", "cuLaunch", "FUNC_PREFIXSUM", mbDebug);
 
 		void* argsB[5] = { &array2, &scan2, &array3, &numElem2, &zon }; // sum array2. output -> scan2, array3
-		cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXSUM], numElem3, 1, 1, threads, 1, 1, 0, NULL, argsB, NULL ), "cuPrefixSumB" );		
+		cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXSUM], numElem3, 1, 1, threads, 1, 1, 0, NULL, argsB, NULL ), "PrefixSumCellsCUDA", "cuLaunch", "FUNC_PREFIXSUM", mbDebug);
 
 		if ( numElem3 > 1 ) {
 			CUdeviceptr nptr = {0};
 			void* argsC[5] = { &array3, &scan3, &nptr, &numElem3, &zon };	// sum array3. output -> scan3
-			cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXSUM], 1, 1, 1, threads, 1, 1, 0, NULL, argsC, NULL ), "cuPrefixSumB" );					
+			cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXSUM], 1, 1, 1, threads, 1, 1, 0, NULL, argsC, NULL ), "PrefixSumCellsCUDA", "cuLaunch", "FUNC_PREFIXFIXUP", mbDebug);
 
 			void* argsD[3] = { &scan2, &scan3, &numElem2 };	// merge scan3 into scan2. output -> scan2
-			cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXFIXUP], numElem3, 1, 1, threads, 1, 1, 0, NULL, argsD, NULL ), "cuPrefixFixupC" );			
+			cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXFIXUP], numElem3, 1, 1, threads, 1, 1, 0, NULL, argsD, NULL ), "PrefixSumCellsCUDA", "cuLaunch", "FUNC_PREFIXFIXUP", mbDebug);
 		}
 
 		void* argsE[3] = { &scan1, &scan2, &numElem1 };		// merge scan2 into scan1. output -> scan1
-		cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXFIXUP], numElem2, 1, 1, threads, 1, 1, 0, NULL, argsE, NULL ), "cuPrefixFixupC" );		
+		cuCheck ( cuLaunchKernel ( m_Func[FUNC_FPREFIXFIXUP], numElem2, 1, 1, threads, 1, 1, 0, NULL, argsE, NULL ), "PrefixSumCellsCUDA", "cuLaunch", "FUNC_PREFIXFIXUP", mbDebug);
 
 		// Transfer data back if requested
 		if ( goff != 0x0 ) {
-			cuCheck( cuMemcpyDtoH ( goff,		m_Fluid.gpu(FGRIDOFF),	numElem1*sizeof(int) ),  "DtoH mgridcnt" );		
+			cuCheck( cuMemcpyDtoH ( goff,		m_Fluid.gpu(FGRIDOFF),	numElem1*sizeof(int) ), "PrefixSumCellsCUDA", "cuMemcpyDtoH", "FGRIDOFF", mbDebug);
 			cuCtxSynchronize ();
 		}
 	#endif
@@ -2766,16 +2782,15 @@ void FluidSystem::PrefixSumCellsCUDA ( uint* goff, int zero_offsets )
 void FluidSystem::IntegrityCheck()
 {
 	// Retrieve data from GPU
-	int numPoints = m_FParams.pnum;
-	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FPOS),   m_Fluid.gpu(FPOS),   numPoints*sizeof(Vector3DF) ), "Memcpy");
-	cuCheck(cuMemcpyDtoH (m_Fluid.bufC(FGCELL), m_Fluid.gpu(FGCELL), numPoints*sizeof(uint) ), "Memcpy");
-	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FGNDX),  m_Fluid.gpu(FGNDX),  numPoints*sizeof(uint) ), "Memcpy");
+	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FPOS),   m_Fluid.gpu(FPOS),		mNumPoints *sizeof(Vector3DF) ), "IntegrityCheck", "cuMemcpyDtoH", "FPOS", mbDebug);
+	cuCheck(cuMemcpyDtoH (m_Fluid.bufC(FGCELL), m_Fluid.gpu(FGCELL),	mNumPoints *sizeof(uint) ),		"IntegrityCheck", "cuMemcpyDtoH", "FGCELL", mbDebug);
+	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FGNDX),  m_Fluid.gpu(FGNDX),		mNumPoints *sizeof(uint) ),		"IntegrityCheck", "cuMemcpyDtoH", "FGNDX", mbDebug);
 	
 	int numElem = m_GridTotal;
-	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FGRID),    m_Fluid.gpu(FGRID),    numPoints*sizeof(int)), "Memcpy");
-	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FGRIDOFF), m_Fluid.gpu(FGRIDOFF), numElem*sizeof(int)), "Memcpy");
-	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FGRIDCNT), m_Fluid.gpu(FGRIDCNT), numElem*sizeof(int)), "Memcpy");
-	cuCheck(cuCtxSynchronize(), "Sync");
+	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FGRID),    m_Fluid.gpu(FGRID),	 mNumPoints *sizeof(int)),	"IntegrityCheck", "cuMemcpyDtoH", "FGRID", mbDebug);
+	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FGRIDOFF), m_Fluid.gpu(FGRIDOFF), numElem*sizeof(int)),		"IntegrityCheck", "cuMemcpyDtoH", "FGRIDOFF", mbDebug);
+	cuCheck(cuMemcpyDtoH( m_Fluid.bufC(FGRIDCNT), m_Fluid.gpu(FGRIDCNT), numElem*sizeof(int)),		"IntegrityCheck", "cuMemcpyDtoH", "FGRIDCNT", mbDebug);
+	cuCheck(cuCtxSynchronize(), "IntegrityCheck", "cuCtxSynchronize", "", mbDebug);
 
 	// Analysis by grid cells	
 	uint p;
@@ -2796,26 +2811,26 @@ void FluidSystem::IntegrityCheck()
 void FluidSystem::CountingSortFullCUDA ( Vector3DF* ppos )
 {
 	// Transfer particle data to temp buffers
-	//  (gpu-to-gpu copy, no sync needed)
-	int numPoints = m_FParams.pnum;
-	TransferToTempCUDA ( FPOS,		numPoints*sizeof(Vector3DF) );
-	TransferToTempCUDA ( FVEL,		numPoints*sizeof(Vector3DF) );
-	TransferToTempCUDA ( FVEVAL,	numPoints*sizeof(Vector3DF) );
-	TransferToTempCUDA ( FFORCE,	numPoints*sizeof(Vector3DF) );
-	TransferToTempCUDA ( FPRESS,	numPoints*sizeof(float) );
-	TransferToTempCUDA ( FDENSITY,	numPoints*sizeof(float) );
-	TransferToTempCUDA ( FCLR,		numPoints*sizeof(uint) );
-	TransferToTempCUDA ( FGCELL,	numPoints*sizeof(uint) );
-	TransferToTempCUDA ( FGNDX,		numPoints*sizeof(uint) );	
+	//  (gpu-to-gpu copy, no sync needed)	
+	TransferToTempCUDA ( FPOS,		mNumPoints *sizeof(Vector3DF) );
+	TransferToTempCUDA ( FVEL,		mNumPoints *sizeof(Vector3DF) );
+	TransferToTempCUDA ( FVEVAL,	mNumPoints *sizeof(Vector3DF) );
+	TransferToTempCUDA ( FFORCE,	mNumPoints *sizeof(Vector3DF) );
+	TransferToTempCUDA ( FPRESS,	mNumPoints *sizeof(float) );
+	TransferToTempCUDA ( FDENSITY,	mNumPoints *sizeof(float) );
+	TransferToTempCUDA ( FCLR,		mNumPoints *sizeof(uint) );
+	TransferToTempCUDA ( FGCELL,	mNumPoints *sizeof(uint) );
+	TransferToTempCUDA ( FGNDX,		mNumPoints *sizeof(uint) );
 
 	// Reset grid cell IDs
 	//cuCheck(cuMemsetD32(m_Fluid.gpu(FGCELL), GRID_UNDEF, numPoints ), "cuMemsetD32(Sort)");
 
-	void* args[1] = { &m_FParams.pnum };
-	cuCheck ( cuLaunchKernel ( m_Func[FUNC_COUNTING_SORT], m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "cuLaunch(CountingSort" );
+	void* args[1] = { &mNumPoints };
+	cuCheck ( cuLaunchKernel ( m_Func[FUNC_COUNTING_SORT], m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL),
+				"CountingSortFullCUDA", "cuLaunch", "FUNC_COUNTING_SORT", mbDebug );
 
 	if ( ppos != 0x0 ) {
-		cuCheck( cuMemcpyDtoH ( ppos,		m_Fluid.gpu(FPOS),	m_FParams.pnum*sizeof(Vector3DF) ),  "DtoH sortpos" );		
+		cuCheck( cuMemcpyDtoH ( ppos,		m_Fluid.gpu(FPOS),	mNumPoints*sizeof(Vector3DF) ), "CountingSortFullCUDA", "cuMemcpyDtoH", "FPOS", mbDebug);
 		cuCtxSynchronize ();
 	}
 }
@@ -2829,9 +2844,9 @@ int FluidSystem::ResizeBrick ( uint3 res )
 		m_FParams.brickRes = make_int3(res.x, res.y, res.z);
 
 		if ( m_Fluid.gpu(FBRICK) != 0x0 ) {
-			cuCheck ( cuMemFree ( m_Fluid.gpu(FBRICK) ),  "Free brick dev buffer" );
+			cuCheck ( cuMemFree ( m_Fluid.gpu(FBRICK) ), "ResizeBrick", "cuMemFree", "FBRICK", mbDebug);
 		}		
-		cuCheck ( cuMemAlloc ( m_Fluid.gpuptr(FBRICK), sz ),  "Malloc brick dev buffer" );		
+		cuCheck ( cuMemAlloc ( m_Fluid.gpuptr(FBRICK), sz ), "ResizeBrick", "cuMemAlloc", "FBRICK", mbDebug);
 	}
 	return sz;
 }
@@ -2844,36 +2859,36 @@ void FluidSystem::SampleParticlesCUDA ( float* outbuf, uint3 res, float3 bmin, f
 	blocks = make_uint3(8,8,8);
 	grid = make_uint3( int(res.x/8)+1, int(res.y/8)+1, int(res.z/8)+1 );
 
-	void* args[6] = { &res, &bmin, &bmax, &m_FParams.pnum, &scalar };
-	cuCheck ( cuLaunchKernel ( m_Func[FUNC_SAMPLE],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "cuLaunch(Sample)" );
+	void* args[6] = { &res, &bmin, &bmax, &mNumPoints, &scalar };
+	cuCheck ( cuLaunchKernel ( m_Func[FUNC_SAMPLE],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "SampleParticlesCUDA", "cuLaunch", "FUNC_SAMPLES", mbDebug);
 }
 
 void FluidSystem::ComputeQueryCUDA ()
 {
-	void* args[1] = { &m_FParams.pnum };
-	cuCheck ( cuLaunchKernel ( m_Func[FUNC_QUERY],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "cuLaunch(Query)" );
+	void* args[1] = { &mNumPoints };
+	cuCheck ( cuLaunchKernel ( m_Func[FUNC_QUERY],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "ComputeQueryCUDA", "cuLaunch", "FUNC_QUERY", mbDebug);
 }
 
 void FluidSystem::ComputePressureCUDA ()
 {
-	void* args[1] = { &m_FParams.pnum };
-	cuCheck ( cuLaunchKernel ( m_Func[FUNC_COMPUTE_PRESS],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "cuLaunch(ComputePressure)" );	
+	void* args[1] = { &mNumPoints };
+	cuCheck ( cuLaunchKernel ( m_Func[FUNC_COMPUTE_PRESS],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "ComputePressureCUDA", "cuLaunch", "FUNC_COMPUTE_PRESS", mbDebug);
 }
 
 void FluidSystem::ComputeForceCUDA ()
 {
 	void* args[1] = { &m_FParams.pnum };
-	cuCheck ( cuLaunchKernel ( m_Func[FUNC_COMPUTE_FORCE],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "cuLaunch(ComputeForce)" );
+	cuCheck ( cuLaunchKernel ( m_Func[FUNC_COMPUTE_FORCE],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "ComputeForceCUDA", "cuLaunch", "FUNC_COMPUTE_FORCE", mbDebug);
 }
 
 void FluidSystem::AdvanceCUDA ( float tm, float dt, float ss )
 {
 	void* args[4] = { &tm, &dt, &ss, &m_FParams.pnum };
-	cuCheck ( cuLaunchKernel ( m_Func[FUNC_ADVANCE],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "cuLaunch(Advance)" );
+	cuCheck ( cuLaunchKernel ( m_Func[FUNC_ADVANCE],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "AdvanceCUDA", "cuLaunch", "FUNC_ADVANCE", mbDebug);
 }
 
 void FluidSystem::EmitParticlesCUDA ( float tm, int cnt )
 {
 	void* args[3] = { &tm, &cnt, &m_FParams.pnum };
-	cuCheck ( cuLaunchKernel ( m_Func[FUNC_EMIT],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "cuLaunch(Emit)" );
+	cuCheck ( cuLaunchKernel ( m_Func[FUNC_EMIT],  m_FParams.numBlocks, 1, 1, m_FParams.numThreads, 1, 1, 0, NULL, args, NULL), "EmitParticlesCUDA", "cuLaunch", "FUNC_EMIT", mbDebug);
 }

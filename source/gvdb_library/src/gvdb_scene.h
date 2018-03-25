@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 
@@ -32,6 +33,16 @@
 	#pragma warning (disable : 4251 )
 
 	#define MAX_PATHS	32
+
+	#define GLS_SIMPLE		0	// GL Shader Programs
+	#define GLS_OUTLINE		1
+	#define GLS_SLICE		2
+	#define GLS_VOXELIZE	3
+	#define GLS_RAYCAST		4
+	#define GLS_INSTANCE	5
+	#define GLS_SCREENTEX	6
+
+	#define MAX_PROG		8
 
 	class CallbackParser;
 
@@ -66,16 +77,20 @@
 		bool		FindFile ( std::string fname, char* path );
 		Camera3D*	SetCamera ( Camera3D* cam );
 		Light*		SetLight ( int n, Light* light );
+		Model*		AddModel ();
 		int			AddModel ( std::string filename, float scale, float tx, float ty, float tz );
 		int			AddVolume ( std::string filename, Vector3DI res, char vtype, float scale=1.0 );
 		int			AddGround ( float hgt, float scale=1.0 );
 		void		SetAspect ( int w, int h );
+		void		ClearModel ( Model* m );
+		void		LoadModel ( Model* m, std::string filestr, float scale, float tx, float ty, float tz );
 		
 		// Shaders
-		int			AddShader ( char* vertfile, char* fragfile );
-		int			AddShader ( char* vertfile, char* fragfile, char* geomfile );
-		int			AddParam ( int prog, int id, char* name );
-		int			AddAttrib ( int prog, int id, char* name );			
+		int			AddShader ( int prog_id, char* vertfile, char* fragfile );
+		int			AddShader ( int prog_id, char* vertfile, char* fragfile, char* geomfile );
+		int			AddParam (  int prog_id, int id, char* name );
+		int			AddAttrib ( int prog_id, int id, char* name );
+		int			getProgram(int prog_id) { return mProgram[prog_id]; }
 
 		// Materials
 		int			AddMaterial ();
@@ -95,14 +110,15 @@
 		// Transfer function		
 		void		LinearTransferFunc ( float t0, float t1, Vector4DF a, Vector4DF b );		
 
+		int			getShaderProgram(int i);			 
 		int			getNumModels ()		{ return (int) mModels.size(); }
 		Model*		getModel ( int n )	{ if (n < mModels.size()) return mModels[n]; else return 0x0; }
 		Camera3D*	getCamera ()		{ return mCamera; }
 		Light*		getLight ()			{ return mLights[0]; }
-		int			getSlot ( int prog );
-		int			getParam ( int prog, int id )	{ return mParams[ mProgToSlot[prog] ].p[id]; }
+		int			getSlot ( int prog_id );
+		int			getParam ( int prog_id, int id )	{ return mParams[ mProgToSlot[ mProgram[prog_id] ] ].p[id]; }
 		bool		useOverride ()		{ return clrOverride; }
-		Vector4DF	getShadowParams ()	{ return mShadowParams; }		
+		Vector3DF	getShadowParams ()	{ return mShadowParams; }		
 		Vector3DI	getFrameRange ()	{ return mVFrames; }
 		int			getNumLights()		{ return (int) mLights.size(); }
 		
@@ -130,11 +146,22 @@
 		Vector3DF getSteps()			{ return mSteps; }
 		Vector3DF getSectionPnt()		{ return mSectionPnt; }
 		Vector3DF getSectionNorm()		{ return mSectionNorm; }
+		int getShading()				{ return mShading; }		
+		int getSample()					{ return mSample; }
+		int getFrame()					{ return mFrame; }
+		int getFilterMode()				{ return mFilterMode; }
+		int getDepthBuf()				{ return mDepthBuf; }
 		void SetExtinct ( float a, float b, float c )	{ mExtinct.Set(a,b,c); }
 		void SetSteps ( float a, float b, float c )		{ mSteps.Set(a,b,c); }
 		void SetCutoff ( float a, float b, float c )	{ mCutoff.Set(a,b,c); }
 		void SetBackgroundClr ( float r, float g, float b, float a )	{ mBackgroundClr.Set(r,g,b,a); }
 		void SetCrossSection ( Vector3DF pos, Vector3DF norm )	{ mSectionPnt = pos; mSectionNorm = norm; }		
+		void SetShading ( uchar s )		{ mShading = s; }
+		void SetShadowParams ( float x, float y, float z )	{mShadowParams.Set(x,y,z); }
+		void SetSample ( int s )		{ mSample = s; }
+		void SetFrame ( int f )			{ mFrame = f; }
+		void SetFilterMode ( int f )	{ mFilterMode = f; }
+		void SetDepthBuf ( int db )		{ mDepthBuf = db; }
 
 	public:
 		int						mXres, mYres;
@@ -150,9 +177,9 @@
 		bool					clrOverride;
 		Vector4DF				clrAmb, clrDiff, clrSpec;	
 
-		char*					mSearchPaths[MAX_PATHS];
-		int						mNumPaths;
-
+		std::vector<std::string> mSearchPaths;		
+		
+		int						mProgram[MAX_PROG];
 		int						mProgToSlot[ 512 ];
 		
 		// Animation recording
@@ -163,11 +190,11 @@
 		std::string				mOutModel;
 
 		// Shadow parameters (independent of method used)
-		Vector4DF				mShadowParams;
+		Vector3DF				mShadowParams;
 
 		// Volume import settings
 		Vector3DF				mVClipMin, mVClipMax;
-		Vector3DF				mVThreshold, mVLeaf;
+		Vector3DF				mVLeaf;
 		Vector3DF				mVFrames;
 		std::string				mVName;
 
@@ -178,6 +205,7 @@
 		Vector4DF*				mTransferFunc;
 
 		// Volume settings
+		Vector3DF				mVThreshold;
 		Vector3DF				mExtinct;
 		Vector3DF				mSteps;
 		Vector3DF				mCutoff;
@@ -187,6 +215,13 @@
 		Vector3DF				mSectionPnt;
 		Vector3DF				mSectionNorm;
 
+		// Rendering settings
+		uchar					mShading;
+		uchar					mFilterMode;
+		int						mFrame;
+		int						mSample;		
+		int						mDepthBuf;		
+							
 		std::string		mLastShader;
 	};
 

@@ -262,7 +262,7 @@
 	  int			m_renderCnt;
 	  int			m_curX, m_curY;	  
 	  int			m_wheel;
-	  int			m_winSz[2];
+	  int			m_winSz[4];
 	  int			m_mods;
 	  ContextFlags	m_cflags;
 	  bool			m_doSwap;
@@ -271,6 +271,8 @@
 	  bool			m_keyPressed[KEY_LAST+1];
       bool			m_keyToggled[KEY_LAST+1];
 	  bool			m_fullscreen;
+	  int			m_display_frame;
+	  int			m_golden_frame;
 	  int			m_screenquad_prog;
 	  int			m_screenquad_vshader;
 	  int			m_screenquad_fshader;
@@ -307,6 +309,8 @@
 	  inline void         setCurMouse(int x, int y) { m_curX = x; m_curY = y; }
 	  inline int          getCurX() { return m_curX; }
 	  inline int          getCurY() { return m_curY; }
+	  inline bool isFirstFrame()	{ return m_display_frame==0; }
+	  inline int getDisplayFrame() { return m_display_frame; }
 
 	  // activate and deactivate are not thread-safe, need to be wrapped in mutex if called from multiple threads
 	  // invisible windows will not have any active callbacks, nor will they be affected by sysEvents
@@ -317,6 +321,7 @@
 	  bool create(const char* title=NULL, const ContextFlags* cflags=0, int width=1024, int height=768);
 	  void setTitle(const char* title);
 	  void maximize();
+	  void resize_window ( int w, int h );
 	  void restore();
 	  void minimize();
 	  void postRedisplay(int n=1) { m_renderCnt=n; }
@@ -329,6 +334,7 @@
 	  void vsync (bool state);
 	  void setKeyPress ( int key, bool state );
 	  void setFullscreen ( bool fullscreen );
+	  void save_frame ( char* fname );
 	  
 	  // from NVPWindow
 	  virtual bool init() { return true; }
@@ -336,6 +342,7 @@
 	  virtual void reshape(int w, int h) { }
 	  virtual void motion(int x, int y, int dx, int dy) {}
 	  virtual void mousewheel(int delta) {}
+	  virtual void on_arg( std::string arg, std::string val ) {}
 	  virtual void mouse(MouseButton button, ButtonAction action, int mods, int x, int y) {}
 	  virtual void keyboard(KeyCode key, ButtonAction action, int mods, int x, int y) {}
 	  virtual void keyboardchar(unsigned char key, int mods, int x, int y) {}
@@ -344,14 +351,14 @@
       virtual void end() {}
 
 	  // from WindowProfiler
-	  int run( const std::string &name, int argc, const char** argv, int width, int height, int Major, int Minor );
+	  int run( const std::string &name, const std::string& shortname, int argc, const char** argv, int width, int height, int Major, int Minor, int GoldenFrame=0 );
 	  void initGL ();
 	  void initScreenQuadGL ();
 	  void clearScreenGL ();
 	  void createScreenQuadGL ( int* glid, int w, int h );
-	  void renderScreenQuadGL(int glid, char inv1=0);
-	  void compositeScreenQuadGL(int glid1, int glid2, char inv1=0, char inv2=0 );
-	  void renderScreenQuadGL ( int glid1, int glid2, float x1, float y1, float x2, float y2, char inv1=0, char inv2=0 );
+	  void renderScreenQuadGL(int glid, char inv1 = 0);
+	  void compositeScreenQuadGL(int glid1, int glid2, char inv1 = 0, char inv2 = 0);
+	  void renderScreenQuadGL(int glid1, int glid2, float x1, float y1, float x2, float y2, char inv1 = 0, char inv2 = 0);
 
 	  //////////////////////////////////////////////////////////////////////////
 	  // system related

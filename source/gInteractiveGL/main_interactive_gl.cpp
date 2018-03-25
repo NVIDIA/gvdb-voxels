@@ -18,8 +18,10 @@ public:
 	virtual void motion(int x, int y, int dx, int dy);
 	virtual void mouse (NVPWindow::MouseButton button, NVPWindow::ButtonAction state, int mods, int x, int y);
 
-	int		gl_screen_tex;
-	int		mouse_down;
+	int			gl_screen_tex;
+	int			mouse_down;
+
+	Vector3DF	m_pretrans, m_scale, m_angs, m_trans;
 };
 
 
@@ -27,15 +29,19 @@ bool Sample::init()
 {
 	int w = getWidth(), h = getHeight();			// window width & height
 	mouse_down = -1;
-	gl_screen_tex = -1;
+	gl_screen_tex = -1;	
+	m_pretrans.Set(-125, -160, -125);
+	m_scale.Set(1, 1, 1);
+	m_angs.Set(0, 0, 0);
+	m_trans.Set(0, 0, 0);	
 
-	// Initialize GVDB
-	int devid = -1;
+	// Initialize GVDB	
 	gvdb.SetVerbose ( true );
-	gvdb.SetCudaDevice ( devid );
+	gvdb.SetCudaDevice ( GVDB_DEV_FIRST );
 	gvdb.Initialize ();
-	gvdb.AddPath ( std::string("../source/shared_assets/") );
-	gvdb.AddPath ( std::string(ASSET_PATH) );
+	gvdb.AddPath ( "../source/shared_assets/" );
+	gvdb.AddPath ( "../shared_assets/" );
+	gvdb.AddPath ( ASSET_PATH );
 
 	// Load VBX
 	char scnpath[1024];		
@@ -48,21 +54,23 @@ bool Sample::init()
 	gvdb.LoadVBX ( scnpath );	
 
 	// Set volume params
+	gvdb.SetTransform(m_pretrans, m_scale, m_angs, m_trans);
 	gvdb.getScene()->SetSteps ( .25, 16, .25 );				// Set raycasting steps
-	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
-	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, .1f );	// Set volume value range
-	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );
+	gvdb.getScene()->SetExtinct ( -1.0f, 1.0f, 0.0f );		// Set volume extinction
+	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, .5f );	// Set volume value range
+	gvdb.getScene()->SetCutoff ( 0.005f, 0.005f, 0.0f );
 	gvdb.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0 );
-	gvdb.getScene()->LinearTransferFunc ( 0.00f, 0.25f, Vector4DF(0,0,0,0), Vector4DF(1,1,0,0.1f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.25f, 0.50f, Vector4DF(1,1,0,0.4f), Vector4DF(1,0,0,0.3f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.3f), Vector4DF(.2f,.2f,0.2f,0.1f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.1f), Vector4DF(0,0,0,0.0) );
+	gvdb.getScene()->LinearTransferFunc(0.00f, 0.25f, Vector4DF(0, 0, 0, 0), Vector4DF(1, 0, 0, 0.05f));
+	gvdb.getScene()->LinearTransferFunc(0.25f, 0.50f, Vector4DF(1, 0, 0, 0.05f), Vector4DF(1, .5f, 0, 0.1f));
+	gvdb.getScene()->LinearTransferFunc(0.50f, 0.75f, Vector4DF(1, .5f, 0, 0.1f), Vector4DF(1, 1, 0, 0.15f));
+	gvdb.getScene()->LinearTransferFunc(0.75f, 1.00f, Vector4DF(1, 1, 0, 0.15f), Vector4DF(1, 1, 1, 0.2f));
 	gvdb.CommitTransferFunc ();
+
 
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
-	cam->setOrbit ( Vector3DF(20,30,0), Vector3DF(125,160,125), 700, 1.0 );	
+	cam->setOrbit ( Vector3DF(20,30,0), Vector3DF(0,0,0), 700, 1.0 );	
 	gvdb.getScene()->SetCamera( cam );
 	
 	// Create Light
@@ -85,6 +93,7 @@ bool Sample::init()
 void Sample::reshape (int w, int h)
 {
 	// Resize the opengl screen texture
+	glViewport(0, 0, w, h);
 	createScreenQuadGL ( &gl_screen_tex, w, h );
 
 	// Resize the GVDB render buffers
@@ -95,9 +104,12 @@ void Sample::reshape (int w, int h)
 
 void Sample::display() 
 {
+	m_angs.y += 0.05;		
+	gvdb.SetTransform(m_pretrans, m_scale, m_angs, m_trans);
+
 	// Render volume
 	gvdb.TimerStart ();
-	gvdb.Render ( 0, SHADE_VOLUME, 0, 0, 1, 1, 1 );
+	gvdb.Render ( SHADE_VOLUME, 0, 0 );
 	float rtime = gvdb.TimerStop();
 	nvprintf ( "Render volume. %6.3f ms\n", rtime );
 
@@ -110,6 +122,8 @@ void Sample::display()
 	// This is a helper func in sample utils (not part of gvdb),
 	// which renders an opengl 2D texture to the screen.
 	renderScreenQuadGL ( gl_screen_tex );
+
+	postRedisplay();
 }
 
 void Sample::motion(int x, int y, int dx, int dy) 
@@ -152,7 +166,7 @@ void Sample::mouse ( NVPWindow::MouseButton button, NVPWindow::ButtonAction stat
 int sample_main ( int argc, const char** argv ) 
 {
 	Sample sample_obj;
-	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gInteractveGL", argc, argv, 1024, 768, 4, 5 );
+	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gInteractveGL", "intergl", argc, argv, 1024, 768, 4, 5 );
 }
 
 void sample_print( int argc, char const *argv)

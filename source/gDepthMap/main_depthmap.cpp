@@ -20,8 +20,9 @@ public:
 	virtual void mouse (NVPWindow::MouseButton button, NVPWindow::ButtonAction state, int mods, int x, int y);
 
 	void	prepare_depth(int w, int h);
+	void	resize_depth(int w, int h );
 	void	render_depth(int w, int h);
-	void	update_camera_gl();
+	void	update_camera_gl(int w, int h);
 
 	int		mFBO;				// Framebuffer object
 	int		mDepthInputID;		// GVDB render buffer being used for depth input
@@ -30,28 +31,35 @@ public:
 	int		m_polys_tex;		// Texture holding GL color buffer for polygons
 	int     m_gvdb_tex;			// Texture holding GL color /w alpha for GVDB volume 
 
-	int		mouse_down;
+	Vector3DF	m_translate;
+	Vector3DF	m_rotate;
+
 	bool	m_use_opengl_cam;
+	int		mouse_down;
+
+	float	m_bias;
 };
+
 
 
 bool Sample::init() 
 {
 	int w = getWidth(), h = getHeight();			// window width & height
 	mFBO = -1;
+	m_bias = 1.0;
 	m_depth_tex = -1;
 	m_polys_tex = -1;
 	m_gvdb_tex = -1;
 	mouse_down = -1;
-	m_use_opengl_cam = true;
+	m_use_opengl_cam = false;
+	m_translate = Vector3DF(0, 0, -25);
+	m_rotate = Vector3DF(0, 0, 0);
 
-	// Initialize GVDB
-	int devid = -1;
+	// Initialize GVDB	
 	gvdb.SetVerbose ( true );
-	gvdb.SetCudaDevice ( devid );
-	gvdb.Initialize ();
-	gvdb.AddPath ( std::string("../source/shared_assets/") );
-	gvdb.AddPath ( std::string(ASSET_PATH) );
+	gvdb.SetCudaDevice ( GVDB_DEV_FIRST );
+	gvdb.Initialize ();	
+	gvdb.AddPath ( ASSET_PATH );
 
 	gvdb.StartRasterGL();
 
@@ -59,7 +67,7 @@ bool Sample::init()
 	// This loads an obj file into scene memory on cpu.
 	char scnpath[1024];
 	printf("Loading polygon model.\n");
-	gvdb.getScene()->AddModel("lucy.obj", 400.0, 128, 128, 128);
+	gvdb.getScene()->AddModel("lucy.obj", 100.0, 0, 0, 0);
 	gvdb.CommitGeometry(0);					// Send the polygons to GPU as OpenGL VBO	
 
 	// Load VBX
@@ -71,29 +79,31 @@ bool Sample::init()
 	printf ( "Loading VBX. %s\n", scnpath );
 	gvdb.SetChannelDefault ( 16, 16, 16 );
 	gvdb.LoadVBX ( scnpath );	
+	gvdb.UpdateApron();
 
 	// Set volume params
-	gvdb.getScene()->SetSteps ( .5, 16, .5 );				// Set raycasting steps
-	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
-	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, .1f );	// Set volume value range
-	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );
-	gvdb.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0 );
-	gvdb.getScene()->LinearTransferFunc ( 0.00f, 0.25f, Vector4DF(0,0,0,0), Vector4DF(1,1,0,0.1f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.25f, 0.50f, Vector4DF(1,1,0,0.4f), Vector4DF(1,0,0,0.3f) );
+	gvdb.getScene()->SetSteps ( .1, 16, .1 );				// Set raycasting steps
+	gvdb.getScene()->SetExtinct ( -1.0f, 1.0f, 0.0f );		// Set volume extinction
+	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, 0.5f );	// Set volume value range
+	gvdb.getScene()->SetCutoff ( 0.005f, 0.005f, 0.0f );
+	gvdb.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0 );		
+	gvdb.getScene()->LinearTransferFunc ( 0.00f, 0.10f, Vector4DF(0,0,0,0), Vector4DF(0,0,0,0.0f) );	
+	gvdb.getScene()->LinearTransferFunc ( 0.10f, 0.50f, Vector4DF(1,1,0,0.1f), Vector4DF(1,0,0,0.3f) );
 	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.3f), Vector4DF(.2f,.2f,0.2f,0.1f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.1f), Vector4DF(0,0,0,0.0) );
+	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.1f), Vector4DF(0.1,0.1,.1,0.3) ); 
 	gvdb.CommitTransferFunc ();
+	gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.5, .5, .5), m_rotate, m_translate );
 
-	// Create Camera 
+	// Default Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
-	cam->setNearFar(.1, 5000);
-	cam->setOrbit ( Vector3DF(20,30,0), Vector3DF(125,200,125), 1200, 1.0 );	
+	cam->setNearFar(.1f, 1000);
+	cam->setOrbit ( Vector3DF(-40,20,0), Vector3DF(0,0,0), 400, 1.0 );	
 	gvdb.getScene()->SetCamera( cam );
-	
-	// Create Light
+
+	// Default Light
 	Light* lgt = new Light;								
-	lgt->setOrbit ( Vector3DF(299,57.3f,0), Vector3DF(125,200,125), 1400, 1.0 );
+	lgt->setOrbit ( Vector3DF(299,57.3f,0), Vector3DF(0,0,0), 500, 1.0 );
 	gvdb.getScene()->SetLight ( 0, lgt );	
 
 	// Add render buffer
@@ -101,6 +111,7 @@ bool Sample::init()
 	gvdb.AddRenderBuf ( 0, w, h, 4 );
 	mDepthInputID = 1;
 	gvdb.AddDepthBuf (mDepthInputID, w, h );
+	gvdb.getScene()->SetDepthBuf( mDepthInputID );
 
 	// Create opengl texture for display
 	// This is a helper func in sample utils (not part of gvdb),
@@ -115,7 +126,6 @@ bool Sample::init()
 
 void Sample::prepare_depth(int w, int h )
 {
-
 	// Create OpenGL render texture
 	glGenTextures(1, (GLuint*) &m_polys_tex);
 	glBindTexture(GL_TEXTURE_2D, m_polys_tex );
@@ -153,8 +163,20 @@ void Sample::prepare_depth(int w, int h )
 	checkGL("prepare_depth");
 }
 
+void Sample::resize_depth(int w, int h )
+{
+	// Resize OpenGL textures
+	glBindTexture(GL_TEXTURE_2D, m_polys_tex );
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
-void Sample::update_camera_gl ()
+	glBindTexture(GL_TEXTURE_2D, m_depth_tex);	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+
+void Sample::update_camera_gl (int w, int h )
 {
 	// Manually setup an OpenGL camera
 	// - Normally, GVDB will automatically use the camera specified by gvdb.getScene()->SetCamera.
@@ -169,7 +191,7 @@ void Sample::update_camera_gl ()
 	double znear = 0.1;
 	double zfar = 5000.0;
 	double fov = 50.0;
-	double aspect = 1.3333333333333;
+	double aspect = float(w)/float(h);
 	GLfloat proj_mtx[16];
 	GLfloat view_mtx[16];
 	GLfloat invmodel_mtx[16];
@@ -202,7 +224,6 @@ void Sample::update_camera_gl ()
 	cam->setMatrices ( view_mtx, proj_mtx, vol_pos );
 }
 
-
 void Sample::render_depth (int w, int h)
 {
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);		
@@ -212,59 +233,72 @@ void Sample::render_depth (int w, int h)
 	glDepthFunc(GL_LEQUAL);
 	glDisable(GL_MULTISAMPLE);
 	glDisable(GL_STENCIL_TEST);
-	
+
 	// Bind shader
-	int simple_shader = getShaderID(0);
-	glUseProgram(simple_shader);
+	int simple_id = 0;
+	int simple_prog = gvdb.getScene()->getShaderProgram( simple_id );
+	glUseProgram(simple_prog);
 	checkGL("glUseProgram(SIMPLE), render_depth");
-	
+
 	glViewport(0, 0, w, h);
 
 	// Bind framebuffer to output color and depth
-	glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
-	checkGL("glBindFramebuffer, render_depth");
+	glBindFramebuffer(GL_FRAMEBUFFER, mFBO);	
+	checkGL( "glBindFramebuffer, render_depth");
 
 	// Clear both textures
 	glClearDepth(1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	checkGL ( "clear depth" );
 
 	// Send shader params
-	Matrix4F model_mtx;	
-	model_mtx.Identity();
-	renderCamSetupGL(gvdb.getScene(), simple_shader, &model_mtx);
-	renderLightSetupGL(gvdb.getScene(), simple_shader);
-	renderSetMaterialGL(gvdb.getScene(), simple_shader, Vector4DF(.1, .1, .1, 1), Vector4DF(.5, .5, .5, 1), Vector4DF(1, 1, 1, 1));
+	Matrix4F model_mtx;	model_mtx.Identity();
+	renderCamSetupGL(gvdb.getScene(), simple_id, &model_mtx);	
+	renderLightSetupGL(gvdb.getScene(), simple_id);
+	checkGL ( "lights" );
+	renderSetMaterialGL(gvdb.getScene(), simple_id, Vector4DF(.1, .1, .1, 1), Vector4DF(.5, .5, .5, 1), Vector4DF(1, 1, 1, 1));
+	checkGL ( "mats" );
 
 	// Render polygons for color and depth
-	renderSceneGL(gvdb.getScene(), simple_shader, false);
+	renderSceneGL(gvdb.getScene(), simple_id, false);
+	checkGL ( "draw depth" );
 
 	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glDisable(GL_DEPTH_TEST);
 
 	// Write depth texture into GVDB depth texture for CUDA access
-	gvdb.WriteDepthTexGL( mDepthInputID, m_depth_tex );
+	gvdb.WriteDepthTexGL( mDepthInputID, m_depth_tex );	
 	
 }
 
-
 void Sample::reshape (int w, int h)
 {
-	// Resize the opengl screen texture
-	createScreenQuadGL ( &m_gvdb_tex, w, h );
+	// Resize the OpenGL textures
+	resize_depth ( w, h );
 
 	// Resize the GVDB render buffers
+	glViewport(0, 0, w, h);
 	gvdb.ResizeRenderBuf ( 0, w, h, 4 );
+	gvdb.ResizeDepthBuf ( 1, w, h );
+
+	// Resize the GVDB to OpenGL texture
+	createScreenQuadGL ( &m_gvdb_tex, w, h );	
+
+	Camera3D* cam = gvdb.getScene()->getCamera();
+	cam->setAspect ( float(w)/float(h) );
 
 	postRedisplay();
 }
 
 void Sample::display() 
 {
-	int w = getWidth(), h = getHeight();			// window width & height
+	int w = getWidth(), h = getHeight();	// window width & height
+
+	gvdb.SetBias(m_bias);
 
 	if ( m_use_opengl_cam )
-		update_camera_gl ();				// Use OpenGL camera matrices
+		update_camera_gl (w, h);				// Use OpenGL camera matrices
 
 	render_depth(w, h);
 	
@@ -272,7 +306,7 @@ void Sample::display()
 
 	// Render volume
 	gvdb.TimerStart ();
-	gvdb.Render(0, SHADE_VOLUME, 0, 0, 1, 1, 0, mDepthInputID );    // last value indicates render buffer for depth input
+	gvdb.Render( SHADE_VOLUME, 0, 0 );   // in_chan=0, out_rbuf=0
 	float rtime = gvdb.TimerStop();
 	nvprintf ( "Render volume. %6.3f ms\n", rtime );
 
@@ -282,7 +316,6 @@ void Sample::display()
 	// Composite the OpenGL render with the GVDB render.
 	// The GL is treated as background for polygons, and the 
 	// depth-limited GVDB volume is composited over it with alpha.
-
 	compositeScreenQuadGL( m_polys_tex, m_gvdb_tex, 1, 0 );
 }
 
@@ -291,31 +324,51 @@ void Sample::motion(int x, int y, int dx, int dy)
 	// Get camera for GVDB Scene
 	Camera3D* cam = gvdb.getScene()->getCamera();
 	Light* lgt = gvdb.getScene()->getLight();
-	bool shift = (getMods() & NVPWindow::KMOD_SHIFT);		// Shift-key to modify light
+	bool shift = (getMods() & NVPWindow::KMOD_SHIFT);		// Shift-key to move volume
+	bool ctrl = (getMods() & NVPWindow::KMOD_CONTROL);		// Ctrl-key to rotate volume
+	bool alt = (getMods() & NVPWindow::KMOD_ALT);			// Alt-key to move light	
 
 	switch (mouse_down) {
 	case NVPWindow::MOUSE_BUTTON_LEFT: {
-		// Adjust orbit angles
-		Vector3DF angs = (shift ? lgt->getAng() : cam->getAng());
-		angs.x += dx*0.2f;
-		angs.y -= dy*0.2f;
-		if (shift)	lgt->setOrbit(angs, lgt->getToPos(), lgt->getOrbitDist(), lgt->getDolly());
-		else		cam->setOrbit(angs, cam->getToPos(), cam->getOrbitDist(), cam->getDolly());
+		if (shift) {
+			// Move volume
+			m_translate.x -= dx;
+			m_translate.z -= dy;
+			gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.5, .5, .5), m_rotate, m_translate);
+		} else if (ctrl) {
+			m_rotate.y += dx*0.1;
+			m_rotate.x += dy*0.1;
+			gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.5, .5, .5), m_rotate, m_translate);
+		} else {
+			// Adjust orbit angles
+			Vector3DF angs = (alt ? lgt->getAng() : cam->getAng());
+			angs.x += dx*0.2f;
+			angs.y -= dy*0.2f;
+			if (alt)	lgt->setOrbit(angs, lgt->getToPos(), lgt->getOrbitDist(), lgt->getDolly());
+			else		cam->setOrbit(angs, cam->getToPos(), cam->getOrbitDist(), cam->getDolly());
+		}
 		postRedisplay();
 	} break;
 
 	case NVPWindow::MOUSE_BUTTON_MIDDLE: {
 		// Adjust target pos		
+		//m_bias += dy *0.01;
 		cam->moveRelative(float(dx) * cam->getOrbitDist() / 1000, float(-dy) * cam->getOrbitDist() / 1000, 0);
 		postRedisplay();
 	} break;
 
 	case NVPWindow::MOUSE_BUTTON_RIGHT: {
-		// Adjust dist
-		float dist = (shift ? lgt->getOrbitDist() : cam->getOrbitDist());
-		dist -= dy;
-		if (shift)	lgt->setOrbit(lgt->getAng(), lgt->getToPos(), dist, cam->getDolly());
-		else		cam->setOrbit(cam->getAng(), cam->getToPos(), dist, cam->getDolly());
+		if (shift) {
+			// Move volume
+			m_translate.y += dy;
+			gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.5, .5, .5), m_rotate, m_translate);
+		} 	else {
+			// Adjust dist
+			float dist = (shift ? lgt->getOrbitDist() : cam->getOrbitDist());
+			dist -= dy;
+			if (ctrl)	lgt->setOrbit(lgt->getAng(), lgt->getToPos(), dist, cam->getDolly());
+			else		cam->setOrbit(cam->getAng(), cam->getToPos(), dist, cam->getDolly());
+		}
 		postRedisplay();
 	} break;
 	}
@@ -330,7 +383,7 @@ void Sample::mouse ( NVPWindow::MouseButton button, NVPWindow::ButtonAction stat
 int sample_main ( int argc, const char** argv ) 
 {
 	Sample sample_obj;
-	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gDepthMap", argc, argv, 1024, 768, 4, 5 );
+	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gDepthMap", "depthmap", argc, argv, 1024, 768, 4, 5 );
 }
 
 void sample_print( int argc, char const *argv)

@@ -1,7 +1,6 @@
-
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -18,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #include "gvdb_volume_3D.h"
@@ -90,9 +90,8 @@ void Volume3D::PrepareRasterGL ( bool start )
 			glEnable ( GL_TEXTURE_3D );	
 
 			// Set rasterize program once
-			int vox_shader = getShaderID(3);  // 3 == voxelize shader
-			glUseProgram (vox_shader);
-			checkGL ( "glUseProgram(VOX) (PrepareRaster)" );
+			glUseProgram ( getScene()->getProgram(GLS_VOXELIZE) );
+			gchkGL ( "glUseProgram(VOX) (PrepareRaster)" );
 
 			// Set raster sampling to major axis						
 			int smax = max3(mVoxRes.x, mVoxRes.y, mVoxRes.z);
@@ -102,7 +101,7 @@ void Volume3D::PrepareRasterGL ( bool start )
 			int glid = mPool->getAtlasGLID ( 0 );
 			glActiveTexture ( GL_TEXTURE0 );
 			glBindTexture ( GL_TEXTURE_3D, glid );
-			checkGL ( "glBindTexture (RasterizeFast)" );
+			gchkGL ( "glBindTexture (RasterizeFast)" );
 
 			if ( mVFBO[0] == -1 ) glGenFramebuffers(1, (GLuint*) &mVFBO);
 			glBindFramebuffer(GL_FRAMEBUFFER, mVFBO[0] );
@@ -112,10 +111,10 @@ void Volume3D::PrepareRasterGL ( bool start )
 			case T_UCHAR:	glBindImageTexture( 0, glid, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R8 );		break;
 			case T_FLOAT:	glBindImageTexture( 0, glid, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F );	break;
 			};
-			checkGL ( "glBindImageTexture (RasterizeFast)" );	
+			gchkGL ( "glBindImageTexture (RasterizeFast)" );
 
 			// Indicate res of major axis
-			glProgramUniform1i ( vox_shader, getScene()->getParam(vox_shader, USAMPLES), smax );
+			glProgramUniform1i ( getScene()->getProgram(GLS_VOXELIZE), getScene()->getParam(GLS_VOXELIZE, USAMPLES), smax );
 
 		} else {
 			// Restore state
@@ -125,7 +124,7 @@ void Volume3D::PrepareRasterGL ( bool start )
 			glBindFramebuffer (GL_FRAMEBUFFER, 0);		
 			glDepthMask ( GL_TRUE);
 			glColorMask ( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); 			
-			checkGL ( "glUseProgram(0) (PrepareRaster)" );			
+			gchkGL( "glUseProgram(0) (PrepareRaster)" );
 		}
 	#endif 
 }
@@ -139,22 +138,21 @@ void Volume3D::SurfaceVoxelizeFastGL ( Vector3DF vmin, Vector3DF vmax, Matrix4F*
 
 		// Clear texture. 		
 		Empty ();												// using cuda kernel						
-		cudaCheck ( cuCtxSynchronize(), "cuCtxSync", "SurfaceVoxelizeFastGL" );		// must sync for opengl to use		
+		cudaCheck ( cuCtxSynchronize(), "Volume3D", "SurfaceVoxelizeFastGL", "cuCtxSynchronize", "", false );		// must sync for opengl to use		
 		
 		//glClearColor ( 0, 0, 0, 0);			// using FBO, see PrepareRasterGL setup
 		//glClear(GL_COLOR_BUFFER_BIT);	
 
 		// Setup transform matrix
-		int vox_shader = getShaderID(3);  // 3 == voxelize shader
 		Matrix4F mw;
 		mw.Translate ( -mObjMin.x, -mObjMin.y, -mObjMin.z );
 		mw *= (*model);
 		mw *= Vector3DF( 2.0/(mObjMax.x-mObjMin.x), 2.0/(mObjMax.y-mObjMin.y), 2.0/(mObjMax.z-mObjMin.z) );		
-		renderSetUW ( getScene(), vox_shader, &mw, mVoxRes );
+		renderSetUW ( getScene(), GLS_VOXELIZE, &mw, mVoxRes );
 
 		// Rasterize		
-		renderSceneGL ( getScene(), vox_shader, false );
-		checkGL ( "renderSceneGL (RasterizeFast)" );
+		renderSceneGL ( getScene(), GLS_VOXELIZE, false );
+		gchkGL ( "renderSceneGL (RasterizeFast)" );
 
 		glFinish ();
 
@@ -208,19 +206,18 @@ void Volume3D::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 		glBindTexture ( GL_TEXTURE_3D, glid );
 		glBindImageTexture( 0, glid, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F );
     
-		int vox_shader = getShaderID(3);  // 3 == voxelize shader
-		glUseProgram ( vox_shader );
+		glUseProgram ( getScene()->getProgram(GLS_VOXELIZE) );
 
-		glProgramUniform1i (vox_shader, getScene()->getParam(vox_shader, USAMPLES), s );	// indicate res of major axis
+		glProgramUniform1i ( getScene()->getProgram(GLS_VOXELIZE), getScene()->getParam(GLS_VOXELIZE, USAMPLES), s );	// indicate res of major axis
     
 		// Send model orientation, scaled to fit in volume
 		Matrix4F mw;
 		mw.Translate ( -mObjMin.x, -mObjMin.y, -mObjMin.z );
 		mw *= (*xform);
 		mw *= Vector3DF( 2.0/(mObjMax.x-mObjMin.x), 2.0/(mObjMax.y-mObjMin.y), 2.0/(mObjMax.z-mObjMin.z) );		
-		renderSetUW ( getScene(), vox_shader, &mw, mVoxRes );		// this sets uTexRes in shader
+		renderSetUW ( getScene(), getScene()->getProgram(GLS_VOXELIZE), &mw, mVoxRes );		// this sets uTexRes in shader
 
-		renderSceneGL ( getScene(), vox_shader, false );
+		renderSceneGL ( getScene(), getScene()->getProgram(GLS_VOXELIZE), false );
 
 		glUseProgram ( 0 );	
 	

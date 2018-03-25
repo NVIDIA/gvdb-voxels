@@ -61,8 +61,12 @@ struct ALIGN(16) ScnInfo {
 	float3		light_pos;		
 	float3		slice_pnt;
 	float3		slice_norm;
-	float		bias;
-	float		shadow_amt;
+	float3		shadow_params;
+	float4		backclr;
+	float		xform[16];
+	float		invxform[16];
+	float		invxrot[16];
+	float		bias;	
 	char		shading;
 	char		filtering;	
 	int			frame;
@@ -70,9 +74,10 @@ struct ALIGN(16) ScnInfo {
 	float3		extinct;
 	float3		steps;
 	float3		cutoff;
+	float3		thresh;
+	float4*		transfer;
 	char*		outbuf;
-  	char*   	dbuf;
-	float4		backclr;
+  	char*   	dbuf;	
 };
 
 struct ALIGN(16) ScnRay {
@@ -86,54 +91,37 @@ struct ALIGN(16) ScnRay {
 };
 
 #ifdef CUDA_PATHWAY
-	__constant__ ScnInfo		scn;					// Scene info
-
-	#define SCN_SHADE			scn.shading
-	#define SCN_EXTINCT			scn.extinct.x
-	#define SCN_ALBEDO			scn.extinct.y
-	#define SCN_PSTEP			scn.steps.x
-	#define SCN_SSTEP			scn.steps.y
-	#define SCN_FSTEP			scn.steps.z
-	#define SCN_MINVAL			scn.cutoff.x
-	#define SCN_ALPHACUT		scn.cutoff.y
-	#define SCN_SHADOWAMT		scn.shadow_amt
-	#define SCN_DBUF			(float*) scn.dbuf
-	#define SCN_WIDTH			scn.width
-	#define SCN_HEIGHT			scn.height
-	#define SCN_BACKCLR			scn.backclr
-	#define SCN_SLICE_NORM		scn.slice_norm
-	#define SCN_SLICE_PNT		scn.slice_pnt
-	#define TRANSFER_FUNC		gvdb.transfer
+	__constant__ ScnInfo		scn;					// Scene Info
+	#define TRANSFER_FUNC		scn.transfer			// Transfer Func Buffer
+	#define SCN_DBUF			(float*) scn.dbuf		// Depth Buffer
 #endif
+
 #ifdef OPTIX_PATHWAY
-	rtBuffer<float4>			scn_transfer_func;		// Scene info
-	rtDeclareVariable(uint,		scn_shading, , );
-	rtDeclareVariable(float,	scn_shadowamt, , );
-	rtDeclareVariable(float4,	scn_backclr, , );
-	rtDeclareVariable(float3,	scn_extinct, , );
-	rtDeclareVariable(float3,	scn_steps, , );
-	rtDeclareVariable(float3,	scn_cutoff, , );
-	rtDeclareVariable(int,		scn_width, , );
-	rtDeclareVariable(int,		scn_height, , );
-	rtDeclareVariable(float3,	scn_slice_norm, , );
-	rtDeclareVariable(float3,	scn_slice_pnt, , );
-	rtBuffer<float>				scn_dbuf;
-
-	#define SCN_DBUF			0x0
-	//#define SCN_DBUF			(float*) &scn_dbuf[0];
-    #define SCN_WIDTH			scn_width
-    #define SCN_HEIGHT			scn_height
-	#define SCN_SHADE			scn_shading		
-	#define SCN_EXTINCT			scn_extinct.x
-	#define SCN_ALBEDO			scn_extinct.y
-	#define SCN_PSTEP			scn_steps.x
-	#define SCN_SSTEP			scn_steps.y
-	#define SCN_FSTEP			scn_steps.z
-	#define SCN_MINVAL			scn_cutoff.x
-	#define SCN_ALPHACUT		scn_cutoff.y
-	#define SCN_SHADOWAMT		scn_shadowamt
-	#define SCN_BACKCLR			scn_backclr
-	#define SCN_SLICE_NORM		scn_slice_norm
-	#define SCN_SLICE_PNT		scn_slice_pnt
+	rtDeclareVariable(ScnInfo, scn, , );				// Scene info
+	rtBuffer<float4>	scn_transfer_func;				// Transfer func	
+	
 	#define TRANSFER_FUNC		scn_transfer_func
+	#define SCN_DBUF			0x0 
 #endif
+
+#define SCN_SHADE			scn.shading
+#define SCN_EXTINCT			scn.extinct.x
+#define SCN_ALBEDO			scn.extinct.y
+#define SCN_PSTEP			scn.steps.x
+#define SCN_SSTEP			scn.steps.y
+#define SCN_FSTEP			scn.steps.z
+#define SCN_MINVAL			scn.cutoff.x
+#define SCN_ALPHACUT		scn.cutoff.y
+#define SCN_THRESH			scn.thresh.x
+#define SCN_VMIN			scn.thresh.y
+#define SCN_VMAX			scn.thresh.z
+#define SCN_SHADOWAMT		scn.shadow_params.x
+#define SCN_SHADOWBIAS		scn.shadow_params.y
+#define SCN_WIDTH			scn.width
+#define SCN_HEIGHT			scn.height
+#define SCN_BACKCLR			scn.backclr
+#define SCN_SLICE_NORM		scn.slice_norm
+#define SCN_SLICE_PNT		scn.slice_pnt
+#define SCN_XFORM			scn.xform
+#define SCN_INVXFORM		scn.invxform
+#define SCN_INVXROT			scn.invxrot

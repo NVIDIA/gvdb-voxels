@@ -37,8 +37,10 @@ struct ALIGN(16) VDBNode {
 	int3		mPos;			// Pos			Max = +/- 4 mil (linear space/range)	12 bytes
 	int3		mValue;			// Value		Max = +8 mil		4 bytes
 	uint64		mParent;		// Parent ID						8 bytes
-	uint64		mChildList;		// Child List						8 bytes		
+	uint64		mChildList;		// Child List						8 bytes
+#ifdef USE_BITMASKS
 	uint64		mMask;			// Bitmask starts
+#endif
 };
 struct ALIGN(16) VDBAtlasNode {
 	int3		mPos;
@@ -68,9 +70,8 @@ struct ALIGN(16) VDBInfo {
 	float4*		transfer;
 };
 
-
 //------- BIT COUNTING
-
+#ifdef USE_BITMASKS
 inline __device__ uint64 numBitsOn ( uint64 v)
 {
 	v = v - ((v >> 1) & uint64(0x5555555555555555LLU));
@@ -94,7 +95,7 @@ inline __device__ bool isBitOn ( VDBNode* node, int b )
 {
 	return ( (&node->mMask)[ b >> 6 ] & (uint64(1) << (b & 63))) != 0;
 }
-
+#endif
 //------- BASIC GEOMETRY
 
 inline __device__ float3 getRayPoint ( float3 pos, float3 dir, float t )
@@ -105,7 +106,7 @@ inline __device__ float3 getRayPoint ( float3 pos, float3 dir, float t )
 inline __device__ float3 getViewRay ( float x, float y )
 {
   float3 v = x*scn.camu + y*scn.camv + scn.cams;
-  return normalize(v);
+  return mmult(normalize(v), SCN_INVXFORM);
 }
 
 

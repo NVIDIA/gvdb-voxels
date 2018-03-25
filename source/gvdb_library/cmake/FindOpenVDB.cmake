@@ -2,6 +2,7 @@
 # Try to find OpenVDB project dll/so and headers
 #
 
+
 # outputs
 unset(OPENVDB_DLL CACHE)
 unset(OPENVDB_LIB CACHE)
@@ -11,21 +12,27 @@ unset(OPENVDB_LIB_DIR CACHE)
 unset(OPENVDB_LIB_DEBUG CACHE)
 unset(OPENVDB_LIB_RELEASE CACHE)
 
-macro(_find_files targetVar incDir dllName )
-  unset ( fileList )
-  file(GLOB fileList "${${incDir}}/${dllName}")
-  list(LENGTH fileList NUMLIST)
-  message ( STATUS "locate: ${${incDir}}/${dllName}, found: ${NUMLIST}" )  
-  if(NUMLIST EQUAL 0)
-    message(FATAL_ERROR "MISSING: unable to find ${targetVar} files (${folder}${dllName}, ${folder}${dllName64})" )    
-  else()
-    list(APPEND ${targetVar} ${fileList} )  
-  endif()  
 
-  # message ( "File list: ${${targetVar}}" )		#-- debugging
-endmacro()
-
-
+FUNCTION(package_openvdb_binaries)
+   list ( APPEND OPENVDB_LIST "blosc.dll")
+   list ( APPEND OPENVDB_LIST "boost_system-vc140-mt-1_64.dll")
+   list ( APPEND OPENVDB_LIST "boost_system-vc140-mt-gd-1_64.dll")
+   list ( APPEND OPENVDB_LIST "boost_thread-vc140-mt-1_64.dll")
+   list ( APPEND OPENVDB_LIST "boost_thread-vc140-mt-gd-1_64.dll")
+   list ( APPEND OPENVDB_LIST "Half.dll")
+   list ( APPEND OPENVDB_LIST "Iex.dll")
+   list ( APPEND OPENVDB_LIST "IexMath.dll")
+   list ( APPEND OPENVDB_LIST "IlmImf.dll")
+   list ( APPEND OPENVDB_LIST "IlmThread.dll")
+   list ( APPEND OPENVDB_LIST "Imath.dll")
+   list ( APPEND OPENVDB_LIST "openvdb.dll")
+   list ( APPEND OPENVDB_LIST "openvdb_d.dll")
+   list ( APPEND OPENVDB_LIST "tbb.dll")
+   list ( APPEND OPENVDB_LIST "tbb_debug.dll")
+   list ( APPEND OPENVDB_LIST "zlib.dll")
+   list ( APPEND OPENVDB_LIST "zlibd.dll")
+   set ( OPENVDB_BINARIES ${OPENVDB_LIST} PARENT_SCOPE)      
+ENDFUNCTION()
 
 if (OPENVDB_ROOT_DIR AND USE_OPENVDB)
 
@@ -62,10 +69,10 @@ if (OPENVDB_ROOT_DIR AND USE_OPENVDB)
 	  set( OPENVDB_FOUND "YES" )      
 	  
   endif()
-  message(STATUS "--> Found OpenVDB at ${OPENVDB_ROOT_DIR}." )
+  message(STATUS "OpenVDB Location: ${OPENVDB_ROOT_DIR}" )
 else()
 
-  set ( OPENVDB_ROOT_DIR "SET-OPENVDB-ROOTDIR-HERE" CACHE PATH "")
+  set ( OPENVDB_ROOT_DIR "SET-OPENVDB_ROOT_DIR" CACHE PATH "")
   if ( USE_OPENVDB) 
   
       message(STATUS "--> WARNING: OPENVDB not found. Some samples requiring OpenVDB may not run.

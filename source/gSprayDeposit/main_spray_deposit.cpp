@@ -81,6 +81,7 @@ void handle_gui ( int gui, float val )
 
 void Sample::start_guis (int w, int h)
 {
+	clearGuis();
 	setview2D (w, h);
 	guiSetCallback ( handle_gui );	
 	addGui (  10, h-30, 130, 20, "Simulate", GUI_CHECK, GUI_BOOL, &m_simulate, 0, 1 );
@@ -116,12 +117,14 @@ bool Sample::init()
 
 	// Initialize GVDB
 	int devid = -1;
+	gvdb.SetDebug ( true );
 	gvdb.SetVerbose ( true );
-	gvdb.SetProfile ( false );
+	gvdb.SetProfile ( false, true );
 	gvdb.SetCudaDevice ( devid );
 	gvdb.Initialize ();
-	gvdb.AddPath ( std::string( "../source/shared_assets/" ) );
-	gvdb.AddPath ( std::string(ASSET_PATH) );
+	gvdb.AddPath ( "../source/shared_assets/" );
+	gvdb.AddPath ( "../shared_assets/" );
+	gvdb.AddPath ( ASSET_PATH );
 	gvdb.StartRasterGL ();
 
 	// Load polygons
@@ -154,21 +157,21 @@ bool Sample::init()
 	// For this GVDB Beta, the last argument to AddChannel specifies the
 	// maximum number of bricks. Keep this as low as possible for performance reasons.
 	// AddChanell ( channel_id, channel_type, apron, max bricks )
-	
+
 	// Create two channels (density & color)
 	gvdb.AddChannel ( 0, T_FLOAT, 1 );
 	gvdb.AddChannel ( 1, T_UCHAR4, 1 );
-	gvdb.SetColorChannel ( 1 );					// Let GVDB know channel 1 can be used for color
+	gvdb.SetColorChannel ( 1 );					// Let GVDB know channel 1 can be used for color	
 
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
-	cam->setOrbit ( Vector3DF(45,40,0), Vector3DF(50,55,50), 200, 1.0 );	
+	cam->setOrbit ( Vector3DF(45,40,0), Vector3DF(200,200,200), 1000, 1.0 );	
 	gvdb.getScene()->SetCamera( cam );
 	
 	// Create Light
 	Light* lgt = new Light;								
-	lgt->setOrbit ( Vector3DF(80,50,0), Vector3DF(50,50,50), 60, 1.0 );
+	lgt->setOrbit ( Vector3DF(80,50,0), Vector3DF(200,200,200), 800, 1.0 );
 	gvdb.getScene()->SetLight ( 0, lgt );	
 
 	// Add render buffer
@@ -181,13 +184,12 @@ bool Sample::init()
 
 	// Rasterize the polygonal part to voxels
 	Matrix4F xform;	
-	float part_size = 25.0;							// Part size is set to 100 mm height.
-	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(50,50,50), part_size );
-	Vector3DF voxelsize ( 0.10f, 0.10f, 0.10f );	// Voxel size (mm)
-	gvdb.SetVoxelSize ( voxelsize.x, voxelsize.y, voxelsize.z );
+	float part_size = 200.0;							// Part size is set to 100 mm height.
+	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(200,200,200), part_size );
+	gvdb.SetVoxelSize ( 1, 1, 1 );
 	Model* m = gvdb.getScene()->getModel(0);
 
-	gvdb.SurfaceVoxelizeGL ( 0, m, &xform );		// polygons to voxels
+	gvdb.SolidVoxelize ( 0, m, &xform, 1, 1 );		// polygons to voxels
 
 	// Fill color channel	
 	gvdb.FillChannel ( 1, Vector4DF(0.7f, 0.7f, 0.7f, 1) );
@@ -206,10 +208,14 @@ bool Sample::init()
 void Sample::reshape (int w, int h)
 {
 	// Resize the opengl screen texture
+	glViewport(0, 0, w, h);
 	createScreenQuadGL ( &gl_screen_tex, w, h );
 
 	// Resize the GVDB render buffers
 	gvdb.ResizeRenderBuf ( 0, w, h, 4 );
+
+	// Resize 2D UI
+	start_guis(w, h);
 
 	postRedisplay();
 }
@@ -265,7 +271,7 @@ void Sample::simulate()
 		y = std::max<float>(-0.5f, std::min<float>(0.5f, y));
 		ray->orig.Set ( x*25.0f, 0, y*0.5f + lt*effect.y );	// wand sweeping
 		ray->orig *= rot;									// rotating wand over time
-		ray->orig += Vector3DF( 50, 80, 50 );				// position of wand
+		ray->orig += Vector3DF( 200, 400, 200 );			// position of wand
 		
 		// set ray direction
 		dir.Random ( -0.1f, 0.1f, 0, 0.0, 0, 0 );		
@@ -284,7 +290,7 @@ void Sample::simulate()
 
 	// Trace rays
 	// Returns the hit position and normal of each ray
-	gvdb.Raytrace ( m_rays, SHADE_TRILINEAR, 0, -0.0001f);
+	gvdb.Raytrace ( m_rays, 0, SHADE_TRILINEAR, 0, -0.0001f);
 
 	// Insert Points into the GVDBb grid
 	// This identifies a grid cell for each point. The SetPointStruct function accepts an arbitrary 
@@ -293,20 +299,20 @@ void Sample::simulate()
 	DataPtr pntpos, pntclr; 
 	gvdb.SetDataGPU ( pntpos, m_numrays, m_rays.gpu, 0, sizeof(ScnRay) );
 	gvdb.SetDataGPU ( pntclr, m_numrays, m_rays.gpu, 48, sizeof(ScnRay) );
-	gvdb.SetPoints ( pntpos, pntclr );
+	gvdb.SetPoints ( pntpos, DataPtr(), pntclr );  
 
-	gvdb.InsertPoints ( m_numrays, Vector3DF(0,0,0) );
+	int scPntLen = 0;
+	int subcell_size = 4;
+	float radius=1.0;
+	gvdb.InsertPointsSubcell (subcell_size, m_numrays, radius, Vector3DF(0,0,0), scPntLen);
+	gvdb.GatherDensity (subcell_size, m_numrays, radius, Vector3DF(0,0,0), scPntLen, 0, 1, true ); // true = accumulate
+
+	gvdb.UpdateApron ( 0 );
 		
-	// Scatter Point Density
-	// This adds voxels to the volume at the point locations
-	gvdb.ScatterPointDensity ( m_numrays, 2.0, 1.0, Vector3DF(0,0,0) );
-	gvdb.UpdateApron ();
-
 	// Smooth the volume
 	// A smoothing effect simulates gradual erosion
 	if ( int(m_time) % 20 == 0 ) {
 		gvdb.Compute ( FUNC_SMOOTH, 0, 1, Vector3DF(4,0,0), true ); 	
-	    gvdb.Compute ( FUNC_CLR_EXPAND, 1, 1, Vector3DF(2,1,0), true ); 		
 	}
 	
 }
@@ -383,7 +389,7 @@ void Sample::display()
 	case 3: sh = SHADE_SECTION3D;	break;
 	case 4: sh = SHADE_VOLUME;		break;
 	};
-	gvdb.Render ( 0, sh, 0, 0, 1, 1, 0.6f );			// Render volume to internal cuda buffer
+	gvdb.Render ( sh, 0, 0 );						// Render volume to output buffer
 
 	gvdb.ReadRenderTexGL ( 0, gl_screen_tex );		// Copy internal buffer into opengl texture
 
@@ -448,7 +454,7 @@ void Sample::mouse ( NVPWindow::MouseButton button, NVPWindow::ButtonAction stat
 int sample_main ( int argc, const char** argv ) 
 {
 	Sample sample_obj;
-	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gSprayDeposit", argc, argv, 1024, 768, 4, 5 );
+	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gSprayDeposit", "spraydep", argc, argv, 1024, 768, 4, 5, 100 );
 }
 
 void sample_print( int argc, char const *argv)

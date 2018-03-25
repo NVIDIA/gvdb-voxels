@@ -36,11 +36,18 @@ using namespace nvdb;
 // Sample utils
 #include "main.h"			// window system 
 #include "nv_gui.h"			// gui system
+#include "vec.h"
 #include <GL/glew.h>
 
 VolumeGVDB	gvdb;
 
 FluidSystem fluid;
+
+#ifdef USE_OPTIX
+	// OptiX scene
+	#include "optix_scene.h"
+	OptixScene  optx;
+#endif
 
 //#define USE_CPU_COPY		// by default use data already on GPU (no CPU copy)
 
@@ -66,8 +73,11 @@ public:
 	void		simulate ();		// simulation material deposition
 	void		start_guis (int w, int h);	
 	void		reconfigure ();
+	void		RebuildOptixGraph ();
 
 	Vector3DF	m_origin;
+	float		m_radius;
+	bool		m_rebuild_gpu;
 	int			m_numpnts;
 	DataPtr		m_pntpos;
 	DataPtr		m_pntclr;
@@ -75,20 +85,24 @@ public:
 	int			mouse_down;	
 	float		m_time;				// simulation time	
 	bool		m_show_gui;
+	bool		m_render_optix;
 	bool		m_show_fluid;	
 	bool		m_show_topo;
 	bool		m_use_color;
-	bool		m_simulate;
-	int			m_surface;
+	bool		m_simulate;	
 	int			m_shade_style;
 	int			m_id;
+
+	int			m_mat_surf1;
+	int			m_frame;
+	int			m_sample;
 };
 Sample sample_obj;
 
 void Sample::reconfigure ()
 {
 	// Configure new GVDB volume
-	gvdb.Configure ( 3, 3, 3, 3, 4 );	
+	gvdb.Configure ( 3, 3, 3, 3, 5 );	
 	
 	// VoxelSize. Determines the effective resolution of the voxel grid. 
 	gvdb.SetVoxelSize ( 1.0f, 1.0f, 1.0f );
@@ -99,47 +113,99 @@ void Sample::reconfigure ()
 	// For this GVDB Beta, the last argument to AddChannel specifies the
 	// maximum number of bricks. Keep this as low as possible for performance reasons.
 	// AddChanell ( channel_id, channel_type, apron, max bricks )
-	gvdb.SetChannelDefault ( 8, 8, 8 );
+	gvdb.SetChannelDefault ( 16, 16, 1 );
 	gvdb.AddChannel ( 0, T_FLOAT, 1 );	
 	if ( m_use_color ) {
 		gvdb.AddChannel ( 1, T_UCHAR4, 1 );
 		gvdb.SetColorChannel ( 1 );
 	}
+
 }
 
 void handle_gui ( int gui, float val )
 {
-	switch ( gui ) {
-	case 3:	{				// Shading gui changed
-		float alpha = (val==4) ? 0.03f : 0.8f;		// when in volume mode (#4), make volume very transparent
-		gvdb.getScene()->LinearTransferFunc ( 0.00f, 0.05f,  Vector4DF(0, 0, 0, 0), Vector4DF(1, .5f, 0, 0.1f) );
-		gvdb.getScene()->LinearTransferFunc ( 0.05f, 0.18f,  Vector4DF(1, .5f, 0, .1f), Vector4DF(.9f, .9f, .9f, alpha) );
-		gvdb.getScene()->LinearTransferFunc ( 0.18f, 1.0f,   Vector4DF(.9f, .9f, .9f, alpha), Vector4DF(0,0,0,0) );
-		gvdb.CommitTransferFunc ();		
-		} break;
-	case 4:					// Color gui changed
-		sample_obj.reconfigure ();			// Reconfigure GVDB volume to add/remove a color channel
+	switch ( gui ) {	
+	case 3:								// Color GUI changed
+		sample_obj.reconfigure ();		// Reconfigure GVDB volume to add/remove a color channel		
 		break;
 	}
 }
 
 void Sample::start_guis (int w, int h)
 {
+	clearGuis();
 	setview2D (w, h);
 	guiSetCallback ( handle_gui );	
 	addGui (  10, h-30, 130, 20, "Simulate", GUI_CHECK, GUI_BOOL, &m_simulate, 0, 1 );
 	addGui ( 150, h-30, 130, 20, "Topology", GUI_CHECK, GUI_BOOL, &m_show_topo, 0, 1 );
-	addGui ( 300, h-30, 130, 20, "Fluid",    GUI_CHECK, GUI_BOOL, &m_show_fluid, 0, 1 );
-	addGui ( 450, h-30, 130, 20, "Shading",  GUI_COMBO, GUI_INT, &m_shade_style, 0, 5 );
-		addItem ( "Off" );
-		addItem ( "Voxel" );
-		addItem ( "Surface" );
-		addItem ( "Section" );
-		addItem ( "Volume" );
-	addGui ( 600, h-30, 130, 20, "Color",    GUI_CHECK, GUI_BOOL, &m_use_color, 0, 1 );
-	addGui ( 750, h-30, 130, 20, "Surface",  GUI_COMBO, GUI_INT,  &m_surface, 0, 1 );
-		addItem ( "Scatter" );
-		addItem ( "Gather" );
+	addGui ( 300, h-30, 130, 20, "Fluid",    GUI_CHECK, GUI_BOOL, &m_show_fluid, 0, 1 );	
+	addGui ( 450, h-30, 130, 20, "Color",    GUI_CHECK, GUI_BOOL, &m_use_color, 0, 1 );	
+}
+
+
+void Sample::RebuildOptixGraph ()
+{
+	char filepath[1024];
+
+	optx.ClearGraph();
+
+	if ( gvdb.FindFile ( "sky.png", filepath) )
+		optx.CreateEnvmap ( filepath );
+
+	m_mat_surf1 = optx.AddMaterial("optix_trace_surface", "trace_surface", "trace_shadow");		
+	MaterialParams* matp = optx.getMaterialParams( m_mat_surf1 );
+	matp->light_width = 1.2;
+	matp->shadow_width = 0.1f;
+	matp->shadow_bias = 0.5f;
+	matp->amb_color = Vector3DF(.05f, .05f, .05f);
+	matp->diff_color = Vector3DF(.7f, .7f, .7f);
+	matp->spec_color = Vector3DF(1.f, 1.f, 1.f);
+	matp->spec_power = 400.0;
+	matp->env_color = Vector3DF(0.f, 0.f, 0.f);
+	matp->refl_width = 0.5f;
+	matp->refl_bias = 0.5f;
+	matp->refl_color = Vector3DF(0.4f, 0.4f, 0.4f);
+	
+	matp->refr_width = 0.0f;
+	matp->refr_color = Vector3DF(0.1f, .1f, .1f);
+	matp->refr_ior = 1.1f;
+	matp->refr_amount = 0.5f;
+	matp->refr_offset = 50.0f;
+	matp->refr_bias = 0.5f;
+	optx.SetMaterialParams( m_mat_surf1, matp );
+
+	// Add GVDB volume to the OptiX scene
+	nvprintf("Adding GVDB Volume to OptiX graph.\n");
+	Vector3DF volmin = gvdb.getVolMin();
+	Vector3DF volmax = gvdb.getVolMax();
+	Matrix4F xform;
+	xform.Identity();
+	int atlas_glid = gvdb.getAtlasGLID(0);
+	optx.AddVolume( atlas_glid, volmin, volmax, xform, m_mat_surf1, 'L' );		
+
+	// Ground polygons
+	if ( gvdb.FindFile ( "ground.obj", filepath) ) {
+		Model* m;
+		gvdb.getScene()->AddModel ( filepath, 1.0, 0, 0, 0 );	
+		m = gvdb.getScene()->getModel ( 0 );	
+		xform.RotateZ ( 5 );
+		xform.PreTranslate ( Vector3DF(0, 10, 0) );		
+		optx.AddPolygons ( m, m_mat_surf1, xform );
+	}
+
+	// Set Transfer Function (once before validate)
+	Vector4DF* src = gvdb.getScene()->getTransferFunc();
+	optx.SetTransferFunc(src);
+
+	// Validate OptiX graph
+	nvprintf("Validating OptiX.\n");
+	optx.ValidateGraph();
+
+	// Assign GVDB data to OptiX	
+	nvprintf("Update GVDB Volume.\n");
+	optx.UpdateVolume(&gvdb);
+
+	nvprintf("Rebuild Optix.. Done.\n");
 }
 
 bool Sample::init() 
@@ -147,34 +213,44 @@ bool Sample::init()
 	int w = getWidth(), h = getHeight();			// window width & height
 	mouse_down = -1;
 	gl_screen_tex = -1;
-	m_time = 0;
+	m_time = 0;	
 	m_simulate = true;
 	m_show_gui = true;
 	m_show_fluid = false;
 	m_show_topo = false;
-	m_use_color = false;
-	m_surface = 0;
-	m_shade_style = 2;
+	m_use_color = true;
+	m_render_optix = true;
+	m_shade_style = 1;
+	m_frame = 0;
+	m_sample = 0;
 	m_id = 0;
+	m_origin = Vector3DF(0, 0, 0);
+	m_radius = 1.0;
+	m_rebuild_gpu = true;
 	srand ( 6572 );
 
 	init2D ( "arial" );
 
-	// Initialize GVDB
-	int devid = -1;
+	// Initialize OptiX
+	if (m_render_optix) {
+		optx.InitializeOptix(w, h);
+	}
+	// Initialize 
+	fluid.SetDebug ( false );
+
+	gvdb.SetDebug ( false );
 	gvdb.SetVerbose ( false );
-	gvdb.SetProfile ( false );
-	gvdb.SetCudaDevice ( devid );
+	gvdb.SetProfile ( false, true );	
+	gvdb.SetCudaDevice( m_render_optix ? GVDB_DEV_CURRENT : GVDB_DEV_FIRST );
 	gvdb.Initialize ();
-	gvdb.AddPath ( std::string ( "../source/shared_assets/" ) );
-	gvdb.AddPath ( std::string (ASSET_PATH) );
+	gvdb.AddPath ( ASSET_PATH );
 	
 	// Set volume params
-	gvdb.getScene()->SetSteps ( 0.25, 16, 0.25 );				// Set raycasting steps
+	gvdb.getScene()->SetSteps ( 0.2, 16, 0.2 );				// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
-	gvdb.getScene()->SetVolumeRange ( 0.5f, 0.0f, 1.0f );	// Set volume value range
+	gvdb.getScene()->SetVolumeRange ( 0.0f, 3.0f, -1.0f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );
-	gvdb.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0f );
+	gvdb.getScene()->SetBackgroundClr ( 0.8f, 0.8f, 0.8f, 1.0f );
 	
 	// Configure volume
 	reconfigure ();
@@ -185,8 +261,7 @@ bool Sample::init()
 
 	// Initialize Fluid System
 	nvprintf ( "Starting Fluid System.\n" );
-	m_numpnts = 500000;
-	m_origin = Vector3DF(450, 100, 450);
+	m_numpnts = 1500000;
 	
 	#ifdef USE_CPU_COPY
 		// Do not assume there is a GPU buffer. Create some.
@@ -197,15 +272,17 @@ bool Sample::init()
 	fluid.Initialize ();
 	fluid.Start ( m_numpnts );
 
+	Vector3DF ctr = (fluid.GetGridMax() + fluid.GetGridMin()) * Vector3DF(0.5,0.5,0.5);
+
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
-	cam->setOrbit ( Vector3DF(50,30,0), m_origin, 700, 1.0 );	
+	cam->setOrbit ( Vector3DF(50,30,0), ctr, 1200, 1.0 );	
 	gvdb.getScene()->SetCamera( cam );
 	
 	// Create Light
 	Light* lgt = new Light;								
-	lgt->setOrbit ( Vector3DF(0,40,0), m_origin, 500, 1.0 );
+	lgt->setOrbit ( Vector3DF(20,60,0), ctr, 1000, 1.0 );
 	gvdb.getScene()->SetLight ( 0, lgt );	
 
 	// Add render buffer
@@ -215,6 +292,11 @@ bool Sample::init()
 	// Initialize GUIs
 	start_guis ( w, h );
 
+	if ( m_render_optix ) {
+		RebuildOptixGraph ();
+		optx.UpdateVolume ( &gvdb );
+	}
+
 	nvprintf ( "Running..\n" );
 	return true; 
 }
@@ -222,10 +304,18 @@ bool Sample::init()
 void Sample::reshape (int w, int h)
 {
 	// Resize the opengl screen texture
+	glViewport(0, 0, w, h);
 	createScreenQuadGL ( &gl_screen_tex, w, h );
 
 	// Resize the GVDB render buffers
 	gvdb.ResizeRenderBuf ( 0, w, h, 4 );
+
+	// Resize OptiX output
+	if ( m_render_optix )
+		optx.ResizeOutput(w, h);
+
+	// Resize 2D UI
+	start_guis(w, h);
 
 	postRedisplay();
 }
@@ -241,63 +331,59 @@ void Sample::simulate()
 
 	if ( m_shade_style == 0 ) return;		// Do not create volume if surface shading is off
 
-	// Create a GVDB topology from fluid particles
-   PERF_PUSH ( "Topology" );
-
-	PERF_PUSH ( "Clear" );
-	gvdb.Clear ();
-	PERF_POP ();
-	Vector3DF*	fpos = fluid.getPos(0);				// fluid positions
-	uint*		fclr = fluid.getClr(0);					// fluid colors
-	Vector3DF p1;	
-
-	PERF_PUSH ( "Activate" );
-	for (int n=0; n < m_numpnts; n++) {		
-		p1 = (*fpos++) + m_origin;	// get fluid sim pos		
-		if ( n % 2 == 0 ) gvdb.ActivateSpace ( p1 );					// Activate GVDB topology
-	}
-	PERF_POP ();	
-
-	PERF_PUSH ( "Finish" );
-	gvdb.FinishTopology ();	
-	PERF_POP ();
-	PERF_POP ();
-
-	// Update and Clear Atlas
-	gvdb.UpdateAtlas ();
-	gvdb.ClearAtlas ();	
-
-	// Insert and splat fluid particles into volume	
-		
+	// Setup GPU points for GVDB
 	#ifdef USE_CPU_COPY
-		//-- transfer point data from cpu
-		// common use case: reading data from disk, import from a device
-		gvdb.CommitData ( m_pntpos, m_numpnts, (char*) fluid.getPos(0), 0, sizeof(Vector3DF) );
-		gvdb.CommitData ( m_pntclr, m_numpnts, (char*) fluid.getClr(0), 0, sizeof(uint) );
+												//-- transfer point data from cpu
+												// common use case: reading data from disk, import from a device
+		gvdb.CommitData(m_pntpos, m_numpnts, (char*)fluid.getPos(0), 0, sizeof(Vector3DF));
+		gvdb.CommitData(m_pntclr, m_numpnts, (char*)fluid.getClr(0), 0, sizeof(uint));
 	#else 
-		//-- assign data already on gpu
-		// common use case: simulation already on gpu
-		gvdb.SetDataGPU ( m_pntpos, m_numpnts, fluid.getBufferGPU(FPOS), 0, sizeof(Vector3DF) );	
-		gvdb.SetDataGPU ( m_pntclr, m_numpnts, fluid.getBufferGPU(FCLR), 0, sizeof(uint) );		
-	#endif	
-	
-	gvdb.SetPoints(m_pntpos, m_use_color ? m_pntclr : DataPtr());
+												//-- assign data already on gpu
+												// common use case: simulation already on gpu
+		gvdb.SetDataGPU(m_pntpos, m_numpnts, fluid.getBufferGPU(FPOS), 0, sizeof(Vector3DF));
+		gvdb.SetDataGPU(m_pntclr, m_numpnts, fluid.getBufferGPU(FCLR), 0, sizeof(uint));
+	#endif
 
-	if ( m_surface == 0 ) {
-		// Scatter & Smooth
-		gvdb.InsertPoints ( m_numpnts, m_origin, false );
-		gvdb.ScatterPointDensity ( m_numpnts, 4.0, 1.0, m_origin );
-		gvdb.Compute ( FUNC_SMOOTH,		0, 2, Vector3DF(2, 0.02f, 0), true );	
-		if ( m_use_color )
-		  gvdb.Compute ( FUNC_CLR_EXPAND,	1, 5, Vector3DF(1, 1, 0), true );
-	
+	gvdb.SetPoints(m_pntpos, DataPtr(), m_use_color ? m_pntclr : DataPtr());
+
+	// Rebuild Topology
+	PERF_PUSH("Topology");	
+
+	if (m_rebuild_gpu) {
+		// GPU rebuild
+		gvdb.RebuildTopology( m_numpnts, m_radius*2.0, m_origin);
+		gvdb.FinishTopology( false, true );
+
 	} else {
-		// Gather
-		gvdb.InsertPoints ( m_numpnts, m_origin, true );			// true = prefix sum into node bins
-		gvdb.GatherPointDensity ( m_numpnts, 5.0, 0 );
-		gvdb.UpdateApron ();
+		// CPU rebuild
+		Vector3DF*	fpos = fluid.getPos(0);				// fluid positions
+		uint*		fclr = fluid.getClr(0);					// fluid colors
+		Vector3DF p1;			
+		for (int n=0; n < m_numpnts; n++) {		
+			p1 = (*fpos++) + m_origin;	// get fluid sim pos		
+			if ( n % 2 == 0 ) gvdb.ActivateSpace ( p1 );					// Activate GVDB topology
+		}	
+		gvdb.FinishTopology ();			
 	}
+	PERF_POP ();
 
+	// Update and Clear Atlas	
+	gvdb.UpdateAtlas ();	
+
+	// Insert and Gather Points-to-Voxels
+	int scPntLen = 0, subcell_size = 4;
+	gvdb.InsertPointsSubcell (subcell_size, m_numpnts, m_radius*2.0, m_origin, scPntLen );
+	gvdb.GatherLevelSet (subcell_size, m_numpnts, m_radius, m_origin, scPntLen, 0, 1 );
+	gvdb.UpdateApron(0, 3.0f);
+	if (m_use_color) gvdb.UpdateApron(1, 0.0f);
+
+	// Smooth voxels
+	//gvdb.Compute ( FUNC_SMOOTH,		0, 2, Vector3DF(1, -0.05f, 0), true );	
+
+	// Update OptiX
+	PERF_PUSH("Update OptiX");
+		if (m_render_optix) optx.UpdateVolume(&gvdb);			// GVDB topology has changed
+	PERF_POP();
 }
 
 void Sample::draw_fluid ()
@@ -358,22 +444,30 @@ void Sample::display()
 {
 	clearScreenGL ();
 
-	if ( m_simulate ) simulate();					// Simulation step
+	if ( m_simulate ) {
+		simulate();					// Simulation step				
+		m_frame++;
+		m_sample = 0;
+	}
 
-	gvdb.getScene()->SetCrossSection ( m_origin, Vector3DF(0,0,-1) );
-
-	int sh;
-	switch ( m_shade_style ) {
-	case 0: sh = SHADE_OFF;			break;
-	case 1: sh = SHADE_VOXEL;		break;
-	case 2: sh = SHADE_TRILINEAR;	break;
-	case 3: sh = SHADE_SECTION3D;	break;
-	case 4: sh = SHADE_VOLUME;		break;
-	};
-	gvdb.Render ( 0, sh, 0, 0, 1, 1, 0.6f );	// Render volume to internal cuda buffer
-	
-	gvdb.ReadRenderTexGL ( 0, gl_screen_tex );		// Copy internal buffer into opengl texture*/
-
+	if (m_render_optix) {
+		// OptiX render
+		optx.SetSample( m_frame, m_sample++ );
+		PERF_PUSH("Raytrace");
+		optx.Render( &gvdb, SHADE_LEVELSET, 0);
+		PERF_POP();
+		PERF_PUSH("ReadToGL");
+		optx.ReadOutputTex(gl_screen_tex);
+		PERF_POP();
+	} else {
+		// CUDA render
+		PERF_PUSH("Raytrace");
+		gvdb.Render( SHADE_LEVELSET, 0, 0);
+		PERF_POP();
+		PERF_PUSH("ReadToGL");
+		gvdb.ReadRenderTexGL(0, gl_screen_tex);
+		PERF_POP();
+	}
 	renderScreenQuadGL ( gl_screen_tex );			// Render screen-space quad with texture 
 
 	if ( m_show_fluid ) draw_fluid ();				// Draw fluid system
@@ -407,11 +501,13 @@ void Sample::motion(int x, int y, int dx, int dy)
 		angs.y -= dy*0.2f;		
 		if ( shift )	lgt->setOrbit ( angs, lgt->getToPos(), lgt->getOrbitDist(), lgt->getDolly() );				
 		else			cam->setOrbit ( angs, cam->getToPos(), cam->getOrbitDist(), cam->getDolly() );				
+		m_sample = 0;
 		} break;
 	
 	case NVPWindow::MOUSE_BUTTON_MIDDLE: {
 		// Adjust target pos		
 		cam->moveRelative ( float(dx) * cam->getOrbitDist()/1000, float(-dy) * cam->getOrbitDist()/1000, 0 );	
+		m_sample = 0;
 		} break;
 	
 	case NVPWindow::MOUSE_BUTTON_RIGHT: {	
@@ -420,6 +516,7 @@ void Sample::motion(int x, int y, int dx, int dy)
 		dist -= dy;
 		if ( shift )	lgt->setOrbit ( lgt->getAng(), lgt->getToPos(), dist, cam->getDolly() );
 		else			cam->setOrbit ( cam->getAng(), cam->getToPos(), dist, cam->getDolly() );		
+		m_sample = 0;
 		} break;
 	}
 }
@@ -458,7 +555,7 @@ void Sample::mouse ( NVPWindow::MouseButton button, NVPWindow::ButtonAction stat
 
 int sample_main ( int argc, const char** argv ) 
 {
-	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gFluidSim Sample", argc, argv, 1024, 768, 4, 5 );
+	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gFluidSurface Sample", "fluidsurf", argc, argv, 1024, 768, 4, 5 );
 }
 
 void sample_print( int argc, char const *argv)

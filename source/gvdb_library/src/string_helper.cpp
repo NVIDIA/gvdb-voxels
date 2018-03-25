@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #include "string_helper.h"
@@ -154,16 +155,41 @@ float strToNum ( std::string str )
 {
 	return (float) atof ( str.c_str() );
 }
-void strToVec3 ( std::string str, float* vec )
+bool strToVec ( std::string& str, std::string lsep, std::string insep, std::string rsep, float* vec, int cpt )
 {
-	str = strTrim( str );
-	std::string arg = strSplit ( str, " " );
-	vec[0] = strToNum ( arg );
-	if  (str == "") return;
-	arg = strSplit ( str, " " );
-	vec[1] = strToNum ( arg );
-	vec[2] = strToNum ( str );	
+	std::string val;	
+	char sep = insep.at(0);
+	int vc = 0;
+
+	std::string vstr = strParse ( str, lsep, rsep );
+	if ( vstr.empty() ) return false;
+	
+	for (int j=0; j < vstr.length(); j++ ) {		
+		if ( vstr[j]==sep )  {
+			vec[vc++] = strToNum(val);
+			if ( vc >= cpt ) return true;
+			val = "";
+		} else {
+			val += vstr[j];			
+		}
+	}	
+	if ( !val.empty() ) vec[vc] = strToNum(val);
+	return true;
 }
+
+bool strToVec3 ( std::string& str, std::string lsep, std::string insep, std::string rsep, float* vec )
+{
+	return strToVec ( str, lsep, insep, rsep, vec, 3 );	
+}
+bool strToVec4 ( std::string& str, std::string lsep, std::string insep, std::string rsep, float* vec )
+{
+	return strToVec ( str, lsep, insep, rsep, vec, 4 );	
+}
+bool strEq ( std::string str, std::string str2 )
+{
+	return (str.compare(str2)==0);
+}
+
 
 // trim from start
 #include <algorithm>
@@ -222,7 +248,7 @@ unsigned long getFilePos ( FILE* fp )
 	return ftell ( fp );
 }
 
-bool getFileLocation ( char* filename, char* outpath, char** searchPaths, int numPaths )
+bool getFileLocation ( char* filename, char* outpath, std::vector<std::string>& searchPaths )
 {
 	bool found = false;
 	FILE* fp = fopen( filename, "rb" );
@@ -230,10 +256,9 @@ bool getFileLocation ( char* filename, char* outpath, char** searchPaths, int nu
 		found = true;
 		strcpy ( outpath, filename );		
 	} else {
-		for (int i=0; i < numPaths; i++) {
-			if (!searchPaths) break;        // If no valid search path list exit now
-			if (!searchPaths[i]) continue;  // If any search path in the list is NULL, contine.  Other entries may be valid			
-			sprintf ( outpath, "%s%s", searchPaths[i], filename );
+		for (int i=0; i < searchPaths.size(); i++) {			
+			if (searchPaths[i].empty() ) continue;  
+			sprintf ( outpath, "%s%s", searchPaths[i].c_str(), filename );
 			fp = fopen( outpath, "rb" );
 			if (fp)	{ found = true;	break; }
 		}		
@@ -241,4 +266,3 @@ bool getFileLocation ( char* filename, char* outpath, char** searchPaths, int nu
 	if ( found ) fclose ( fp );
 	return found;
 }
-
