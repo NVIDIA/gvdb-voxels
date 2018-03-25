@@ -113,7 +113,7 @@ VolumeGVDB::VolumeGVDB ()
 	mOVDB = 0x0;
 	mV3D = 0x0;
 	mAtlasResize.Set ( 0, 20, 0 );
-	mEpsilon = 0.01f;				// default epsilon
+	mEpsilon = 0.001f;				// default epsilon
 	mMaxIter = 256;					// default max iter
 	mVoxsize.Set ( 1, 1, 1 );		// default voxel size
 	mApron = 1;						// default apron
