@@ -549,9 +549,9 @@ __device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, flo
 				}			// deep termination				
 				if (hit.z != NOHIT) return;						// surface termination												
 				
-				//STEP_DDA										// leaf node empty, step DDA
-				t.x = hit.y;				
-				PREPARE_DDA
+				STEP_DDA										// leaf node empty, step DDA
+				//t.x = hit.y;				
+				//PREPARE_DDA
 
 			} else {				
 				lev--;											// step down tree

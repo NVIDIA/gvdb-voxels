@@ -1,6 +1,6 @@
 
 NVIDIA(R) GVDB VOXELS
-Release 1.0
+Release 1.1
 
 ## OVERVIEW
 NVIDIA GVDB is a new library and SDK for compute, simulation and rendering of 
@@ -9,6 +9,17 @@ found at:
    http://developer.nvidia.com/gvdb
 
 ## RELEASE NOTES
+
+3/25/2018, GVDB Voxels 1.1 
+- Dynamic topology on GPU
+- Multiple contexts and GVDB objects
+- Multiple samples with OptiX support
+- Improved compute and raytrace performance
+- Render from any channel
+- Resampling functions
+- Grid transforms for rendering
+- All limitations in Programming Guide 1.0 addressed
+
 9/19/2017, GVDB Voxels, Incremental fix
 - Fixed Depth map integrated raycasting
 - Fixed Resample function
