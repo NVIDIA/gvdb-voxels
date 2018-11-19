@@ -8,8 +8,8 @@ else(WIN32)
   SET(USE_GLFW ON CACHE BOOL "Use GLFW instead of our own simple Window management")
 endif(WIN32)
 
-SET(RESOURCE_DIRECTORY "${BASE_DIRECTORY}/resources")
-add_definitions(-DRESOURCE_DIRECTORY="${RESOURCE_DIRECTORY}/")
+SET(RESOURCE_DIRECTORY ${BASE_DIRECTORY}/resources)
+add_definitions(-DRESOURCE_DIRECTORY=${RESOURCE_DIRECTORY}/)
 
 Message(STATUS "BASE_DIRECTORY = ${BASE_DIRECTORY}")
 Message(STATUS "CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR}")
@@ -111,9 +111,9 @@ macro(_add_project_definitions name)
   
   #message(STATUS "${TOPROJECT}")
   
-  add_definitions(-DPROJECT_RELDIRECTORY="${TOPROJECT}/")
-  add_definitions(-DPROJECT_ABSDIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/")
-  add_definitions(-DPROJECT_NAME="${name}")  
+  add_definitions(-DPROJECT_RELDIRECTORY=${TOPROJECT}/)
+  add_definitions(-DPROJECT_ABSDIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/)
+  add_definitions(-DPROJECT_NAME=${name})  
   
 endmacro(_add_project_definitions)
 
