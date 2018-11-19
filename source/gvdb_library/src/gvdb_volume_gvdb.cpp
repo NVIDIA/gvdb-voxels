@@ -3799,7 +3799,7 @@ int VolumeGVDB::VoxelizeNode ( Node* node, uchar chan, Matrix4F* xform, float bd
 	PrepareAux ( AUX_VOXELIZE, e.icnt, mPool->getSize(dt), true, true );	//   Prepare buffer for data retrieve		
 
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI grid ( int(e.ires.x/block.x), int(e.ires.y/block.y), int(e.ires.z)/block.z );		
+	Vector3DI grid ( int(e.ires.x/block.x) + 1, int(e.ires.y/block.y) + 1, int(e.ires.z/block.z) + 1 );
 	int vcnt = mAux[AUX_VERTEX_BUF].lastEle;
 	int ecnt = mAux[AUX_ELEM_BUF].lastEle;
 	int bmax = mAux[AUX_GRIDOFF].lastEle;
@@ -3858,7 +3858,7 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	Clear ();									// creates a new root	
 
 	// Voxelize all nodes in bounding box at starting level		
-	int N = 3;
+	int N = mPool->getNumLevels ();;
 	Extents e = ComputeExtents ( N, mObjMin, mObjMax );			// start - level N
 	ActivateRegion ( N-1, e );									// activate - level N-1
 	#ifdef VOX_GL
