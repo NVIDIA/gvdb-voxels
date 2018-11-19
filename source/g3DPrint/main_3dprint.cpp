@@ -127,7 +127,7 @@ bool Sample::init ()
 	// topology with small upper nodes (3=8^3) and large bricks (5=32^3) for performance.
 	// An apron of 1 is used for correct smoothing and trilinear surface rendering.
 	printf ( "Configure.\n" );
-	gvdb1.Configure ( 3, 3, 3, 3, 8);
+	gvdb1.Configure ( 1, 1, 3, 3, 5);
 	gvdb1.SetChannelDefault ( 16, 16, 1 );
 	gvdb1.AddChannel ( 0, T_FLOAT, 1, F_WRAP );
 

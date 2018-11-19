@@ -3799,7 +3799,7 @@ int VolumeGVDB::VoxelizeNode ( Node* node, uchar chan, Matrix4F* xform, float bd
 	PrepareAux ( AUX_VOXELIZE, e.icnt, mPool->getSize(dt), true, true );	//   Prepare buffer for data retrieve		
 
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI grid ( int(e.ires.x/block.x), int(e.ires.y/block.y), int(e.ires.z)/block.z );		
+	Vector3DI grid ( int(e.ires.x/block.x) + 1, int(e.ires.y/block.y) + 1, int(e.ires.z/block.z) + 1 );
 	int vcnt = mAux[AUX_VERTEX_BUF].lastEle;
 	int ecnt = mAux[AUX_ELEM_BUF].lastEle;
 	int bmax = mAux[AUX_GRIDOFF].lastEle;
@@ -3838,9 +3838,10 @@ int VolumeGVDB::VoxelizeNode ( Node* node, uchar chan, Matrix4F* xform, float bd
 // SolidVoxelize - Voxelize a polygonal mesh to a sparse volume
 void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, float val_surf, float val_inside, float vthresh )
 {
+	verbosef( "VolumeGVDB::SolidVoxelize\n" );
 	PUSH_CTX
 
-	//TimerStart();
+	TimerStart();
 	
 	AuxGeometryMap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );					// Setup VBO for CUDA (interop)
 	
@@ -3897,8 +3898,8 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	AuxGeometryUnmap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );
 
 	POP_CTX
-	//float msec = TimerStop();
-	//verbosef( "Voxelize Complete: %4.2f\n", msec );
+	float msec = TimerStop();
+	verbosef( "Voxelize Complete: %4.2f\n", msec );
 }
 
 // Insert triangles into auxiliary bins
