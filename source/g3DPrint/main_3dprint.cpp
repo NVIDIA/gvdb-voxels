@@ -104,7 +104,7 @@ bool Sample::init ()
 #ifdef USE_GVDB2
 	// GVDB #2
 	gvdb2.SetVerbose(true);		// enable/disable console output from gvdb
-	gvdb2.SetCudaDevice(devid);
+	gvdb2.SetCudaDevice(device);
 	gvdb2.Initialize();
 	gvdb2.StartRasterGL();			// Start GVDB Rasterizer. Requires an OpenGL context.
 	gvdb2.AddPath("../source/shared_assets/");
@@ -115,7 +115,7 @@ bool Sample::init ()
 	// Load polygons
 	// This loads an obj file into scene memory on cpu.
 	printf ( "Loading polygon model.\n" );
-	gvdb1.getScene()->AddModel ( "lucy.obj", 1.0, 0, 0, 0 );
+	gvdb1.getScene()->AddModel ( "lucy.obj", 1.25, 0, 0, 0 );
 	gvdb1.CommitGeometry( 0 );					// Send the polygons to GPU as OpenGL VBO
 
 #ifdef USE_GVDB2
@@ -127,9 +127,9 @@ bool Sample::init ()
 	// topology with small upper nodes (3=8^3) and large bricks (5=32^3) for performance.
 	// An apron of 1 is used for correct smoothing and trilinear surface rendering.
 	printf ( "Configure.\n" );
-	gvdb1.Configure ( 3, 3, 3, 3, 5 );	
+	gvdb1.Configure ( 3, 3, 3, 3, 8);
 	gvdb1.SetChannelDefault ( 16, 16, 1 );
-	gvdb1.AddChannel ( 0, T_FLOAT, 1 );
+	gvdb1.AddChannel ( 0, T_FLOAT, 1, F_WRAP );
 
 #ifdef USE_GVDB2
 	gvdb2.Configure ( 3, 3, 3, 3, 4);
@@ -143,7 +143,7 @@ bool Sample::init ()
 	// Translation has been added to position the part at (50,55,50).
 	Matrix4F xform;	
 	float part_size = 100.0;					// Part size is set to 100 mm height.
-	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(50,55,50), part_size );
+	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(50,100,50), part_size );
 	
 	// The part can be oriented arbitrarily inside the target GVDB volume
 	// by applying a rotation, translation, or scale to the transform.
@@ -156,7 +156,7 @@ bool Sample::init ()
 	// The voxel resolution of a rasterized part is the maximum number of voxels along each axis, 
 	// and is found by dividing the part size by the voxel size.
 	// To limit the resolution, one can invert the equation and find the voxel size for a given resolution.	
-	Vector3DF voxelsize ( 0.2f, 0.2f, 0.2f );	// Voxel size (mm)
+	Vector3DF voxelsize ( 0.1f, 0.1f, 0.1f );	// Voxel size (mm)
 
 	// Poly-to-Voxels
 	// Converts polygons-to-voxels using the GPU graphics pipeline.		

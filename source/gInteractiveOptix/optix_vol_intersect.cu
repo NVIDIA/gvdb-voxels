@@ -26,7 +26,6 @@
 // Version 1.0: Rama Hoetzlein, 5/1/2017
 //----------------------------------------------------------------------------------
 
-
 #include "optix_extra_math.cuh"			
 #include "texture_fetch_functions.h"
 

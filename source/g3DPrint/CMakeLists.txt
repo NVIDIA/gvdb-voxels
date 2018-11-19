@@ -58,7 +58,7 @@ _add_package_CUDA()
 #
 file(GLOB CUDA_FILES RELATIVE "${BASE_DIRECTORY}" *.cu *.cuh)
 message ( STATUS "Build CUDA kernels: ${CUDA_FILES}" )
-_COMPILEPTX ( SOURCES ${CUDA_FILES} TARGET_PATH ${EXECUTABLE_OUTPUT_PATH} GENERATED PTX_FILES INCLUDE "${CMAKE_CURRENT_SOURCE_DIR},${GVDB_INCLUDE_DIR}" OPTIONS -arch=compute_30 -code=sm_30 --ptxas-options=-v -O3 --use_fast_math --maxrregcount=128 )
+_COMPILEPTX ( SOURCES ${CUDA_FILES} TARGET_PATH ${EXECUTABLE_OUTPUT_PATH} GENERATED PTX_FILES INCLUDE "${CMAKE_CURRENT_SOURCE_DIR},${GVDB_INCLUDE_DIR}" OPTIONS -arch=compute_50 -code=sm_50 --ptxas-options=-v -O3 --use_fast_math --maxrregcount=128 )
 
 #####################################################################################
 # Asset Path

@@ -2270,7 +2270,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 			leaf_max++;
 		}
 		vdbNext ( mOVDB, gridtype, isFloat );
-	}	
+	}
 	voffset = mVoxMin * -1;		// offset to positive space (hack)	
 	
 	// Activate Space
@@ -3858,12 +3858,12 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	Clear ();									// creates a new root	
 
 	// Voxelize all nodes in bounding box at starting level		
-	int N = 3;
+	int N = mPool->getNumLevels ();
 	Extents e = ComputeExtents ( N, mObjMin, mObjMax );			// start - level N
 	ActivateRegion ( N-1, e );									// activate - level N-1
-	#ifdef VOX_GL
-		PrepareV3D ( Vector3DI(8,8,8), 0 );
-	#endif
+//	#ifdef VOX_GL
+//		PrepareV3D ( Vector3DI(8,8,8), 0 );
+//	#endif
 
 	// Voxelize at each level	
 	int node_cnt, cnt;
