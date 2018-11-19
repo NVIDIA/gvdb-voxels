@@ -174,6 +174,10 @@ void checkGL( char* msg )
         LOGE("%s, ERROR: 0x%x\n", msg, errCode );
     }
 }
+
+#else
+//------------------------------------------------------------------------------
+void checkGL( char* msg ) {}
 #endif
 
 struct WINinternal{

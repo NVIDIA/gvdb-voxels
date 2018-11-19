@@ -344,7 +344,8 @@ void Sample::simulate()
 		gvdb.SetDataGPU(m_pntclr, m_numpnts, fluid.getBufferGPU(FCLR), 0, sizeof(uint));
 	#endif
 
-	gvdb.SetPoints(m_pntpos, DataPtr(), m_use_color ? m_pntclr : DataPtr());
+	DataPtr pntvel, clrpos;
+	gvdb.SetPoints(m_pntpos, pntvel, m_use_color ? m_pntclr : clrpos);
 
 	// Rebuild Topology
 	PERF_PUSH("Topology");	
