@@ -1,3 +1,4 @@
+
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
 // Copyright 2017, NVIDIA Corporation. 
@@ -23,8 +24,13 @@
 // - InsertPoints		- insert points into bricks
 // - SplatPoints		- splat points into bricks
 
+#define RGBA2INT(r,g,b,a)	(				uint((r)*255.0f) +		(uint((g)*255.0f)<<8) +			(uint((b)*255.0f)<<16) +		(uint((a)*255.0f)<<24) )
+#define CLR2INT(c)			(				uint((c.x)*255.0f) +	(uint((c.y)*255.0f)<<8)	+		(uint((c.z)*255.0f)<<16) +		(uint((c.w)*255.0f)<<24 ) )
+#define INT2CLR(c)			( make_float4( float(c & 0xFF)/255.0f,	float((c>>8) & 0xFF)/255.0f,	float((c>>16) & 0xFF)/255.0f,	float((c>>24) & 0xFF)/255.0f ))
+#define CLR2CHAR(c)			( make_uchar4( uchar(c.x*255.0f),	uchar(c.y*255.0f),	uchar(c.z*255.0f),	uchar(c.w*255.0f) ))
+#define CHAR2CLR(c)			( make_float4( float(c.x)/255.0f,	float(c.y)/255.0f,	float(c.z)/255.0f,	float(c.w)/255.0f ))
 
-extern "C" __global__ void gvdbInsertPoints ( int num_pnts, char* ppos, int pos_off, int pos_stride, int* pnode, int* poff, int* gcnt, float3 ptrans )
+extern "C" __global__ void gvdbInsertPoints ( VDBInfo* gvdb, int num_pnts, char* ppos, int pos_off, int pos_stride, int* pnode, int* poff, int* gcnt, float3 ptrans )
 {
 	uint i = blockIdx.x * blockDim.x + threadIdx.x;
 	if ( i >= num_pnts ) return;
@@ -34,7 +40,7 @@ extern "C" __global__ void gvdbInsertPoints ( int num_pnts, char* ppos, int pos_
 	if ( wpos.z == NOHIT ) { pnode[i] = ID_UNDEFL; return; }		// If position invalid, return. 
 	float3 offs, vmin, vdel;										// Get GVDB node at the particle point
 	uint64 nid;
-	VDBNode* node = getNodeAtPoint ( wpos + ptrans, &offs, &vmin, &vdel, &nid );	
+	VDBNode* node = getNodeAtPoint ( gvdb, wpos + ptrans, &offs, &vmin, &vdel, &nid );
 	if ( node == 0x0 ) { pnode[i] = ID_UNDEFL; return; }			// If no brick at location, return.	
 
 	__syncthreads();
@@ -44,7 +50,7 @@ extern "C" __global__ void gvdbInsertPoints ( int num_pnts, char* ppos, int pos_
 }
 
 
-extern "C" __global__ void gvdbInsertSupportPoints ( int num_pnts, float offset, char* ppos, int pos_off, int pos_stride, int* pnode, int* poff, int* gcnt, char* pdir, int dir_off, int dir_stride, float3 ptrans )
+extern "C" __global__ void gvdbInsertSupportPoints ( VDBInfo* gvdb, int num_pnts, float offset, char* ppos, int pos_off, int pos_stride, int* pnode, int* poff, int* gcnt, char* pdir, int dir_off, int dir_stride, float3 ptrans )
 {
 	uint i = blockIdx.x * blockDim.x + threadIdx.x;
 	if ( i >= num_pnts ) return;
@@ -55,7 +61,7 @@ extern "C" __global__ void gvdbInsertSupportPoints ( int num_pnts, float offset,
 	if ( wpos.z == NOHIT ) { pnode[i] = ID_UNDEFL; return; }		// If position invalid, return. 
 	float3 offs, vmin, vdel;										// Get GVDB node at the particle point
 	uint64 nid;
-	VDBNode* node = getNodeAtPoint ( wpos + ptrans + wdir * offset, &offs, &vmin, &vdel, &nid );	
+	VDBNode* node = getNodeAtPoint ( gvdb, wpos + ptrans + wdir * offset, &offs, &vmin, &vdel, &nid );
 	if ( node == 0x0 ) { pnode[i] = ID_UNDEFL; return; }			// If no brick at location, return.	
 
 	__syncthreads();
@@ -79,6 +85,485 @@ extern "C" __global__ void gvdbSortPoints ( int num_pnts, char* ppos, int pos_of
 	pout[ndx] = wpos;
 }
 
+inline __device__ int3 GetCoveringNode (float3 pos, int3 range)
+{
+	int3 nodepos;
+
+	nodepos.x = ceil(pos.x / range.x) * range.x;
+	nodepos.y = ceil(pos.y / range.y) * range.y;
+	nodepos.z = ceil(pos.z / range.z) * range.z;
+	if ( pos.x < nodepos.x ) nodepos.x -= range.x;
+	if ( pos.y < nodepos.y ) nodepos.y -= range.y;
+	if ( pos.z < nodepos.z ) nodepos.z -= range.z;
+
+	return nodepos;
+}
+
+inline __device__ int3 GetCoveringNode (float3 pos, int range)
+{
+	int3 nodepos;
+
+	nodepos.x = ceil(pos.x / range) * range;
+	nodepos.y = ceil(pos.y / range) * range;
+	nodepos.z = ceil(pos.z / range) * range;
+	if ( pos.x < nodepos.x ) nodepos.x -= range;
+	if ( pos.y < nodepos.y ) nodepos.y -= range;
+	if ( pos.z < nodepos.z ) nodepos.z -= range;
+
+	return nodepos;
+}
+
+inline __device__ bool IsBoxIntersection (int3 amin, int3 amax, int3 bmin, int3 bmax)
+{
+	return (amin.x <= bmax.x && amax.x >= bmin.x) &&
+         (amin.y <= bmax.y && amax.y >= bmin.y) &&
+         (amin.z <= bmax.z && amax.z >= bmin.z);
+}
+
+extern "C" __global__ void gvdbSetFlagSubcell(VDBInfo* gvdb, int num_sc, int* sc_flag)
+{
+
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= num_sc) return;
+
+	VDBNode* node = getNode(gvdb, 0, i);
+
+	sc_flag[i] = (node->mParent == ID_UNDEF64) ? 0 : 1;
+}
+
+extern "C" __global__ void gvdbConvAndTransform ( int num_pnts, char* psrc, char psrcbits, char* pdest, char pdestbits,
+									float3 wmin, float3 wdelta, float3 trans, float3 scal )
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	float3 pnt;
+
+	// unpack input format
+	switch ( psrcbits ) {
+	case 2: { 
+		ushort* pbuf = (ushort*) (psrc+i*6);
+		pnt = make_float3( *pbuf, *(pbuf+1), *(pbuf+2) ); 
+		} break;
+	case 4: {
+		float* pbuf = (float*) (psrc+i*12);
+		pnt = make_float3( *pbuf, *(pbuf+1), *(pbuf+2) );
+		} break;
+	};
+	// scale and transform
+	pnt = (wmin + pnt * wdelta) * scal + trans;
+
+	*(float3*) (pdest + i*12) = pnt;
+}
+
+extern "C" __global__ void gvdbScalePntPos (int num_pnts, char* ppos, int pos_off, int pos_stride, float scale)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	(*(float3*) (ppos + i*pos_stride + pos_off)) *= scale;
+}
+
+
+extern "C" __global__ void gvdbInsertSubcell_fp16 (
+	VDBInfo* gvdb, int subcell_size, int sc_per_brick, int num_pnts,
+	int* sc_cnt, int* sc_offset, int* sc_mapping,
+	float3 pos_min, float3 pos_range, float3 vel_min, float3 vel_range,
+	int3 sc_range, float3 ptrans, int res, float radius,	
+	char* ppos, int pos_off, int pos_stride, ushort3* sc_pnt_pos,
+	char* pvel, int vel_off, int vel_stride, ushort3* sc_pnt_vel,
+	char* pclr, int clr_off, int clr_stride, uint* sc_pnt_clr	
+)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= num_pnts) return;
+
+	float3 wpos = (*(float3*)(ppos + i*pos_stride + pos_off)) + ptrans; // NOTE: +ptrans is below. Allows check for wpos.z==NOHIT 
+
+	if (wpos.z == NOHIT) return;							// If position invalid, return. 
+	if (wpos.x < 0 || wpos.y < 0 || wpos.z < 0) return;	// robust test
+
+	float3 wvel = (pvel == 0x0) ? make_float3(0, 0, 0) : (*(float3*)(pvel + i*vel_stride + vel_off));
+	uint wclr = (pclr == 0x0) ? 0 : (*(uint*)(pclr + i*clr_stride + clr_off));
+
+	int scminx = (int(wpos.x - radius) / subcell_size) * subcell_size;
+	int scminy = (int(wpos.y - radius) / subcell_size) * subcell_size;
+	int scminz = (int(wpos.z - radius) / subcell_size) * subcell_size;
+	int scmaxx = (int(wpos.x + 1 + radius) / subcell_size) * subcell_size;
+	int scmaxy = (int(wpos.y + 1 + radius) / subcell_size) * subcell_size;
+	int scmaxz = (int(wpos.z + 1 + radius) / subcell_size) * subcell_size;
+
+	VDBNode* pnode;
+	int3 scPos, posInNode;
+	int pnodeId, localOffs, offset, sc_idx;
+	for (scPos.x = scminx; scPos.x <= scmaxx; scPos.x += subcell_size)
+	{
+		for (scPos.y = scminy; scPos.y <= scmaxy; scPos.y += subcell_size)
+		{
+			for (scPos.z = scminz; scPos.z <= scmaxz; scPos.z += subcell_size)
+			{
+				pnodeId = getPosLeafParent(gvdb, scPos);
+				if (pnodeId == ID_UNDEFL) continue;
+				//getNode ( 0, pnodeId);
+				pnode = (VDBNode*)(gvdb->nodelist[0] + pnodeId*gvdb->nodewid[0]);
+
+				posInNode = scPos - pnode->mPos;
+				posInNode.x /= subcell_size;
+				posInNode.y /= subcell_size;
+				posInNode.z /= subcell_size;
+				localOffs = (posInNode.z*res + posInNode.y)*res + posInNode.x;
+
+				sc_idx = sc_mapping[pnodeId] * sc_per_brick + localOffs;
+				offset = atomicAdd(&sc_cnt[sc_idx], (uint)1);
+				sc_pnt_pos[sc_offset[sc_idx] + offset] = (make_ushort3)(
+					(wpos.x - pos_min.x) / pos_range.x * 65535,
+					(wpos.y - pos_min.y) / pos_range.y * 65535,
+					(wpos.z - pos_min.z) / pos_range.z * 65535);
+				if (pvel != 0x0) sc_pnt_vel[sc_offset[sc_idx] + offset] = (make_ushort3)(
+					(wvel.x - vel_min.x) / vel_range.x * 65535,
+					(wvel.y - vel_min.y) / vel_range.y * 65535,
+					(wvel.z - vel_min.z) / vel_range.z * 65535);
+				if (pclr != 0x0) sc_pnt_clr[sc_offset[sc_idx] + offset] = wclr;
+			}
+		}
+	}
+}
+
+extern "C" __global__ void gvdbInsertSubcell (
+	VDBInfo* gvdb, int subcell_size, int sc_per_brick, int num_pnts,
+	int* sc_cnt, int* sc_offset, int* sc_mapping,	
+	int3 sc_range, float3 ptrans, int res, float radius,
+	char* ppos, int pos_off, int pos_stride, float3* sc_pnt_pos,
+	char* pvel, int vel_off, int vel_stride, float3* sc_pnt_vel,
+	char* pclr, int clr_off, int clr_stride, uint* sc_pnt_clr
+)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off));
+	if ( wpos.z == NOHIT ) return;							// If position invalid, return. 
+	if ( wpos.x < 0 || wpos.y < 0 || wpos.z < 0) return;	// robust test
+	wpos += ptrans;			// add ptrans here to allow check for NOHIT
+
+	float3 wvel = (pvel==0x0) ? make_float3(0,0,0) : (*(float3*) (pvel + i*vel_stride + vel_off));
+	uint wclr = (pclr== 0x0) ? 0 : (*(uint*)(pclr + i*clr_stride + clr_off));
+
+	int scminx = (int(wpos.x - radius) / subcell_size) * subcell_size;
+	int scminy = (int(wpos.y - radius) / subcell_size) * subcell_size;
+	int scminz = (int(wpos.z - radius) / subcell_size) * subcell_size;
+	int scmaxx = (int(wpos.x + 1 + radius) / subcell_size) * subcell_size;
+	int scmaxy = (int(wpos.y + 1 + radius) / subcell_size) * subcell_size;
+	int scmaxz = (int(wpos.z + 1 + radius) / subcell_size) * subcell_size;
+
+	VDBNode* pnode;
+	int3 scPos, posInNode;
+	int pnodeId, localOffs, offset, sc_idx;
+	for (scPos.x = scminx; scPos.x <= scmaxx; scPos.x += subcell_size)
+	{
+		for (scPos.y = scminy; scPos.y <= scmaxy; scPos.y += subcell_size)
+		{
+			for (scPos.z = scminz; scPos.z <= scmaxz; scPos.z += subcell_size)
+			{
+				pnodeId = getPosLeafParent( gvdb, scPos);
+				if (pnodeId == ID_UNDEFL) continue;
+				//getNode ( 0, pnodeId);
+				pnode = (VDBNode*) (gvdb->nodelist[0] + pnodeId*gvdb->nodewid[0]);
+
+				posInNode = scPos - pnode->mPos;
+				posInNode.x /= subcell_size;
+				posInNode.y /= subcell_size;
+				posInNode.z /= subcell_size;
+				localOffs = (posInNode.z*res + posInNode.y)*res+ posInNode.x;
+
+				sc_idx = sc_mapping[pnodeId] * sc_per_brick + localOffs;
+				offset = atomicAdd( &sc_cnt[sc_idx], (uint) 1);
+				sc_pnt_pos[sc_offset[sc_idx] + offset] = wpos;
+				if ( pvel != 0x0 ) sc_pnt_vel[sc_offset[sc_idx] + offset] = wvel;
+				if ( pclr != 0x0 ) sc_pnt_clr[sc_offset[sc_idx] + offset] = wclr;
+			}
+		}
+	}
+}
+
+extern "C" __global__ void gvdbCountSubcell (VDBInfo* gvdb, int subcell_size, int sc_per_brick, int num_pnts, char* ppos, int pos_off, int pos_stride, 
+											 int* sc_cnt, int3 sc_range, float3 ptrans, int res, float radius, int num_sc, int* sc_mapping)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off));
+	if ( wpos.z == NOHIT ) return;							// If position invalid, return. 
+	wpos += ptrans;											// add here to allow check above for NOHIT
+	if ( wpos.x < 0 || wpos.y < 0 || wpos.z < 0) return;	// robust test
+
+	int scminx = (int(wpos.x - radius) / subcell_size) * subcell_size;
+	int scminy = (int(wpos.y - radius) / subcell_size) * subcell_size;
+	int scminz = (int(wpos.z - radius) / subcell_size) * subcell_size;
+	int scmaxx = (int(wpos.x + 1 + radius) / subcell_size) * subcell_size;
+	int scmaxy = (int(wpos.y + 1 + radius) / subcell_size) * subcell_size;
+	int scmaxz = (int(wpos.z + 1 + radius) / subcell_size) * subcell_size;
+
+	VDBNode* pnode;
+	int3 scPos, posInNode;
+	int pnodeId, localOffs;
+	for (scPos.x = scminx; scPos.x <= scmaxx; scPos.x += subcell_size)
+	{
+		for (scPos.y = scminy; scPos.y <= scmaxy; scPos.y += subcell_size)
+		{
+			for (scPos.z = scminz; scPos.z <= scmaxz; scPos.z += subcell_size)
+			{
+				pnodeId = getPosLeafParent(gvdb, scPos);
+				if (pnodeId == ID_UNDEFL) continue;
+				pnode = (VDBNode*) (gvdb->nodelist[0] + pnodeId*gvdb->nodewid[0]);
+				posInNode = scPos - pnode->mPos;
+				posInNode.x /= subcell_size;
+				posInNode.y /= subcell_size;
+				posInNode.z /= subcell_size;
+				localOffs = (posInNode.z*res + posInNode.y)*res+ posInNode.x;
+
+				atomicAdd( &sc_cnt[sc_mapping[pnodeId] * sc_per_brick + localOffs], (uint) 1);
+			}
+		}
+	}
+}
+
+extern "C" __global__ void gvdbFindActivBricks (int num_pnts, int lev, int3 brick_range, int dim, char* ppos,  int pos_off, int pos_stride, float3 orig, int3 orig_shift, int* pout)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off)) + orig;
+	
+	int3 brickPos = GetCoveringNode(wpos, brick_range);																			
+
+	int3 brickIdx3 = make_int3(brickPos.x / brick_range.x, brickPos.y / brick_range.y, brickPos.z / brick_range.z);	// brick idx in global
+
+	int brickIdx = brickIdx3.x + brickIdx3.y * dim + brickIdx3.z * dim * dim;
+
+	//if ( brickIdx >= num_bricks) return;
+
+	//poff[i] = atomicAdd(&pout[brickIdx], 1);
+	pout[i] = brickIdx;
+}
+
+extern "C" __global__ void gvdbFindUnique ( int num_pnts, long long* pin, int* marker, int* uniqueCnt, int* levCnt)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	if ((i == 0) || (pin[i] != pin[i-1])) 
+	{
+		marker[i] = 1; atomicAdd(&uniqueCnt[0],1);
+
+		int lev = ((pin[i] >> 48) & 0xFF);
+		if (lev == 255) return;
+
+		atomicAdd( &levCnt[lev], 1);
+	}
+}
+
+extern "C" __global__ void gvdbCalcBrickId (  int num_pnts, int lev_depth, int* range_res, 
+											char* ppos,  int pos_off, int pos_stride, 
+											float3 orig, unsigned short* pout)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off)) + orig;
+	
+	if (wpos.x < 0 || wpos.y < 0 || wpos.z < 0)
+	{
+		for (unsigned short lev = 0; lev < lev_depth; lev++) 
+		{
+			pout[i * lev_depth * 4 + lev * 4 + 3] = 255;
+			pout[i * lev_depth * 4 + lev * 4 + 2] = 0;
+			pout[i * lev_depth * 4 + lev * 4 + 1] = 0;
+			pout[i * lev_depth * 4 + lev * 4 + 0] = 0;
+		}
+		return;
+	}
+
+	for (unsigned short lev = 0; lev < lev_depth; lev++) 
+	{
+		int3 brickPos = GetCoveringNode( wpos, range_res[lev]);	
+
+		pout[i * lev_depth * 4 + lev * 4 + 3] = lev; 
+		pout[i * lev_depth * 4 + lev * 4 + 2] = (unsigned short) (brickPos.x / range_res[lev]); 
+		pout[i * lev_depth * 4 + lev * 4 + 1] = (unsigned short) (brickPos.y / range_res[lev]); 
+		pout[i * lev_depth * 4 + lev * 4 + 0] = (unsigned short) (brickPos.z / range_res[lev]); 
+	}
+}
+
+extern "C" __global__ void gvdbCalcIncreBrickId (VDBInfo* gvdb, float radius, int num_pnts, int lev_depth, int* range_res,
+												 char* ppos,  int pos_off, int pos_stride, 
+												 float3 orig, unsigned short* pout, int* exBrick_cnt,
+												 int* node_markers
+												 )
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off)) + orig;
+	
+	if (wpos.x < 0 || wpos.y < 0 || wpos.z < 0) return;
+
+	int pnodeId, idx;
+	int3 brickPos;
+
+	for (unsigned short lev = 0; lev < lev_depth; lev++) 
+	{
+		brickPos = GetCoveringNode(wpos, range_res[lev]);	
+		pnodeId = getPosParent(gvdb, brickPos, lev);
+
+		if (pnodeId == ID_UNDEFL) 
+		{
+			idx = atomicAdd ( &exBrick_cnt[0], (uint) 1 );
+			pout[idx * 4 + 0 ] = (unsigned short) (brickPos.z / range_res[lev]); 
+			pout[idx * 4 + 1 ] = (unsigned short) (brickPos.y / range_res[lev]); 
+			pout[idx * 4 + 2 ] = (unsigned short) (brickPos.x / range_res[lev]); 
+			pout[idx * 4 + 3 ] = lev; 
+		}
+		else 
+		{
+			if(lev == 0) atomicOr ( &node_markers[pnodeId], true );
+		}
+	}
+}
+
+extern "C" __global__ void gvdbCalcIncreExtraBrickId (VDBInfo* gvdb, float radius, int num_pnts, int lev_depth, int* range_res,
+														char* ppos,  int pos_off, int pos_stride, 
+														float3 orig, unsigned short* pout, int* exBrick_cnt,
+														int* node_markers
+														)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off)) + orig;
+	
+	if (wpos.x < 0 || wpos.y < 0 || wpos.z < 0) return;
+
+	int3 bmin = make_int3(int(wpos.x) - radius, int(wpos.y) - radius, int(wpos.z) - radius); 
+	int3 bmax = make_int3(int(wpos.x) + radius, int(wpos.y) + radius, int(wpos.z) + radius); 
+
+	int3 ndPos;
+	int pnodeId, idx;
+	VDBNode* node;
+	//unsigned short levxyx[40];
+	//int ndCnt = 0;
+
+	for (unsigned short lev = 0; lev < lev_depth; lev++) 
+	{
+		int rres = range_res[lev];
+		for (ndPos.x = bmin.x / rres * rres; ndPos.x <= bmax.x / rres * rres; ndPos.x += rres)
+		{
+			for (ndPos.y = bmin.y / rres * rres; ndPos.y <= bmax.y / rres * rres; ndPos.y += rres)
+			{
+				for (ndPos.z = bmin.z / rres * rres; ndPos.z <= bmax.z / rres * rres; ndPos.z += rres)
+				{
+					//ndPos = make_int3(ndx, ndy, ndz);
+					pnodeId = getPosParent(gvdb, ndPos, lev);
+					
+
+					if (pnodeId == ID_UNDEFL) 
+					{
+						idx = atomicAdd ( &exBrick_cnt[0], (uint) 1 );
+						pout[idx * 4 + 0 ] = (unsigned short) (ndPos.z / rres); 
+						pout[idx * 4 + 1 ] = (unsigned short) (ndPos.y / rres); 
+						pout[idx * 4 + 2 ] = (unsigned short) (ndPos.x / rres); 
+						pout[idx * 4 + 3 ] = lev; 
+						//levxyx[ndCnt * 4 + 0 ] = (ndPos.z / rres); 
+						//levxyx[ndCnt * 4 + 1 ] = (ndPos.y / rres); 
+						//levxyx[ndCnt * 4 + 2 ] = (ndPos.x / rres); 
+						//levxyx[ndCnt * 4 + 3 ] = lev; 
+						//ndCnt++;
+					} else {						
+						if(lev == 0) atomicOr ( &node_markers[pnodeId], true );
+					}
+				}
+			}
+		}
+	}
+
+	//idx = atomicAdd ( &exBrick_cnt[0], (uint) ndCnt);
+	//for (int pi = 0; pi < ndCnt * 4; pi++) pout[idx * 4 + pi] = levxyx[pi]; 
+	//ndCnt = 0;
+	//for (unsigned short lev = 0; lev < lev_depth; lev++) 
+	//{
+	//	int rres = range_res[lev];
+	//	for (ndPos.x = bmin.x / rres * rres; ndPos.x <= bmax.x / rres * rres; ndPos.x += rres)
+	//	{
+	//		for (ndPos.y = bmin.y / rres * rres; ndPos.y <= bmax.y / rres * rres; ndPos.y += rres)
+	//		{
+	//			for (ndPos.z = bmin.z / rres * rres; ndPos.z <= bmax.z / rres * rres; ndPos.z += rres)
+	//			{
+	//				//ndPos = make_int3(ndx, ndy, ndz);
+	//				pnodeId = getPosParent(ndPos, lev);
+	//				if (pnodeId == ID_UNDEFL) 
+	//				{
+	//					//idx = atomicAdd ( &exBrick_cnt[0], (uint) 1 );
+	//					pout[idx * 4 + 0 + ndCnt ] = (unsigned short) (ndPos.z / rres); 
+	//					pout[idx * 4 + 1 + ndCnt ] = (unsigned short) (ndPos.y / rres); 
+	//					pout[idx * 4 + 2 + ndCnt ] = (unsigned short) (ndPos.x / rres); 
+	//					pout[idx * 4 + 3 + ndCnt ] = lev; 
+	//					ndCnt += 4; 
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
+}
+
+extern "C" __global__ void gvdbCalcExtraBrickId (VDBInfo* gvdb, float radius, int num_pnts, int lev_depth, int* range_res,
+														char* ppos,  int pos_off, int pos_stride, 
+														float3 orig, unsigned short* pout, int* exBrick_cnt)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off)) + orig;
+	
+	if (wpos.x < 0 || wpos.y < 0 || wpos.z < 0) return;
+
+	//int3 bmin = make_int3(wpos.x - radius, wpos.y - radius, wpos.z - radius); 
+	//int3 bmax = make_int3(wpos.x + radius, wpos.y + radius, wpos.z + radius); 
+
+	int3 bmin = make_int3(int(wpos.x) - radius, int(wpos.y) - radius, int(wpos.z) - radius); 
+	int3 bmax = make_int3(int(wpos.x) + 2 * radius, int(wpos.y) + 2 * radius, int(wpos.z) + 2 * radius); 
+
+	//int3 ndmin, ndmax;
+	int3 ndPos;
+	int pnodeId, idx;
+	for (unsigned short lev = 0; lev < lev_depth; lev++) 
+	{
+		//ndmin = make_int3(int(wpos.x - radius) / range_res[lev] * range_res[lev], int(wpos.y - radius) / range_res[lev] * range_res[lev], int(wpos.z - radius) / range_res[lev] * range_res[lev]);
+		//ndmax = make_int3(int(wpos.x + radius) / range_res[lev] * range_res[lev], int(wpos.y + radius) / range_res[lev] * range_res[lev], int(wpos.z + radius) / range_res[lev] * range_res[lev]);
+		int rres = range_res[lev];
+		for (ndPos.x = bmin.x / rres * rres; ndPos.x <= bmax.x / rres * rres; ndPos.x += rres)
+		{
+			for (ndPos.y = bmin.y / rres * rres; ndPos.y <= bmax.y / rres * rres; ndPos.y += rres)
+			{
+				for (ndPos.z = bmin.z / rres * rres; ndPos.z <= bmax.z / rres * rres; ndPos.z += rres)
+				{
+					//ndPos = make_int3(ndx, ndy, ndz);
+					pnodeId = getPosParent(gvdb, ndPos, lev);
+					if (pnodeId == ID_UNDEFL) 
+					{
+						idx = atomicAdd ( &exBrick_cnt[0], (uint) 1 );
+						pout[idx * 4 + 0 ] = (unsigned short) (ndPos.z / rres); 
+						pout[idx * 4 + 1 ] = (unsigned short) (ndPos.y / rres); 
+						pout[idx * 4 + 2 ] = (unsigned short) (ndPos.x / rres); 
+						pout[idx * 4 + 3 ] = lev; 
+					}
+				}
+			}
+		}
+	}
+}
+
+ 
+
 inline __device__ float distFunc ( float3 a, float bx, float by, float bz, float r )
 {
 	bx -= a.x; by -= a.y; bz -= a.z;	
@@ -88,7 +573,7 @@ inline __device__ float distFunc ( float3 a, float bx, float by, float bz, float
 	//return (r - sqrt(bx*bx+by*by+bz*bz)) / r;
 }
 
-extern "C" __global__ void gvdbScatterPointDensity ( int num_pnts, float radius, float amp, char* ppos, int pos_off, int pos_stride, char* pclr, int clr_off, int clr_stride, int* pnode, float3 ptrans, bool expand, uint* colorBuf)
+extern "C" __global__ void gvdbScatterPointDensity (VDBInfo* gvdb, int num_pnts, float radius, float amp, char* ppos, int pos_off, int pos_stride, char* pclr, int clr_off, int clr_stride, int* pnode, float3 ptrans, bool expand, uint* colorBuf)
 {
 	uint i = blockIdx.x * blockDim.x + threadIdx.x;
 	if ( i >= num_pnts ) return;
@@ -98,23 +583,23 @@ extern "C" __global__ void gvdbScatterPointDensity ( int num_pnts, float radius,
 	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off)) + ptrans;	
 	float3 vmin;
 	float w;
-	VDBNode* node = getNode ( 0, pnode[i], &vmin );			// Get node		
-	float3 p = (wpos-vmin)/gvdb.vdel[0];
+	VDBNode* node = getNode ( gvdb, 0, pnode[i], &vmin );			// Get node		
+	float3 p = (wpos-vmin)/gvdb->vdel[0];
 	float3 pi = make_float3(int(p.x), int(p.y), int(p.z));
 
-	// range of pi.x,pi.y,pi.z = [0, gvdb.res0-1]
-	if ( pi.x < 0 || pi.y < 0 || pi.z < 0 || pi.x >= gvdb.res[0] || pi.y >= gvdb.res[0] || pi.z >= gvdb.res[0] ) return;
+	// range of pi.x,pi.y,pi.z = [0, gvdb->res0-1]
+	if ( pi.x < 0 || pi.y < 0 || pi.z < 0 || pi.x >= gvdb->res[0] || pi.y >= gvdb->res[0] || pi.z >= gvdb->res[0] ) return;
 	uint3 q = make_uint3(pi.x,pi.y,pi.z) + make_uint3( node->mValue );	
 
-	w = tex3D<float>( volIn[0], q.x,q.y,q.z ) + distFunc(p, pi.x, pi.y,pi.z, radius) ;				surf3Dwrite ( w, volOut[0], q.x*sizeof(float), q.y, q.z );
+	w = tex3D<float>( gvdb->volIn[0], q.x,q.y,q.z ) + distFunc(p, pi.x, pi.y,pi.z, radius) ;				surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, q.z );
 
 	if ( expand ) {		
-		w = tex3D<float> (volIn[0], q.x-1,q.y,q.z) + distFunc(p, pi.x-1, pi.y, pi.z, radius);		surf3Dwrite ( w, volOut[0], (q.x-1)*sizeof(float), q.y, q.z );
-		w = tex3D<float> (volIn[0], q.x+1,q.y,q.z) + distFunc(p, pi.x+1, pi.y, pi.z, radius);		surf3Dwrite ( w, volOut[0], (q.x+1)*sizeof(float), q.y, q.z );
-		w = tex3D<float> (volIn[0], q.x,q.y-1,q.z) + distFunc(p, pi.x, pi.y-1, pi.z, radius);		surf3Dwrite ( w, volOut[0], q.x*sizeof(float), (q.y-1), q.z );
-		w = tex3D<float> (volIn[0], q.x,q.y+1,q.z) + distFunc(p, pi.x, pi.y+1, pi.z, radius); 		surf3Dwrite ( w, volOut[0], q.x*sizeof(float), (q.y+1), q.z );
-		w = tex3D<float> (volIn[0], q.x,q.y,q.z-1) + distFunc(p, pi.x, pi.y, pi.z-1, radius);		surf3Dwrite ( w, volOut[0], q.x*sizeof(float), q.y, (q.z-1) );
-		w = tex3D<float> (volIn[0], q.x,q.y,q.z+1) + distFunc(p, pi.x, pi.y, pi.z+1, radius);		surf3Dwrite ( w, volOut[0], q.x*sizeof(float), q.y, (q.z+1) );
+		w = tex3D<float> (gvdb->volIn[0], q.x-1,q.y,q.z) + distFunc(p, pi.x-1, pi.y, pi.z, radius);		surf3Dwrite ( w, gvdb->volOut[0], (q.x-1)*sizeof(float), q.y, q.z );
+		w = tex3D<float> (gvdb->volIn[0], q.x+1,q.y,q.z) + distFunc(p, pi.x+1, pi.y, pi.z, radius);		surf3Dwrite ( w, gvdb->volOut[0], (q.x+1)*sizeof(float), q.y, q.z );
+		w = tex3D<float> (gvdb->volIn[0], q.x,q.y-1,q.z) + distFunc(p, pi.x, pi.y-1, pi.z, radius);		surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), (q.y-1), q.z );
+		w = tex3D<float> (gvdb->volIn[0], q.x,q.y+1,q.z) + distFunc(p, pi.x, pi.y+1, pi.z, radius); 		surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), (q.y+1), q.z );
+		w = tex3D<float> (gvdb->volIn[0], q.x,q.y,q.z-1) + distFunc(p, pi.x, pi.y, pi.z-1, radius);		surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, (q.z-1) );
+		w = tex3D<float> (gvdb->volIn[0], q.x,q.y,q.z+1) + distFunc(p, pi.x, pi.y, pi.z+1, radius);		surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, (q.z+1) );
 	}
 
 	if ( pclr != 0 ) {
@@ -122,7 +607,7 @@ extern "C" __global__ void gvdbScatterPointDensity ( int num_pnts, float radius,
 
 		if ( colorBuf != 0 ) {	
 			// Increment index
-			uint brickres = gvdb.res[0];
+			uint brickres = gvdb->res[0];
 			uint vid = (brickres * brickres * brickres * pnode[i]) + (brickres * brickres * (uint)pi.z) + (brickres * (uint)pi.y) + (uint)pi.x;
 			uint colorIdx = vid * 4;
 		
@@ -133,12 +618,12 @@ extern "C" __global__ void gvdbScatterPointDensity ( int num_pnts, float radius,
 			atomicAdd(&colorBuf[colorIdx + 3], wclr.z);
 		}
 		else {
-		 	surf3Dwrite(wclr, volOut[1], q.x*sizeof(uchar4), q.y, q.z); 
+		 	surf3Dwrite(wclr, gvdb->volOut[3], q.x*sizeof(uchar4), q.y, q.z);
 		}
 	}
 }
 
-extern "C" __global__ void gvdbAddSupportVoxel ( int num_pnts,  float radius, float offset, float amp, 
+extern "C" __global__ void gvdbAddSupportVoxel (VDBInfo* gvdb, int num_pnts,  float radius, float offset, float amp,
 												char* ppos, int pos_off, int pos_stride, 
 												char* pdir, int dir_off, int dir_stride, 
 												int* pnode, float3 ptrans, bool expand, uint* colorBuf)
@@ -155,61 +640,61 @@ extern "C" __global__ void gvdbAddSupportVoxel ( int num_pnts,  float radius, fl
 	//wpos.y -=5.0;//threadIdx.y;
 	float3 vmin;
 	float w;
-	VDBNode* node = getNode ( 0, pnode[i], &vmin );			// Get node	
-	float3 p = (wpos-vmin)/gvdb.vdel[0];
+	VDBNode* node = getNode ( gvdb, 0, pnode[i], &vmin );			// Get node	
+	float3 p = (wpos-vmin)/gvdb->vdel[0];
 	float3 pi = make_float3(int(p.x), int(p.y), int(p.z));
 
 	// -- should be ok that pi.x,pi.y,pi.z = 0 
-	if ( pi.x <= -1 || pi.y <= -1 || pi.z <= -1 || pi.x >= gvdb.res[0] || pi.y >= gvdb.res[0] || pi.z >= gvdb.res[0] ) return;
+	if ( pi.x <= -1 || pi.y <= -1 || pi.z <= -1 || pi.x >= gvdb->res[0] || pi.y >= gvdb->res[0] || pi.z >= gvdb->res[0] ) return;
 	uint3 q = make_uint3(pi.x,pi.y,pi.z) + make_uint3( node->mValue );	
 
-	w = tex3D<float>( volIn[0], q.x, q.y, q.z ) + distFunc(p, pi.x, pi.y,pi.z, radius); 				
-	surf3Dwrite ( w, volOut[0], q.x*sizeof(float), q.y, q.z );	
-	surf3Dwrite ( (uchar)1, volOut[1], q.x*sizeof(uchar), q.y, q.z );
+	w = tex3D<float>(gvdb->volIn[0], q.x, q.y, q.z ) + distFunc(p, pi.x, pi.y,pi.z, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, q.z );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], q.x*sizeof(uchar), q.y, q.z );
 	//surf3Dwrite ( 1.0f, volOut[2], q.x*sizeof(float), q.y, q.z );	
 
 #if 1
 	// expand to 3x3 square, write to both volume and material channels
-	w = tex3D<float> (volIn[0], q.x-1,q.y,q.z) + distFunc(p, pi.x-1, pi.y, pi.z, radius);		
-	surf3Dwrite ( w, volOut[0], (q.x-1)*sizeof(float), q.y, q.z );
-	surf3Dwrite ( (uchar)1, volOut[1], (q.x-1)*sizeof(uchar), q.y, q.z );
+	w = tex3D<float> (gvdb->volIn[0], q.x-1,q.y,q.z) + distFunc(p, pi.x-1, pi.y, pi.z, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], (q.x-1)*sizeof(float), q.y, q.z );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x-1)*sizeof(uchar), q.y, q.z );
 	//surf3Dwrite ( 1.0f, volOut[2], (q.x-1)*sizeof(float), q.y, q.z );
 
-	w = tex3D<float> (volIn[0], q.x+1,q.y,q.z) + distFunc(p, pi.x+1, pi.y, pi.z, radius);		
-	surf3Dwrite ( w, volOut[0], (q.x+1)*sizeof(float), q.y, q.z );
-	surf3Dwrite ( (uchar)1, volOut[1], (q.x+1)*sizeof(uchar), q.y, q.z );
+	w = tex3D<float> (gvdb->volIn[0], q.x+1,q.y,q.z) + distFunc(p, pi.x+1, pi.y, pi.z, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], (q.x+1)*sizeof(float), q.y, q.z );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x+1)*sizeof(uchar), q.y, q.z );
 	//surf3Dwrite ( 1.0f, volOut[2], (q.x+1)*sizeof(float), q.y, q.z );
 
-	w = tex3D<float> (volIn[0], q.x,q.y,q.z-1) + distFunc(p, pi.x, pi.y, pi.z-1, radius);		
-	surf3Dwrite ( w, volOut[0], q.x*sizeof(float), q.y, (q.z-1) );
-	surf3Dwrite ( (uchar)1, volOut[1], q.x*sizeof(uchar), q.y, (q.z-1) );
+	w = tex3D<float> (gvdb->volIn[0], q.x,q.y,q.z-1) + distFunc(p, pi.x, pi.y, pi.z-1, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, (q.z-1) );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], q.x*sizeof(uchar), q.y, (q.z-1) );
 	//surf3Dwrite ( 1.0f, volOut[2], q.x*sizeof(float), q.y, (q.z-1) );
 
-	w = tex3D<float> (volIn[0], q.x,q.y,q.z+1) + distFunc(p, pi.x, pi.y, pi.z+1, radius);		
-	surf3Dwrite ( w, volOut[0], q.x*sizeof(float), q.y, (q.z+1) );
-	surf3Dwrite ( (uchar)1, volOut[1], q.x*sizeof(uchar), q.y, (q.z+1) );
+	w = tex3D<float> (gvdb->volIn[0], q.x,q.y,q.z+1) + distFunc(p, pi.x, pi.y, pi.z+1, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, (q.z+1) );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], q.x*sizeof(uchar), q.y, (q.z+1) );
 	//surf3Dwrite ( 1.0f, volOut[2], q.x*sizeof(float), q.y, (q.z+1) );
 
-	w = tex3D<float> (volIn[0], q.x-1,q.y,q.z-1) + distFunc(p, pi.x-1, pi.y, pi.z-1, radius);		
-	surf3Dwrite ( w, volOut[0], (q.x-1)*sizeof(float), q.y, (q.z-1) );
-	surf3Dwrite ( (uchar)1, volOut[1], (q.x-1)*sizeof(uchar), q.y, (q.z-1) );
+	w = tex3D<float> (gvdb->volIn[0], q.x-1,q.y,q.z-1) + distFunc(p, pi.x-1, pi.y, pi.z-1, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], (q.x-1)*sizeof(float), q.y, (q.z-1) );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x-1)*sizeof(uchar), q.y, (q.z-1) );
 	//surf3Dwrite ( 1.0f, volOut[2], (q.x-1)*sizeof(float), q.y, (q.z-1) );
-	w = tex3D<float> (volIn[0], q.x+1,q.y,q.z+1) + distFunc(p, pi.x+1, pi.y, pi.z+1, radius);		
-	surf3Dwrite ( w, volOut[0], (q.x+1)*sizeof(float), q.y, (q.z+1) );
-	surf3Dwrite ( (uchar)1, volOut[1], (q.x+1)*sizeof(uchar), q.y, (q.z+1) );
+	w = tex3D<float> (gvdb->volIn[0], q.x+1,q.y,q.z+1) + distFunc(p, pi.x+1, pi.y, pi.z+1, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], (q.x+1)*sizeof(float), q.y, (q.z+1) );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x+1)*sizeof(uchar), q.y, (q.z+1) );
 	//surf3Dwrite ( 1.0f, volOut[2], (q.x+1)*sizeof(float), q.y, (q.z+1) );
-	w = tex3D<float> (volIn[0], q.x+1,q.y,q.z-1) + distFunc(p, pi.x+1, pi.y, pi.z-1, radius);		
-	surf3Dwrite ( w, volOut[0], (q.x+1)*sizeof(float), q.y, (q.z-1) );
-	surf3Dwrite ( (uchar)1, volOut[1], (q.x+1)*sizeof(uchar), q.y, (q.z-1) );
+	w = tex3D<float> (gvdb->volIn[0], q.x+1,q.y,q.z-1) + distFunc(p, pi.x+1, pi.y, pi.z-1, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], (q.x+1)*sizeof(float), q.y, (q.z-1) );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x+1)*sizeof(uchar), q.y, (q.z-1) );
 	//surf3Dwrite ( 1.0f, volOut[2], (q.x+1)*sizeof(float), q.y, (q.z-1) );
-	w = tex3D<float> (volIn[0], q.x-1,q.y,q.z+1) + distFunc(p, pi.x-1, pi.y, pi.z+1, radius);		
-	surf3Dwrite ( w, volOut[0], (q.x-1)*sizeof(float), q.y, (q.z+1) );
-	surf3Dwrite ( (uchar)1, volOut[1], (q.x-1)*sizeof(uchar), q.y, (q.z+1) );
+	w = tex3D<float> (gvdb->volIn[0], q.x-1,q.y,q.z+1) + distFunc(p, pi.x-1, pi.y, pi.z+1, radius);
+	surf3Dwrite ( w, gvdb->volOut[0], (q.x-1)*sizeof(float), q.y, (q.z+1) );
+	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x-1)*sizeof(uchar), q.y, (q.z+1) );
 	//surf3Dwrite ( 1.0f, volOut[2], (q.x-1)*sizeof(float), q.y, (q.z+1) );
 #endif
 }
 
-extern "C" __global__ void gvdbScatterPointAvgCol (int num_voxels, uint* colorBuf)
+extern "C" __global__ void gvdbScatterPointAvgCol (VDBInfo* gvdb, int num_voxels, uint* colorBuf)
 {
   uint vid = blockIdx.x * blockDim.x + threadIdx.x;
   if (vid >= num_voxels) return;
@@ -225,10 +710,10 @@ extern "C" __global__ void gvdbScatterPointAvgCol (int num_voxels, uint* colorBu
     uchar4 pclr = make_uchar4(colx, coly, colz, 255);
 
     // Get node
-    uint brickres = gvdb.res[0];
+    uint brickres = gvdb->res[0];
     uint nid = vid / (brickres * brickres * brickres);
     float3 vmin;
-    VDBNode* node = getNode(0, nid, &vmin);
+    VDBNode* node = getNode(gvdb, 0, nid, &vmin);
 
     // Get local 3d indices
     uint3 pi;
@@ -239,124 +724,221 @@ extern "C" __global__ void gvdbScatterPointAvgCol (int num_voxels, uint* colorBu
     // Get global atlas index
     uint3 q = make_uint3(pi.x, pi.y, pi.z) + make_uint3(node->mValue);
     
-    surf3Dwrite(pclr, volOut[1], q.x*sizeof(uchar4), q.y, q.z);
+    surf3Dwrite(pclr, gvdb->volOut[1], q.x*sizeof(uchar4), q.y, q.z);
   }
 }
 
-/*
-extern "C" __global__ void gvdbGatherPointDensity ( int3 res, uchar chan, int num_pnts, float radius, float3* ppos,
-												int num_node, int* gcnt, int* goff )
+extern "C" __global__ void gvdbReadGridVel (VDBInfo* gvdb, int cell_num, int3* cell_pos, float* cell_vel)
 {
-	uint3 bndx = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;
-	if ( bndx.x >= gvdb.atlas_cnt.x || bndx.y >= gvdb.atlas_cnt.y || bndx.z >= gvdb.atlas_cnt.z ) return;
-	int bid = (bndx.z*gvdb.atlas_cnt.y + bndx.y )*gvdb.atlas_cnt.x + bndx.x;		// brick id				
-	int nid = (gvdb.atlas_map + bid)->mLeafID;
-	if ( nid == ID_UNDEFL) return;
-	if ( nid >= num_node ) return;
-	if ( gcnt[nid] == 0 ) return;
-	int3 o = (gvdb.atlas_map + bid)->mPos;		
+	uint cid = blockIdx.x * blockDim.x + threadIdx.x;
+	if (cid >= cell_num) return;
 
-	float3 poslist[200];			// <-- cannot used share memory here
-	
-	float3* pcurr = ppos + goff[nid];
-	for (int j=0; j < gcnt[nid]; j++ ) {
-		poslist[j] = *pcurr++;		
-	}	
-	__syncthreads ();
+	float3 wpos = make_float3(cell_pos[cid].x, cell_pos[cid].y, cell_pos[cid].z);
 
-	float sum, c, R2 = radius*radius;
-	float3 jpos, wpos;		
-	int3 p;
+	float3 vmin, vdel;										
+	VDBNode* node = getleafNodeAtPoint ( gvdb, wpos, &vmin, &vdel);	
+	if ( node == 0x0 ) { cell_vel[cid] = 0.0f; return; }
+
+	//cell_vel[cid] = -1.0f;
+
+	int3 vox = node->mValue + make_int3((wpos.x - vmin.x)/vdel.x, (wpos.y - vmin.y)/vdel.y, (wpos.z - vmin.z)/vdel.z);
+
+	cell_vel[cid] = (tex3D<float> ( gvdb->volIn[3], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f));
+	//cell_vel[cid] = (tex3D<float> ( volIn[9], vox.x, vox.y, vox.z));
+}
+
+extern "C" __global__ void gvdbMapExtraGVDB (VDBInfo* gvdb, int numBricks, int sc_dim, int sc_per_brick, int subcell_size, int* sc_mapping, VDBInfo* obs, int* sc_obs_nid)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= numBricks) return;
+
+	VDBNode* pnode = getNode ( gvdb, 0, i );
+	if (pnode->mParent == ID_UNDEF64) return;
+	int3 pos = pnode->mPos;
+
+	int obs_nid = getPosLeafParent(obs, pos);
+
+	for (int sc = 0; sc < sc_per_brick; sc++)
+	{
+		sc_obs_nid[sc_mapping[i] * sc_per_brick + sc] = obs_nid;
+	}
+}
+
+extern "C" __global__ void gvdbCalcSubcellPos (VDBInfo* gvdb, int* sc_nid, int3* sc_pos, int numBricks, int sc_dim, int sc_per_brick, int subcell_size, int* sc_mapping)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= numBricks) return;
+	//if (sc_mapping[i] < 0) return;
+
+	VDBNode* pnode = getNode ( gvdb, 0, i );
+	if (pnode->mParent == ID_UNDEF64) return;
+	int3 pos = pnode->mPos;
+
+	for (int sc = 0; sc < sc_per_brick; sc++)
+	{
+		sc_pos[sc_mapping[i] * sc_per_brick + sc].x = pos.x + sc % sc_dim * subcell_size;
+		sc_pos[sc_mapping[i] * sc_per_brick + sc].y = pos.y + (sc / sc_dim) % sc_dim * subcell_size;
+		sc_pos[sc_mapping[i] * sc_per_brick + sc].z = pos.z + (sc / sc_dim / sc_dim) % sc_dim* subcell_size;
+		sc_nid[sc_mapping[i] * sc_per_brick + sc] = i;
+	}
+}
+
+extern "C" __global__ void gvdbGatherDensity (VDBInfo* gvdb, int num_pnts, int num_sc, float radius,
+	int* sc_nid, int* sc_cnt, int* sc_off, int3* sc_pos,
+	float3* sc_pnt_pos, float3* sc_pnt_vel, uchar4* sc_pnt_clr,
+	int chanDensity, int chanClr, bool bAccumulate )
+{
+	int sc_id = blockIdx.x;				// current subcell ID
+	if (sc_id >= num_sc) return;
+
+	int3 wpos; 
+	wpos.x = sc_pos[sc_id].x + int(threadIdx.x);	wpos.y = sc_pos[sc_id].y + int(threadIdx.y);	wpos.z = sc_pos[sc_id].z + int(threadIdx.z);
 	
-	for ( p.z = 0; p.z < gvdb.brick_res; p.z++ ) 
-	 for ( p.y = 0; p.y < gvdb.brick_res; p.y++ ) 
-	  for ( p.x = 0; p.x < gvdb.brick_res; p.x++ ) {
-		wpos = make_float3(p+o) * gvdb.voxelsize;
-		sum = 0;
-		for (int j=0; j < gcnt[nid]; j++ ) {
-			jpos = poslist[j] - wpos;
-			c = (jpos.x*jpos.x + jpos.y*jpos.y + jpos.z*jpos.z);		
-			if ( c < R2) {		
-				c = c / R2;
-				sum += 1.0 + c*(-3 + c*(3 - c));		// Wyvill equation
+	VDBNode* node = getNode(gvdb, 0, sc_nid[sc_id]);
+	float3 vmin = node->mPos * gvdb->voxelsize;
+	float3 vdel = gvdb->vdel[0];
+	int3 vox = node->mValue + make_int3((wpos.x - vmin.x) / vdel.x, (wpos.y - vmin.y) / vdel.y, (wpos.z - vmin.z) / vdel.z);
+
+	float3 jpos;
+	float4 clr = make_float4(0,0,0,1);
+	float val = 0, c = 0.0f;
+
+	if ( bAccumulate ) {
+		val = tex3D<float> ( gvdb->volIn[chanDensity], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f );
+		if ( sc_pnt_clr != 0x0 ) clr = CHAR2CLR(tex3D<uchar4>(gvdb->volIn[chanClr], vox.x+ 0.5f, vox.y + 0.5f, vox.z + 0.5f) );
+	}
+	for (int j = 0; j < sc_cnt[sc_id]; j++) {
+		jpos = sc_pnt_pos[sc_off[sc_id] + j] - make_float3(wpos);
+		c = sqrtf(jpos.x*jpos.x + jpos.y*jpos.y + jpos.z*jpos.z);
+		val = max(val, radius - c);
+		if (sc_pnt_clr != 0x0) clr += CHAR2CLR(sc_pnt_clr[sc_off[sc_id] + j]);
+	}
+	surf3Dwrite( val, gvdb->volOut[chanDensity], vox.x * sizeof(float), vox.y, vox.z);
+
+	if (sc_pnt_clr != 0x0) {	
+		clr /= float(sc_cnt[sc_id] + (bAccumulate ? 1 : 0) );		
+		surf3Dwrite( CLR2CHAR(clr), gvdb->volOut[chanClr], vox.x * sizeof(uchar4), vox.y, vox.z);
+	}
+}
+
+
+extern "C" __global__ void gvdbGatherLevelSet (VDBInfo* gvdb, int num_pnts, int num_sc, float radius,
+	int* sc_nid, int* sc_cnt, int* sc_off, int3* sc_pos,
+	float3* sc_pnt_pos, float3* sc_pnt_vel, uchar4* sc_pnt_clr,
+	int chanLevelset, int chanClr, bool bAccumulate)
+{
+	int sc_id = blockIdx.x;				// current subcell ID
+	if (sc_id >= num_sc) return;
+
+	int3 wpos; 
+	wpos.x = sc_pos[sc_id].x + int(threadIdx.x);	wpos.y = sc_pos[sc_id].y + int(threadIdx.y);	wpos.z = sc_pos[sc_id].z + int(threadIdx.z);
+	
+	VDBNode* node = getNode(gvdb, 0, sc_nid[sc_id]);
+	float3 vmin = node->mPos * gvdb->voxelsize;
+	float3 vdel = gvdb->vdel[0];
+	int3 vox = node->mValue + make_int3((wpos.x - vmin.x) / vdel.x, (wpos.y - vmin.y) / vdel.y, (wpos.z - vmin.z) / vdel.z);
+
+	float3 jpos;
+	float4 clr = make_float4(0,0,0,1);
+	float dist = 3.0f, c = 0.0f;
+
+	if ( bAccumulate ) {
+		dist = tex3D<float> ( gvdb->volIn[chanLevelset ], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f );
+		if ( sc_pnt_clr != 0x0 ) clr = CHAR2CLR(tex3D<uchar4>(gvdb->volIn[chanClr], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f) );
+	}
+	for (int j = 0; j < sc_cnt[sc_id]; j++) {
+		jpos = sc_pnt_pos[sc_off[sc_id] + j] - make_float3(wpos);
+		c = sqrtf(jpos.x*jpos.x + jpos.y*jpos.y + jpos.z*jpos.z);
+		dist = min(dist, c - radius);
+		if (sc_pnt_clr != 0x0) clr += CHAR2CLR(sc_pnt_clr[sc_off[sc_id] + j]);
+	}
+	surf3Dwrite( dist, gvdb->volOut[chanLevelset], vox.x * sizeof(float), vox.y, vox.z);
+
+	if (sc_pnt_clr != 0x0) {	
+		clr /= float(sc_cnt[sc_id] + (bAccumulate ? 1 : 0) );		
+		surf3Dwrite( CLR2CHAR(clr), gvdb->volOut[chanClr], vox.x * sizeof(uint), vox.y, vox.z);
+	}
+}
+
+extern "C" __global__ void gvdbGatherLevelSet_fp16(VDBInfo* gvdb, int num_pnts, int num_sc, float radius,
+	float3 pos_min, float3 pos_range, float3 vel_min, float3 vel_range,
+	int* sc_nid, int* sc_cnt, int* sc_off, int3* sc_pos,
+	ushort3* sc_pnt_pos, ushort3* sc_pnt_vel, uint* sc_pnt_clr,
+	int chanLevelset, int chanClr)
+{
+	int sc_id = blockIdx.x;				// current subcell ID
+	if (sc_id >= num_sc) return;
+
+	int3 wpos; wpos.x = sc_pos[sc_id].x + int(threadIdx.x);	wpos.y = sc_pos[sc_id].y + int(threadIdx.y);	wpos.z = sc_pos[sc_id].z + int(threadIdx.z);
+	
+	VDBNode* node = getNode(gvdb, 0, sc_nid[sc_id]);
+	float3 vmin = node->mPos * gvdb->voxelsize;
+	float3 vdel = gvdb->vdel[node->mLev];
+	int3 vox = node->mValue + make_int3((wpos.x - vmin.x) / vdel.x, (wpos.y - vmin.y) / vdel.y, (wpos.z - vmin.z) / vdel.z);
+
+	float3 jpos, tmppos;
+	float4 clr;
+	float c = 0.0f;
+	float dist = 3.0f;
+	
+	for (int j = 0; j < sc_cnt[sc_id]; j++) {
+		tmppos.x = sc_pnt_pos[sc_off[sc_id] + j].x / 65535.0f * pos_range.x + pos_min.x;
+		tmppos.y = sc_pnt_pos[sc_off[sc_id] + j].y / 65535.0f * pos_range.y + pos_min.y;
+		tmppos.z = sc_pnt_pos[sc_off[sc_id] + j].z / 65535.0f * pos_range.z + pos_min.z;
+
+		jpos = tmppos - make_float3(wpos);
+		c = sqrtf(jpos.x*jpos.x + jpos.y*jpos.y + jpos.z*jpos.z);
+		dist = min(dist, c - radius);
+		if (sc_pnt_clr != 0x0) clr += INT2CLR(sc_pnt_clr[sc_off[sc_id] + j]) / c;
+	}
+	
+	surf3Dwrite( dist, gvdb->volOut[chanLevelset], vox.x * sizeof(float), vox.y, vox.z);
+	
+	if ( sc_pnt_clr != 0x0 )
+		surf3Dwrite( CLR2INT(clr), gvdb->volOut[chanClr], vox.x * sizeof(float), vox.y, vox.z);
+}
+
+
+
+extern "C" __global__ void gvdbCheckVal (VDBInfo* gvdb, float slice, int3 res, int chanVx, int chanVy, int chanVz, int chanVxOld, int chanVyOld, int chanVzOld, float* outbuf1, float* outbuf2 )
+												 
+{
+	uint3 vox = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;
+	if ( vox.y >= 1  ) return;
+	if ( vox.x > res.x || vox.z > res.z ) return;
+
+	float3 wpos = make_float3(vox) * 0.5;	
+	wpos.y = slice;
+
+	float3 vmin, vdel;										
+	VDBNode* node = getleafNodeAtPoint ( gvdb, wpos, &vmin, &vdel);
+	float3 p = (wpos - vmin) / vdel;
+	if ( node == 0x0 ) return; 
+
+	//int pi(wpos.x), fj(wpos.y - 0.5f), pk(wpos.z);
+	int fi(wpos.x - 0.5f), pj(wpos.y), fk(wpos.z - 0.5f);
+
+	float vel_y, vel_y2;
+
+	vel_y = 0.0f;
+	for (int ii = 0; ii < 2; ii++) {
+		for (int jj = 0; jj < 2; jj++) {
+			for (int kk = 0; kk < 2; kk++) {
+				int3 vox_pos = make_int3(fi+ii, pj+jj, fk+kk);
+				int3 tmp_vox = node->mValue + make_int3((vox_pos.x - vmin.x)/vdel.x, (vox_pos.y - vmin.y)/vdel.y, (vox_pos.z - vmin.z)/vdel.z);
+				float tmp_vel = tex3D<float> ( gvdb->volIn[chanVy], tmp_vox.x, tmp_vox.y, tmp_vox.z);
+				vel_y += tmp_vel * (1.0f - fabs(fi + ii + 0.5f - wpos.x)) * (1.0f - fabs(pj + jj - wpos.y)) * (1.0f - fabs(fk + kk + 0.5f - wpos.z));	
 			}
 		}
-		surf3Dwrite ( sum, volOut[chan], (p.x+bndx.x*gvdb.brick_res)*sizeof(float), (p.y+bndx.y*gvdb.brick_res), (p.z+bndx.z*gvdb.brick_res) );
-	  }
-	
+	} 
+
+	float3 sp	= make_float3(node->mValue) + p + make_float3(-0.5f, 0.0f, -0.5f);
+	vel_y2		= tex3D<float> ( gvdb->volIn[chanVy], sp.x, sp.y, sp.z );
+
+	outbuf1[ vox.z*res.x + vox.x ] = vel_y;
+	outbuf2[ vox.z*res.x + vox.x ] = vel_y2;
 }
-*/
 
-extern "C" __global__ void gvdbGatherPointDensity (  int3 res, uchar chan, int num_pnts, float radius, float3* ppos,
-												int num_node, int* gcnt, int* goff, int subcell )
-{
-	uint3 packvox = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
-	uint3 vox = packvox + (blockIdx / subcell)*gvdb.atlas_apron*2 + make_uint3(1,1,1);
-	if ( vox.x >= gvdb.atlas_res.x || vox.y >= gvdb.atlas_res.y || vox.z >= gvdb.atlas_res.z ) return;
-
-	// Get atlas node (brick)
-	float3 wpos;
-	int nid;
-	if ( !getAtlasToWorldID ( vox, wpos, nid ) ) return;
-
-	// Transfer brick points into shared memory	
-	__shared__ float3 poslist[4000];	
-	int tid = ((threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x) * 4;
-	for (int k=0; k < 4 && tid+k < gcnt[nid]; k++ ) {
-		poslist[ tid+k ] = *(ppos + goff[nid] + tid+k);		
-	}
-	__syncthreads ();
-
-	float R2 = radius*radius;
-	float3 jpos;
-	float c, sum = 0.0f;	
-	for (int j=0; j < gcnt[nid]; j++ ) {		
-		jpos = poslist[j] - wpos;		
-		c = (jpos.x*jpos.x + jpos.y*jpos.y + jpos.z*jpos.z);		
-		if ( c < R2) {		
-			c = c / R2;
-			sum += 1.0 + c*(-3 + c*(3 - c));		// Wyvill equation (Soft Objects)
-		}
-	}
-
-	surf3Dwrite ( sum, volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
-}	
-
-
-extern "C" __global__ void gvdbGatherPointVelocity (  int3 res, uchar chan, int num_pnts, float radius, float3* ppos,
-												int num_node, int* gcnt, int* goff )
-{
-	uint3 packvox = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
-	uint3 vox = packvox + (blockIdx / 2)*gvdb.atlas_apron*2 + make_uint3(1,1,1);
-	if ( vox.x >= gvdb.atlas_res.x || vox.y >= gvdb.atlas_res.y || vox.z >= gvdb.atlas_res.z ) return;
-
-	// Get atlas node (brick)
-	float3 wpos;
-	int nid;
-	if ( !getAtlasToWorldID ( vox, wpos, nid ) ) return;
-
-	// Transfer brick points into shared memory	
-	__shared__ float3 poslist[4000];	
-	int tid = ((threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x) * 4;
-	for (int k=0; k < 4 && tid+k < gcnt[nid]; k++ ) {
-		poslist[ tid+k ] = *(ppos + goff[nid] + tid+k);		
-	}
-	__syncthreads ();
-
-	float R2 = radius*radius;
-	float3 jpos;
-	float c, sum = 0.0f;	
-	for (int j=0; j < gcnt[nid]; j++ ) {		
-		jpos = poslist[j] - wpos;		
-		c = (jpos.x*jpos.x + jpos.y*jpos.y + jpos.z*jpos.z);		
-		if ( c < R2) {		
-			c = c / R2;
-			sum += 1.0 + c*(-3 + c*(3 - c));		// Wyvill equation (Soft Objects)
-		}
-	}
-
-	surf3Dwrite ( sum, volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
-}	
 
 
 #define SCAN_BLOCKSIZE		512
@@ -430,6 +1012,94 @@ extern "C" __global__ void gvdbInsertTriangles ( float bdiv, int bmax, int* bcnt
 	}	
 }
 
+extern "C" __global__ void gvdbCompactUnique(int num_pnts, long long* pin, int* marker, int* offset, long long* pout)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts ) return;
+
+	if ( marker[i] > 0 )
+	{
+		pout[offset[i]] = pin[i]; 
+	}
+}
+
+#define PRESCAN_BLOCKSIZE		256
+extern "C" __global__ void gvdbRadixPrescan(int len, int* input, int* output)
+{
+	__shared__ int scan_array[PRESCAN_BLOCKSIZE];    
+	int ti = threadIdx.x;
+	int offset = 1; 
+
+	// Pre-load into shared memory
+    scan_array[ti] = input[ti];
+	scan_array[ti + 128] = input[ti + 128];
+    __syncthreads();
+
+    for (int d = len>>1; d > 0; d >>= 1)
+	{
+		if (ti < d)
+		{
+			int ai = offset*(2*ti+1)-1;
+			int bi = offset*(2*ti+2)-1;
+			scan_array[bi] += scan_array[ai];
+		}
+		offset *= 2;
+		__syncthreads();
+	}
+	if (ti == 0) { scan_array[len - 1] = 0; } // clear the last element
+	__syncthreads();
+	for (int d = 1; d < len; d *= 2) // traverse down tree & build scan
+	{
+		offset >>= 1;	
+		if (ti < d)
+		{
+			int ai = offset*(2*ti+1)-1;
+			int bi = offset*(2*ti+2)-1;
+			int t = scan_array[ai];
+			scan_array[ai] = scan_array[bi];
+			scan_array[bi] += t;
+		}
+		__syncthreads();
+	} 
+
+	output[ti] = scan_array[ti];
+	output[ti + 128] = scan_array[ti + 128];
+}
+
+extern "C" __global__ void gvdbRadixBincount (int num_pnts, long long* pin, int* pout, int bpos)
+{
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts) return;
+
+	long long value = pin[i];
+	for (int b = 0; b < bpos; b++)	value >>= 8;
+
+	atomicAdd( &pout[(value & 0xFF)], 1);
+
+	//for (int b = 1; b < 7; b++)
+	//{
+	//	value >>= 8;	atomicAdd( &pout[(value & 0xFF) + 256 * b], 1);
+	//}
+}
+
+extern "C" __global__ void gvdbRadixShuffle(int num_pnts, int* binPrefixSum, long long* pin, long long* pout, int bpos)
+{
+	__shared__ int offset[PRESCAN_BLOCKSIZE]; 
+
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	if ( i >= num_pnts) return;
+
+	long long value = pin[i];
+	for (int b = 0; b < bpos; b++)	value >>= 8;
+
+	//atomicSub( &binPrefixSum[(value & 0xFF) + 1], 1);
+
+	int offs = atomicAdd( &offset[(value & 0xFF)], 1);
+	__syncthreads();
+
+	pout[binPrefixSum[(value & 0xFF)] + offs] = pin[i];
+}
+
 // Sort triangles
 // Give a list of bins and known offsets (prefixes), and a list of vertices and faces,
 // performs a deep copy of triangles into bins, where some may be duplicated.
@@ -473,9 +1143,9 @@ extern "C" __global__ void gvdbSortTriangles ( float bdiv, int bmax, int* bcnt, 
 	}	
 }
 
-extern "C" __global__ void gvdbVoxelize ( float3 vmin, float3 vmax, int3 res, uchar* obuf, uchar val_surf, uchar val_inside, 
-							   float bdiv, int bmax, int* bcnt, int* boff, float3* tbuf )					
-							// int vcnt, int ecnt, float3* vbuf, int* ebuf )
+extern "C" __global__ void gvdbVoxelize ( float3 vmin, float3 vmax, int3 res, uchar* obuf, uchar otype, 
+										  float val_surf, float val_inside, float bdiv, int bmax, int* bcnt, int* boff, 
+										  float3* tbuf )							
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;
@@ -620,14 +1290,55 @@ extern "C" __global__ void gvdbVoxelize ( float3 vmin, float3 vmax, int3 res, uc
 		rad = fabsf(e2.y) * 0.5f + fabsf(e2.x) * 0.5f;
 		if(min>rad || max<-rad) continue; */
 		
-		obuf[ (t.z*res.y + t.y)*res.x + t.x ] = val_surf;
+		switch ( otype ) {
+		case T_UCHAR:	obuf [ (t.z*res.y + t.y)*res.x + t.x ] = (uchar) val_surf;			break;
+		case T_FLOAT:	((float*) obuf) [ (t.z*res.y + t.y)*res.x + t.x ] = val_surf;		break;
+		case T_INT:		((int*) obuf) [ (t.z*res.y + t.y)*res.x + t.x ] = (int) val_surf;	break;
+		};		
+		
 		break;
 	}
 
 	if ( n == boff[b]+bcnt[b] ) {
 		// solid voxelization		
-		if ( cnt % 2 == 1)
-			obuf[ (t.z*res.y + t.y)*res.x + t.x ] = val_inside;
+		if ( cnt % 2 == 1) {
+			switch ( otype ) {
+			case T_UCHAR:	obuf [ (t.z*res.y + t.y)*res.x + t.x ] = (uchar) val_inside;		break;
+			case T_FLOAT:	((float*) obuf) [ (t.z*res.y + t.y)*res.x + t.x ] = val_inside;		break;
+			case T_INT:		((int*) obuf) [ (t.z*res.y + t.y)*res.x + t.x ] = (int) val_inside;	break;
+			};		
+		}
 	}
 }
+
+extern "C" __global__ void gvdbBitonicSort(int *dev_values, int num_pnts, int j, int k)
+{
+	unsigned int i, ixj; /* Sorting partners: i and ixj */
+	i = threadIdx.x + blockDim.x * blockIdx.x;
+	ixj = i^j;
+	
+	if ( i >= num_pnts ) return;
+	if ( ixj >= num_pnts ) return;
+	
+	/* The threads with the lowest ids sort the array. */
+	if ((ixj)>i) {
+		if ((i&k)==0) {
+			/* Sort ascending */
+			if (dev_values[i]>dev_values[ixj]) {
+				int temp = dev_values[i];
+				dev_values[i] = dev_values[ixj];
+				dev_values[ixj] = temp;
+			}
+		}
+		if ((i&k)!=0) {
+			/* Sort descending */
+			if (dev_values[i]<dev_values[ixj]) {
+				int temp = dev_values[i];
+				dev_values[i] = dev_values[ixj];
+				dev_values[ixj] = temp;
+			}
+		}
+	}
+}
+
 

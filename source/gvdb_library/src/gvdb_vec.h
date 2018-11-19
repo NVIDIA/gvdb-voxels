@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 
@@ -405,6 +406,7 @@
 		Matrix4F &RotateZYX ( const Vector3DF& angs );
 		Matrix4F &RotateZYXT (const Vector3DF& angs, const Vector3DF& t);
 		Matrix4F &RotateTZYX (const Vector3DF& angs, const Vector3DF& t);
+		Matrix4F &RotateTZYXS(const Vector3DF& angs, const Vector3DF& t, const Vector3DF& s);
 		Matrix4F &RotateX (const double ang);
 		Matrix4F &RotateY (const double ang);
 		Matrix4F &RotateZ (const double ang);
@@ -435,7 +437,7 @@
 
 		Matrix4F &operator= ( float* mat);
 		Matrix4F &InverseProj ( const float* mat );
-		Matrix4F &InverseView ( const float* mat, Vector3DF& pos );
+		Matrix4F &InverseView ( const float* mat, const Vector3DF& pos );
 		Vector4DF GetT ( float* mat );
 
 		int GetX()			{ return 4; }

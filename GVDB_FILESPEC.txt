@@ -2,13 +2,22 @@
 NVIDIA GVDB Sparse Volumes
 NVIDIA Corporation (c) 2016
 
-Last Updated: Rama Hoetzlein, rhoetzlein@nvidia.com, 8/28/2016
+Created: Rama Hoetzlein, rhoetzlein@nvidia.com, 8/28/2016
+Last Revised: 3/25/2018
 
 This file outlines the VBX file format specification.
-Notes are indicated by [x]
 
-Version Support
-===============
+File Format Versions
+====================
+
+ 1.11 GVDB Release (3/25/2018)
+      Versions on or after 1.11 save grid transforms to file.
+      This allows save/load of volumes to render correctly in world space.
+
+ 1.1  GVDB Release (1/1/2018)
+      Bitmask flags are optional. 
+      Versions on or after 1.1 save setting to vbx file.
+
  1.0  GVDB Beta Release (10/2/2016)
       Grid data types:	Only 'f' (float)
       Grid components: 	Only 1 

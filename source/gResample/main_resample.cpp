@@ -23,8 +23,8 @@ public:
 
 	bool		LoadRAW(char* fname, Vector3DI res, int bpp);
 	bool		ConvertToFloat(Vector3DI res, uchar* dat);
-	void		Rebuild() { Rebuild(m_VolMax, m_sparse); }
-	void		Rebuild( Vector3DF vmax, bool bSparse);
+	void		Rebuild() { Rebuild(m_VolMax, m_sparse, m_halo); }
+	void		Rebuild( Vector3DF vmax, bool bSparse, bool bHalo);
 	
 	void		start_guis(int w, int h);
 	void		draw_topology();
@@ -38,13 +38,14 @@ public:
 	int			mouse_down;
 	bool		m_show_topo;
 	bool		m_sparse;
+	bool		m_halo;
 };
 Sample sample_obj;
 
 
 void handle_gui(int gui, float val)
 {
-	if (gui == 1) {
+	if (gui >= 1) {
 		sample_obj.Rebuild();
 	}
 	sample_obj.postRedisplay();
@@ -52,10 +53,12 @@ void handle_gui(int gui, float val)
 
 void Sample::start_guis(int w, int h)
 {
+	clearGuis();
 	setview2D(w, h);
 	guiSetCallback(handle_gui);
 	addGui(20, h - 30, 130, 20, "Topology", GUI_CHECK, GUI_BOOL, &m_show_topo, 0, 1);
-	addGui(160, h - 30, 130, 20, "Sparse", GUI_CHECK, GUI_BOOL, &m_sparse, 0, 1);
+	addGui(160, h - 30, 130, 20, "Halo", GUI_CHECK, GUI_BOOL, &m_halo, 0, 1);
+	addGui(300, h - 30, 130, 20, "Sparse", GUI_CHECK, GUI_BOOL, &m_sparse, 0, 1);	
 }
 
 bool Sample::ConvertToFloat(Vector3DI res, uchar* dat)
@@ -97,7 +100,7 @@ bool Sample::LoadRAW (char* fname, Vector3DI res, int bpp)
 	fclose(fp);
 }
 
-void Sample::Rebuild(Vector3DF vmax, bool bSparse)
+void Sample::Rebuild(Vector3DF vmax, bool bSparse, bool bHalo )
 {
 	gvdb.Clear();
 	gvdb.DestroyChannels();
@@ -113,34 +116,38 @@ void Sample::Rebuild(Vector3DF vmax, bool bSparse)
 	Matrix4F xform;
 	// NOTE: 
 	// Transform represents the mapping from output space to input space (GVDB space to source data).
-	// Source data uses a different coordinate system, so we swap the Y and Z axes.
-	// Also the source data has Z+/- inverted from gvdb, so we must translate Z and invert the output Y.
-	// Finally, source data is 128 x 256 x 256, but we want to render 256^3, so we scale X-axis by 1/2.
-	//   SRT ( x-basis, y-basis, z-basis, translate, scale );
-	xform.SRT(Vector3DF(1, 0, 0), Vector3DF(0, 0, 1), Vector3DF(0, 1, 0), Vector3DF(0, 0, 256), Vector3DF(.5, -1, 1));
+	// SRT = Scale, Rotate, Translate.  p' = S R T p
+	// Rotate: Source data uses a different coordinate system, so we swap the Y and Z axes.
+	// Scale:  Source has Z+/- inverted, so we translate and invert the Y input (which gets mapped to Z)
+	//         Also, source X-axis is 128, so we scale the output res of 256 by 0.5. Scale=(.5,-1,1)
+	// Transl: Source has Z+/- inverted, so we translate to adjust the inverted Y. Trans=(0,0,256)
+	//
+	xform.SRT(Vector3DF(1, 0, 0), Vector3DF(0, 0, 1), Vector3DF(0, 1, 0), Vector3DF(0, 0, 252), Vector3DF(.5, -1, 1));
 
 	// Activate volume
 	printf("Activate GVDB volume.\n");
 	Extents e;
 	e = gvdb.ComputeExtents(1, Vector3DF(0, 0, 0), vmax);
-	
+
 	if (!bSparse) {
 		// Dense - Activate all bricks in the data volume
-		// To load data densely, we simply active every bring in the volume extents.
-		gvdb.ActivateRegion(e);
-		
+		// To load data densely, we simply active every brick in the volume extents.
+		gvdb.ActivateRegion(0, e);
+
 	} else {
 		// Sparse - Only activate bricks above threshold value
 		// To load data sparsely, we downsample the volume to get the average value at each brick.		
 		// DownsampleCPU will downsample the input AUX volume and retrieve the values back to CPU.
 		gvdb.DownsampleCPU (xform, m_DataRes, AUX_DATA3D, e.ires, vmax, AUX_DOWNSAMPLED, Vector3DF(0, 1, 0), Vector3DF(0, 1, 0));
-		
+	
 		// Then we only activate bricks whose average is above some threshold.
-		gvdb.ActivateRegionFromAux (e, AUX_DOWNSAMPLED, T_FLOAT, .04f);
+		gvdb.ActivateRegionFromAux (e, AUX_DOWNSAMPLED, T_FLOAT, 0.05f);
+
+		if ( bHalo ) gvdb.ActivateHalo(e);
 	}
 	gvdb.FinishTopology();
 	gvdb.UpdateAtlas();
-	gvdb.ClearAtlas();
+	gvdb.ClearAllChannels();
 
 	// Resample data. 
 	// The two vectors here represent the input and output value ranges.
@@ -150,14 +157,14 @@ void Sample::Rebuild(Vector3DF vmax, bool bSparse)
 	gvdb.Resample(0, xform, m_DataRes, AUX_DATA3D, Vector3DF(0, 1, 0), Vector3DF(0, 1, 0));
 }
 
-
 bool Sample::init() 
 {
 	int w = getWidth(), h = getHeight();			// window width & height
 	m_gvdb_tex = -1;
 	mouse_down = -1;
 	m_show_topo = false;
-	m_sparse = true;
+	m_halo = true;
+	m_sparse = false;	
 	m_DataBuf = 0;
 
 	init2D("arial");
@@ -167,8 +174,8 @@ bool Sample::init()
 	gvdb.SetVerbose ( true );
 	gvdb.SetCudaDevice ( devid );
 	gvdb.Initialize ();
-	gvdb.AddPath ( std::string("../source/shared_assets/") );
-	gvdb.AddPath ( std::string(ASSET_PATH) );
+	gvdb.AddPath ( "../source/shared_assets/" );
+	gvdb.AddPath ( ASSET_PATH );
 
 	gvdb.StartRasterGL();
 
@@ -195,7 +202,7 @@ bool Sample::init()
 
 	// Rebuild the data in GVDB	
 	m_VolMax = Vector3DF(256, 256, 256);
-	Rebuild ( m_VolMax, m_sparse );
+	Rebuild ( m_VolMax, m_sparse, m_halo );
 
 	// Set volume params
 	gvdb.getScene()->SetSteps ( .5, 16, .5 );				// Set raycasting steps
@@ -207,14 +214,14 @@ bool Sample::init()
 	gvdb.getScene()->LinearTransferFunc ( 0.15f, 0.25f, Vector4DF(0,0,0,0), Vector4DF(0,0,1,0.01f) );			// skin range, blue
 	gvdb.getScene()->LinearTransferFunc ( 0.25f, 0.50f, Vector4DF(0,0,1,0.01f), Vector4DF(1,0,0,0.02f) );		// bone range, red
 	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.02f), Vector4DF(.2f,.2f,0.2f,0.02f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.02f), Vector4DF(0,0,0,0.0) );
+	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.02f), Vector4DF(.1,.1,.1,0.1) );
 	gvdb.CommitTransferFunc ();
 
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
 	cam->setNearFar(.1, 5000);
-	cam->setOrbit ( Vector3DF(160,10,0), Vector3DF(128,128,128), 1200, 1.0 );	
+	cam->setOrbit ( Vector3DF(90,20,0), Vector3DF(128,100,128), 1000, 1.0 );	
 	gvdb.getScene()->SetCamera( cam );
 	
 	// Create Light
@@ -239,10 +246,14 @@ bool Sample::init()
 void Sample::reshape (int w, int h)
 {
 	// Resize the opengl screen texture
+	glViewport(0, 0, w, h);
 	createScreenQuadGL ( &m_gvdb_tex, w, h );
 
 	// Resize the GVDB render buffers
 	gvdb.ResizeRenderBuf ( 0, w, h, 4 );
+
+	// Resize 2D UIs
+	start_guis(w, h);
 
 	postRedisplay();
 }
@@ -288,7 +299,8 @@ void Sample::display()
 
 	// Render volume
 	gvdb.TimerStart ();
-	gvdb.Render(0, SHADE_VOLUME, 0, 0, 1, 1, 0 );    // last value indicates render buffer for depth input
+	gvdb.Render( SHADE_VOLUME, 0, 0 );    // last value indicates render buffer for depth input
+	//gvdb.Render( SHADE_VOLUME, 0, 0 );    // last value indicates render buffer for depth input
 	float rtime = gvdb.TimerStop();
 	nvprintf ( "Render volume. %6.3f ms\n", rtime );
 
@@ -310,6 +322,7 @@ void Sample::keyboardchar(unsigned char key, int mods, int x, int y)
 	switch (key) {
 	case '1':	m_show_topo = !m_show_topo;	break;
 	case '2':	m_sparse = !m_sparse; Rebuild(); break;
+	case '3':	m_halo = !m_halo; Rebuild(); break;
 	};
 }
 
@@ -359,7 +372,7 @@ void Sample::mouse(NVPWindow::MouseButton button, NVPWindow::ButtonAction state,
 
 int sample_main ( int argc, const char** argv ) 
 {
-	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gDepthMap", argc, argv, 1024, 768, 4, 5 );
+	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gResample", "resample", argc, argv, 1024, 768, 4, 5 );
 }
 
 void sample_print( int argc, char const *argv)

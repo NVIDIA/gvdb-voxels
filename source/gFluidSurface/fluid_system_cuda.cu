@@ -422,49 +422,50 @@ extern "C" __global__ void advanceParticles ( float time, float dt, float ss, in
 	fbuf.bufF3(FPOS)[i] += vnext * (dt/ss);			// p(t+1) = p(t) + v(t+1/2) dt		
 }
 
-extern "C" __global__ void prefixFixup ( uint *input, uint *aux, int len) 
+
+extern "C" __global__ void prefixFixup(uint *input, uint *aux, int len)
 {
-    unsigned int ndx = blockIdx.x * 2*SCAN_BLOCKSIZE + threadIdx.x;
-	
-	if (ndx < len)						input[ndx] += aux[blockIdx.x];
-	if (ndx + SCAN_BLOCKSIZE < len)		input[ndx + SCAN_BLOCKSIZE] += aux[blockIdx.x];	
+	unsigned int t = threadIdx.x;
+	unsigned int start = t + 2 * blockIdx.x * SCAN_BLOCKSIZE;
+	if (start < len)					input[start] += aux[blockIdx.x];
+	if (start + SCAN_BLOCKSIZE < len)   input[start + SCAN_BLOCKSIZE] += aux[blockIdx.x];
 }
 
-extern "C" __global__ void prefixSum ( uint* input, uint* output, uint* aux, int len, int zeroff )
+extern "C" __global__ void prefixSum(uint* input, uint* output, uint* aux, int len, int zeroff)
 {
-    __shared__ uint scan_array[SCAN_BLOCKSIZE << 1];    
+	__shared__ uint scan_array[SCAN_BLOCKSIZE << 1];
 	unsigned int t1 = threadIdx.x + 2 * blockIdx.x * SCAN_BLOCKSIZE;
 	unsigned int t2 = t1 + SCAN_BLOCKSIZE;
-    
-	// Pre-load into shared memory
-    scan_array[threadIdx.x] = (t1<len) ? input[t1] : 0.0f;
-	scan_array[threadIdx.x + SCAN_BLOCKSIZE] = (t2<len) ? input[t2] : 0.0f;
-    __syncthreads();
 
-    // Reduction
-    int stride;
-    for (stride = 1; stride <= SCAN_BLOCKSIZE; stride <<= 1) {
-       int index = (threadIdx.x + 1) * stride * 2 - 1;
-       if (index < 2 * SCAN_BLOCKSIZE)
-          scan_array[index] += scan_array[index - stride];
-       __syncthreads();
-    }
-	
-    // Post reduction
-   for (stride = SCAN_BLOCKSIZE >> 1; stride > 0; stride >>= 1) {
-       int index = (threadIdx.x + 1) * stride * 2 - 1;
-       if (index + stride < 2 * SCAN_BLOCKSIZE)
-          scan_array[index + stride] += scan_array[index];
-       __syncthreads();
-    }
+	// Pre-load into shared memory
+	scan_array[threadIdx.x] = (t1<len) ? input[t1] : 0.0f;
+	scan_array[threadIdx.x + SCAN_BLOCKSIZE] = (t2<len) ? input[t2] : 0.0f;
 	__syncthreads();
-	
+
+	// Reduction
+	int stride;
+	for (stride = 1; stride <= SCAN_BLOCKSIZE; stride <<= 1) {
+		int index = (threadIdx.x + 1) * stride * 2 - 1;
+		if (index < 2 * SCAN_BLOCKSIZE)
+			scan_array[index] += scan_array[index - stride];
+		__syncthreads();
+	}
+
+	// Post reduction
+	for (stride = SCAN_BLOCKSIZE >> 1; stride > 0; stride >>= 1) {
+		int index = (threadIdx.x + 1) * stride * 2 - 1;
+		if (index + stride < 2 * SCAN_BLOCKSIZE)
+			scan_array[index + stride] += scan_array[index];
+		__syncthreads();
+	}
+	__syncthreads();
+
 	// Output values & aux
-	if ( t1+zeroff < len)	output[t1+zeroff] = scan_array[threadIdx.x];
-	if ( t2+zeroff < len)	output[t2+zeroff] = (threadIdx.x==SCAN_BLOCKSIZE-1 && zeroff) ? 0 : scan_array[threadIdx.x + SCAN_BLOCKSIZE];	
-	if ( threadIdx.x == 0 ) {
-		if ( zeroff ) output[0] = 0;
-		if (aux) aux[blockIdx.x] = scan_array[2 * SCAN_BLOCKSIZE - 1];				
-	} 
+	if (t1 + zeroff < len)	output[t1 + zeroff] = scan_array[threadIdx.x];
+	if (t2 + zeroff < len)	output[t2 + zeroff] = (threadIdx.x == SCAN_BLOCKSIZE - 1 && zeroff) ? 0 : scan_array[threadIdx.x + SCAN_BLOCKSIZE];
+	if (threadIdx.x == 0) {
+		if (zeroff) output[0] = 0;
+		if (aux) aux[blockIdx.x] = scan_array[2 * SCAN_BLOCKSIZE - 1];
+	}
 }
 

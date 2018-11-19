@@ -35,12 +35,12 @@ int main (int argc, char* argv)
 
 	// Initialize GVDB
 	printf ( "Starting GVDB.\n" );	
-	int devid = -1;	
 	gvdb.SetVerbose ( true );		// enable/disable console output from gvdb
-	gvdb.SetCudaDevice ( devid );
+	gvdb.SetCudaDevice ( GVDB_DEV_FIRST );
 	gvdb.Initialize ();			
-	gvdb.AddPath ( std::string ( "../source/shared_assets/" ) );
-	gvdb.AddPath ( std::string (ASSET_PATH) );
+	gvdb.AddPath ( "../source/shared_assets/" );
+	gvdb.AddPath ( "../shared_assets/" );
+	gvdb.AddPath ( ASSET_PATH );
 
 
 	// Load VBX
@@ -53,15 +53,15 @@ int main (int argc, char* argv)
 	gvdb.LoadVBX ( scnpath );							// Load VBX
 
 	// Set volume params
-	gvdb.getScene()->SetSteps ( 0.25f, 16, 0.25f );			// Set raycasting steps
+	gvdb.getScene()->SetSteps ( .25, 16, .25 );				// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
-	gvdb.getScene()->SetVolumeRange ( 0.1f, 1.0f, 0.0f );		// Set volume value range
+	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, .1f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );
-	gvdb.getScene()->LinearTransferFunc ( 0.00f, 0.25f, Vector4DF(1,1,0,0.05f), Vector4DF(1,1,0,0.03f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.25f, 0.50f, Vector4DF(1,1,1,0.03f), Vector4DF(1,0,0,0.02f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.02f), Vector4DF(1,.5f,0,0.01f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(1,.5f,0,0.01f), Vector4DF(0,0,0,0.005f) );
-	gvdb.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0f );
+	gvdb.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0 );
+	gvdb.getScene()->LinearTransferFunc ( 0.00f, 0.25f, Vector4DF(0,0,0,0), Vector4DF(1,1,0,0.1f) );
+	gvdb.getScene()->LinearTransferFunc ( 0.25f, 0.50f, Vector4DF(1,1,0,0.4f), Vector4DF(1,0,0,0.3f) );
+	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.3f), Vector4DF(.2f,.2f,0.2f,0.1f) );
+	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.1f), Vector4DF(0,0,0,0.0) );
 	gvdb.CommitTransferFunc ();
 
 	Camera3D* cam = new Camera3D;						// Create Camera 
@@ -78,15 +78,15 @@ int main (int argc, char* argv)
 	gvdb.AddRenderBuf ( 0, w, h, 4 );					// Add render buffer 
 
 	gvdb.TimerStart ();
-	gvdb.Render ( 0, SHADE_VOLUME, 0, 0, 1, 1, 1 );			// Render as volume
+	gvdb.Render ( SHADE_VOLUME, 0, 0 );					// Render as volume (in channel 0, out buffer 0)
 	float rtime = gvdb.TimerStop();
 	printf ( "Render volume. %6.3f ms\n", rtime );
 
-	printf ( "Writing img_rendfile.png\n" );
+	printf ( "Writing out_rendfile.png\n" );
 	unsigned char* buf = (unsigned char*) malloc ( w*h*4 );
 	gvdb.ReadRenderBuf ( 0, buf );						// Read render buffer
 
-	save_png ( "img_rendfile.png", buf, w, h, 4 );				// Save as png
+	save_png ( "out_rendtofile.png", buf, w, h, 4 );				// Save as png
 
 	free ( buf );
 	delete cam;

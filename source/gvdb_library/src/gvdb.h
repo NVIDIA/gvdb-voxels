@@ -24,6 +24,7 @@
 
 	#include "gvdb_types.h"
 	#include "gvdb_vec.h"
+	#include "gvdb_allocator.h"
 	#include "gvdb_render.h"
 	#include "gvdb_scene.h"
 	#include "gvdb_model.h"

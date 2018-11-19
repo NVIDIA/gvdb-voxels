@@ -26,7 +26,7 @@ get_filename_component ( CMAKE_MODULE_PATH ${HELPERS} REALPATH )
 set ( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} CACHE PATH "Full path to gvdb/sample_utils/" )
 set( EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR} CACHE PATH "Executable path" )
 if ( NOT DEFINED ASSET_PATH ) 
-  get_filename_component ( _assets "${CMAKE_MODULE_PATH}/../shared_assets" REALPATH )
+  get_filename_component ( _assets "${CMAKE_MODULE_PATH}/../../source/shared_assets" REALPATH )
   set ( ASSET_PATH ${_assets} CACHE PATH "Full path to gvdb/shared_assets/" )
 endif()
 
@@ -63,6 +63,11 @@ if ( GVDB_FOUND )
 ####################################################################################
 # Find CUDA
 #
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../../../LocalPackages/CUDA)
+  Message(STATUS "Local CUDA detected. Using it")
+  #TODO: if using VS 2015, point to CUDA v8
+  set(CUDA_TOOLKIT_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../LocalPackages/CUDA/v7.5_win")
+endif()
 find_package(CUDA)
 
 if ( CUDA_FOUND )
@@ -147,6 +152,21 @@ if ( MSVC  )
 endif ()
 
 #####################################################################################
+# Install paths
+#
+# CMAKE_INSTALL_PREFIX -- path where library will be installed to
+
+if ( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
+   #if (WIN32)
+      get_filename_component ( _instpath "${CMAKE_CURRENT_SOURCE_DIR}/../../_output" REALPATH )
+   #else()
+   #   get_filename_component ( _instpath "/usr/local/gvdb" REALPATH )
+   #endif()
+   set ( CMAKE_INSTALL_PREFIX ${_instpath} CACHE PATH "default install path" FORCE)   
+endif()
+get_filename_component( BIN_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/bin REALPATH)
+
+#####################################################################################
 # Install Binaries
 #
 _INSTALL ( FILES ${GVDB_GLSL} SOURCE ${GVDB_SHARE_DIR} DESTINATION ${EXECUTABLE_OUTPUT_PATH} )
@@ -154,10 +174,33 @@ _INSTALL ( FILES ${GVDB_PTX} SOURCE ${GVDB_SHARE_DIR} DESTINATION ${EXECUTABLE_O
 _INSTALL ( FILES ${GVDB_DLL} SOURCE ${GVDB_LIB_DIR} DESTINATION ${EXECUTABLE_OUTPUT_PATH} )
 _INSTALL ( FILES ${GVDB_EXTRA} SOURCE ${GVDB_LIB_DIR} DESTINATION ${EXECUTABLE_OUTPUT_PATH} )
 
+foreach ( _file IN ITEMS ${GVDB_GLSL} )
+   list ( APPEND GVDB_GLSL_FILES "${GVDB_SHARE_DIR}/${_file}" )
+endforeach() 
+foreach ( _file IN ITEMS ${GVDB_PTX} )
+   list ( APPEND GVDB_PTX_FILES "${GVDB_SHARE_DIR}/${_file}" )
+endforeach() 
+foreach ( _file IN ITEMS ${GVDB_DLL} )
+   list ( APPEND GVDB_DLL_FILES "${GVDB_LIB_DIR}/${_file}" )
+endforeach() 
+foreach ( _file IN ITEMS ${GVDB_EXTRA} )
+   list ( APPEND GVDB_EXTRA_FILES "${GVDB_LIB_DIR}/${_file}" )
+endforeach() 
+# INSTALL project : for the CMake official install
+install ( FILES ${GVDB_GLSL_FILES} DESTINATION ${BIN_INSTALL_PATH} )
+install ( FILES ${GVDB_PTX_FILES} DESTINATION ${BIN_INSTALL_PATH} )
+install ( FILES ${GVDB_DLL_FILES} DESTINATION ${BIN_INSTALL_PATH} )
+install ( FILES ${GVDB_EXTRA_FILES} DESTINATION ${BIN_INSTALL_PATH} )
+install ( TARGETS ${PROJNAME} DESTINATION ${BIN_INSTALL_PATH} )
+
 #####################################################################################
 # Install PTX to share location
 #  
 _INSTALL_PTX ( FILES ${PTX_FILES_PATH} DESTINATION ${EXECUTABLE_OUTPUT_PATH} )
+foreach ( _file IN ITEMS ${PTX_FILES} )
+   list ( APPEND PTX_FILES_FILES "${EXECUTABLE_OUTPUT_PATH}/${_file}" )
+endforeach() 
+_CMAKE_INSTALL_PTX ( FILES ${PTX_FILES_FILES} DESTINATION ${BIN_INSTALL_PATH} )
 
 
 #####################################################################################
