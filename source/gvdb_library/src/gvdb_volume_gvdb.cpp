@@ -3858,7 +3858,7 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	Clear ();									// creates a new root	
 
 	// Voxelize all nodes in bounding box at starting level		
-	int N = 3;
+	int N = mPool->getNumLevels ();;
 	Extents e = ComputeExtents ( N, mObjMin, mObjMax );			// start - level N
 	ActivateRegion ( N-1, e );									// activate - level N-1
 	#ifdef VOX_GL
