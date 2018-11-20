@@ -846,14 +846,14 @@ void NVPWindow::initScreenQuadGL()
 	if (!status) {
 		nvprintf("*** Error! Failed to link in init_screenquad\n");
 	}
-	checkGL("glLinkProgram (init_screenquad)");
-
-	// Get texture params
-	m_screenquad_utex1 = glGetUniformLocation(m_screenquad_prog, "uTex1");
-	m_screenquad_utex2 = glGetUniformLocation(m_screenquad_prog, "uTex2");
+	checkGL ( "glLinkProgram (init_screenquad)" );
+	
+	// Get texture parameter
+	m_screenquad_utex1 = glGetUniformLocation (m_screenquad_prog, "uTex1" );
+	m_screenquad_utex2 = glGetUniformLocation (m_screenquad_prog, "uTex2");
 	m_screenquad_utexflags = glGetUniformLocation(m_screenquad_prog, "uTexFlags");
-	m_screenquad_ucoords = glGetUniformLocation(m_screenquad_prog, "uCoords");
-	m_screenquad_uscreen = glGetUniformLocation(m_screenquad_prog, "uScreen");
+	m_screenquad_ucoords = glGetUniformLocation ( m_screenquad_prog, "uCoords" );
+	m_screenquad_uscreen = glGetUniformLocation ( m_screenquad_prog, "uScreen" );
 
 
 	// Create a screen-space quad VBO
@@ -924,7 +924,19 @@ void NVPWindow::compositeScreenQuadGL(int glid1, int glid2, char inv1, char inv2
 }
 
 
-void NVPWindow::renderScreenQuadGL(int glid1, int glid2, float x1, float y1, float x2, float y2, char inv1, char inv2)
+
+void NVPWindow::renderScreenQuadGL(int glid, char inv1)
+{
+	renderScreenQuadGL ( glid, -1, (float)0, (float)0, (float)getWidth(), (float)getHeight(), inv1); 
+}
+
+void NVPWindow::compositeScreenQuadGL(int glid1, int glid2, char inv1, char inv2)
+{
+	renderScreenQuadGL( glid1, glid2, (float)0, (float)0, (float)getWidth(), (float)getHeight(), inv1, inv2 );
+}
+
+void NVPWindow::renderScreenQuadGL ( int glid1, int glid2, float x1, float y1, float x2, float y2, char inv1, char inv2 )
+
 {
 	// Prepare pipeline
 	glDisable(GL_DEPTH_TEST);
@@ -945,12 +957,13 @@ void NVPWindow::renderScreenQuadGL(int glid1, int glid2, float x1, float y1, flo
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_screenquad_vbo[1]);
 	checkGL("glBindBuffer");
 	// Select texture
-	glEnable(GL_TEXTURE_2D);
-	glProgramUniform4f(m_screenquad_prog, m_screenquad_ucoords, x1, y1, x2, y2);
-	glProgramUniform2f(m_screenquad_prog, m_screenquad_uscreen, (float)getWidth(), (float)getHeight());
+	glEnable ( GL_TEXTURE_2D );
+	glProgramUniform4f ( m_screenquad_prog, m_screenquad_ucoords, x1, y1, x2, y2 );
+	glProgramUniform2f ( m_screenquad_prog, m_screenquad_uscreen, (float) getWidth(), (float) getHeight() );
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, glid1);
+	glActiveTexture ( GL_TEXTURE0 );
+	glBindTexture ( GL_TEXTURE_2D, glid1 );
+
 	glProgramUniform1i(m_screenquad_prog, m_screenquad_utex1, 0);
 	int flags = 0;
 	if (inv1 > 0) flags |= 1;												// y-invert tex1
@@ -962,7 +975,8 @@ void NVPWindow::renderScreenQuadGL(int glid1, int glid2, float x1, float y1, flo
 		glBindTexture(GL_TEXTURE_2D, glid2);
 		glProgramUniform1i(m_screenquad_prog, m_screenquad_utex2, 1);
 	}
-	glProgramUniform1i(m_screenquad_prog, m_screenquad_utexflags, flags);
+
+	glProgramUniform1i(m_screenquad_prog, m_screenquad_utexflags, flags );	
 
 	// Draw
 	glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1);

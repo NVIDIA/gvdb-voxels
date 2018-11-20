@@ -355,7 +355,8 @@ void Sample::ExposeLayer ( int y, int oy )
 	gvdb.ReadRenderTexGL ( 1, gl_section_tex );
 	
 	// Display slice full-screen 
-	renderScreenQuadGL ( gl_section_tex, 0, 0, 1920, 1080 );
+	//renderScreenQuadGL ( gl_section_tex, 0, 0, 1920, 1080 );
+	renderScreenQuadGL ( gl_section_tex );
 }
 
 void Sample::display ()
