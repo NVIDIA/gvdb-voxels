@@ -127,7 +127,15 @@ bool Sample::init ()
 	// topology with small upper nodes (3=8^3) and large bricks (5=32^3) for performance.
 	// An apron of 1 is used for correct smoothing and trilinear surface rendering.
 	printf ( "Configure.\n" );
-	gvdb1.Configure ( 1, 1, 3, 3, 5);
+//	gvdb1.Configure ( 0, 1, 1, 3, 5);
+	int lvl = 10;
+	int r[lvl], n[lvl];
+	r[0] = 3;
+	for (int i = 1; i < lvl; i++) r[i] = 1;
+//	r[0] = 5; r[1] = 3; r[2] = 3; r[3] = 3;
+	for (int i = 0; i < lvl; i++)	n[i] = pow(pow(2,r[i]),3);
+	gvdb1.Configure (lvl, r, n );
+
 	gvdb1.SetChannelDefault ( 16, 16, 1 );
 	gvdb1.AddChannel ( 0, T_FLOAT, 1, F_WRAP );
 
@@ -304,7 +312,7 @@ void Sample::draw_topology ( VolumeGVDB* gvdb )
 	
 	Vector3DF bmin, bmax;
 	Node* node;
-	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
+	for (int lev=0; lev < 10; lev++ ) {				// draw all levels
 		int node_cnt = gvdb->getNumNodes(lev);
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb->getNodeAtLevel ( n, lev );

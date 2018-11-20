@@ -407,7 +407,7 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
 		desc.Flags = CUDA_ARRAY3D_SURFACE_LDST;	
 		CUarray old_array = p.garray;
 
-		printf("Number of channels: %d\n", desc.NumChannels);
+		printf("Number of channels: %d; size: (%d, %d, %d); \n", desc.NumChannels, res.x, res.y, res.z);
 
 		if ( res.x > 0 && res.y > 0 && res.z > 0 ) {
 			cudaCheck ( cuArray3DCreate( &p.garray, &desc), "Allocator", "AllocateTextureGPU", "cuArray3DCreate", "", mbDebug);

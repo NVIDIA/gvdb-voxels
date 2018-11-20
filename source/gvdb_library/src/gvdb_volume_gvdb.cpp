@@ -2578,12 +2578,20 @@ void VolumeGVDB::Configure ( int q4, int q3, int q2, int q1, int q0 )
 	int r[5], n[5];
 	r[0] = q0; r[1] = q1; r[2] = q2; r[3] = q3; r[4] = q4; 
 
-	n[0] = 4;				// leaf max
-	int cnt = 4;
-	n[1] = cnt;		cnt >>= 1;
-	n[2] = cnt;		cnt >>= 1;
-	n[3] = cnt;		cnt >>= 1;
-	n[4] = cnt;
+//	n[0] = 4;		// leaf max
+//	int cnt = 4;
+//	n[1] = cnt;		cnt >>= 1;
+//	n[2] = cnt;		cnt >>= 1;
+//	n[3] = cnt;		cnt >>= 1;
+//	n[4] = cnt;
+
+	for (int i = 0; i < 5; i++)
+		n[i] = pow(2,r[i]);		// leaf max
+//	int cnt = 4;
+//	n[1] = cnt;		cnt >>= 1;
+//	n[2] = cnt;		cnt >>= 1;
+//	n[3] = cnt;		cnt >>= 1;
+//	n[4] = cnt;
 	
 	Configure ( 5, r, n );	
 }
@@ -2629,6 +2637,7 @@ void VolumeGVDB::Configure ( int levs, int* r, int* numcnt, bool use_masks )
 	for (int n = 0; n < levs; n++) {
 		nodesz = hdr;
 		if ( use_masks ) nodesz += getMaskSize(n);
+		verbosef("level = %d; nodesz = %d; maxcnt = %d\n", n, nodesz, maxcnt[n]);
 		mPool->PoolCreate(0, n, nodesz, maxcnt[n], true);
 	}
 
