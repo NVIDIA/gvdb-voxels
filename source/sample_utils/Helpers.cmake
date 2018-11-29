@@ -223,7 +223,7 @@ function(_LIST_ALL_SOURCE )
 
   unset ( SOURCE_LIST )
   foreach ( _file IN ITEMS ${_LIST_ALL_SOURCE_FILES} )
-     # message ( STATUS "Source: ${_file}")			# uncomment to check source files
+     message ( STATUS "Source: ${_file}")			# uncomment to check source files
      list ( APPEND SOURCE_LIST ${_file} )
   endforeach()
 
