@@ -104,7 +104,7 @@ bool Sample::init ()
 #ifdef USE_GVDB2
 	// GVDB #2
 	gvdb2.SetVerbose(true);		// enable/disable console output from gvdb
-	gvdb2.SetCudaDevice(device);
+	gvdb2.SetCudaDevice(devid);
 	gvdb2.Initialize();
 	gvdb2.StartRasterGL();			// Start GVDB Rasterizer. Requires an OpenGL context.
 	gvdb2.AddPath("../source/shared_assets/");
@@ -115,7 +115,7 @@ bool Sample::init ()
 	// Load polygons
 	// This loads an obj file into scene memory on cpu.
 	printf ( "Loading polygon model.\n" );
-	gvdb1.getScene()->AddModel ( "lucy.obj", 1.25, 0, 0, 0 );
+	gvdb1.getScene()->AddModel ( "lucy.obj", 1.0, 0, 0, 0 );
 	gvdb1.CommitGeometry( 0 );					// Send the polygons to GPU as OpenGL VBO
 
 #ifdef USE_GVDB2
@@ -127,17 +127,9 @@ bool Sample::init ()
 	// topology with small upper nodes (3=8^3) and large bricks (5=32^3) for performance.
 	// An apron of 1 is used for correct smoothing and trilinear surface rendering.
 	printf ( "Configure.\n" );
-//	gvdb1.Configure ( 0, 1, 1, 3, 5);
-	int lvl = 10;
-	int r[lvl], n[lvl];
-	r[0] = 3;
-	for (int i = 1; i < lvl; i++) r[i] = 1;
-//	r[0] = 5; r[1] = 3; r[2] = 3; r[3] = 3;
-	for (int i = 0; i < lvl; i++)	n[i] = pow(pow(2,r[i]),3);
-	gvdb1.Configure (lvl, r, n );
-
+	gvdb1.Configure ( 3, 3, 3, 3, 5 );	
 	gvdb1.SetChannelDefault ( 16, 16, 1 );
-	gvdb1.AddChannel ( 0, T_FLOAT, 1, F_WRAP );
+	gvdb1.AddChannel ( 0, T_FLOAT, 1 );
 
 #ifdef USE_GVDB2
 	gvdb2.Configure ( 3, 3, 3, 3, 4);
@@ -151,7 +143,7 @@ bool Sample::init ()
 	// Translation has been added to position the part at (50,55,50).
 	Matrix4F xform;	
 	float part_size = 100.0;					// Part size is set to 100 mm height.
-	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(50,100,50), part_size );
+	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(50,55,50), part_size );
 	
 	// The part can be oriented arbitrarily inside the target GVDB volume
 	// by applying a rotation, translation, or scale to the transform.
@@ -164,7 +156,7 @@ bool Sample::init ()
 	// The voxel resolution of a rasterized part is the maximum number of voxels along each axis, 
 	// and is found by dividing the part size by the voxel size.
 	// To limit the resolution, one can invert the equation and find the voxel size for a given resolution.	
-	Vector3DF voxelsize ( 0.1f, 0.1f, 0.1f );	// Voxel size (mm)
+	Vector3DF voxelsize ( 0.2f, 0.2f, 0.2f );	// Voxel size (mm)
 
 	// Poly-to-Voxels
 	// Converts polygons-to-voxels using the GPU graphics pipeline.		
@@ -247,7 +239,7 @@ void Sample::render_section ()
 
 	gvdb1.ReadRenderTexGL ( 1, gl_section_tex );
 	
-	renderScreenQuadGL ( gl_section_tex );
+	renderScreenQuadGL ( gl_section_tex, -1, 0, 0, getWidth()/4, getHeight()/4, 0  );
 }
 
 void Sample::display()
@@ -312,7 +304,7 @@ void Sample::draw_topology ( VolumeGVDB* gvdb )
 	
 	Vector3DF bmin, bmax;
 	Node* node;
-	for (int lev=0; lev < 10; lev++ ) {				// draw all levels
+	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
 		int node_cnt = gvdb->getNumNodes(lev);
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb->getNodeAtLevel ( n, lev );
