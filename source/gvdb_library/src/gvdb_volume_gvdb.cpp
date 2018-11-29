@@ -2576,22 +2576,14 @@ void VolumeGVDB::Initialize ()
 void VolumeGVDB::Configure ( int q4, int q3, int q2, int q1, int q0 )
 {
 	int r[5], n[5];
-	r[0] = q0; r[1] = q1; r[2] = q2; r[3] = q3; r[4] = q4; 
+	r[0] = q0; r[1] = q1; r[2] = q2; r[3] = q3; r[4] = q4;
 
-//	n[0] = 4;		// leaf max
-//	int cnt = 4;
-//	n[1] = cnt;		cnt >>= 1;
-//	n[2] = cnt;		cnt >>= 1;
-//	n[3] = cnt;		cnt >>= 1;
-//	n[4] = cnt;
-
-	for (int i = 0; i < 5; i++)
-		n[i] = pow(2,r[i]);		// leaf max
-//	int cnt = 4;
-//	n[1] = cnt;		cnt >>= 1;
-//	n[2] = cnt;		cnt >>= 1;
-//	n[3] = cnt;		cnt >>= 1;
-//	n[4] = cnt;
+	n[0] = 4;		// leaf max
+	int cnt = 4;
+	n[1] = cnt;		cnt >>= 1;
+	n[2] = cnt;		cnt >>= 1;
+	n[3] = cnt;		cnt >>= 1;
+	n[4] = cnt;
 	
 	Configure ( 5, r, n );	
 }
@@ -2637,7 +2629,6 @@ void VolumeGVDB::Configure ( int levs, int* r, int* numcnt, bool use_masks )
 	for (int n = 0; n < levs; n++) {
 		nodesz = hdr;
 		if ( use_masks ) nodesz += getMaskSize(n);
-		verbosef("level = %d; nodesz = %d; maxcnt = %d\n", n, nodesz, maxcnt[n]);
 		mPool->PoolCreate(0, n, nodesz, maxcnt[n], true);
 	}
 
@@ -3848,10 +3839,9 @@ int VolumeGVDB::VoxelizeNode ( Node* node, uchar chan, Matrix4F* xform, float bd
 // SolidVoxelize - Voxelize a polygonal mesh to a sparse volume
 void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, float val_surf, float val_inside, float vthresh )
 {
-	verbosef( "VolumeGVDB::SolidVoxelize\n" );
 	PUSH_CTX
 
-//	TimerStart();
+	//TimerStart();
 	
 	AuxGeometryMap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );					// Setup VBO for CUDA (interop)
 	
@@ -3908,8 +3898,8 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	AuxGeometryUnmap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );
 
 	POP_CTX
-//	float msec = TimerStop();
-//	verbosef( "Voxelize Complete: %4.2f\n", msec );
+	//float msec = TimerStop();
+	//verbosef( "Voxelize Complete: %4.2f\n", msec );
 }
 
 // Insert triangles into auxiliary bins
@@ -4820,7 +4810,6 @@ void VolumeGVDB::UpdateApron ( uchar chan, float boundval, bool changeCtx)
 
 	if (bricks == 0) return;
 
-	verbosef("# bricks: %d\n", bricks);
 	if ( bricks > 65535 ) bricks = 65535;
 
 	Vector3DI threadcnt(brickres, brickres, bricks);		// brickres ^ 2
