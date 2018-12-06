@@ -14,10 +14,12 @@ Message(STATUS "Processing Project ${PROJNAME}:")
 if(NOT BASE_DIRECTORY)
   SET(BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
-include ( "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Helpers.cmake" )    
-include ( "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Packages.cmake" )  
-include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/src")    
+include ( "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Helpers.cmake" )
+include ( "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Packages.cmake" )
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CudaComputeTargetFlags.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CudaAutodetectCompute.cmake)
 
+include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/src")
 _add_project_definitions(${PROJNAME})
 
 #####################################################################################
@@ -92,12 +94,20 @@ set ( EXECUTABLE_OUTPUT_PATH ${LIB_INSTALL_PATH} CACHE PATH "" FORCE )
 file(GLOB CUDA_FILES RELATIVE "${BASE_DIRECTORY}" kernels/*.cu kernels/*.cuh )
 message ( STATUS "Located CUDA kernels: ${CUDA_FILES}" )
 
-if ( NOT DEFINED CUDA_ARCH )
-   SET( CUDA_ARCH "compute_30" CACHE STRING "CUDA Architecture target")
-   SET( CUDA_CODE "sm_30" CACHE STRING "CUDA Code target")
+# Autodetect Target Architecture
+unset(CUDA_ARCH_BIN CACHE)
+unset(CUDA_ARCH_PTX CACHE)
+detect_installed_gpus(CUDA_ARCH_BIN)
+# Take the detected version, and append the bin and ptx flags assuming ptx ver==bin ver
+APPEND_TARGET_ARCH_FLAGS()
+
+if ( NOT DEFINED CUDA_ARCH_BIN )
+   message( "Did not detect CUDA_ARCH - should not be here, but falling back to default")
+   SET( CUDA_ARCH_BIN "compute_30" CACHE STRING "CUDA Architecture target")
+   SET( CUDA_ARCH_PTX "sm_30" CACHE STRING "CUDA Code target")
 endif ()
 
-_COMPILEPTX ( SOURCES ${CUDA_FILES} TARGET_PATH ${LIB_OUTPUT_PATH} GENERATED CUDA_PTX GENPATHS CUDA_PTX_PATHS INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/kernels" OPTIONS -DSIM_CODE -arch=${CUDA_ARCH} -code=${CUDA_CODE} --ptxas-options=-v -O3 --use_fast_math --maxrregcount=64 )
+_COMPILEPTX ( SOURCES ${CUDA_FILES} TARGET_PATH ${LIB_OUTPUT_PATH} GENERATED CUDA_PTX GENPATHS CUDA_PTX_PATHS INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/kernels" OPTIONS -DSIM_CODE -arch=${CUDA_ARCH_BIN} -code=${CUDA_ARCH_PTX} --ptxas-options=-v -O3 --use_fast_math --maxrregcount=64 )
 
 #####################################################################################
 # Executable
