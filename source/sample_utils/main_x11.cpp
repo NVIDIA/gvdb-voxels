@@ -924,17 +924,6 @@ void NVPWindow::compositeScreenQuadGL(int glid1, int glid2, char inv1, char inv2
 }
 
 
-
-void NVPWindow::renderScreenQuadGL(int glid, char inv1)
-{
-	renderScreenQuadGL ( glid, -1, (float)0, (float)0, (float)getWidth(), (float)getHeight(), inv1); 
-}
-
-void NVPWindow::compositeScreenQuadGL(int glid1, int glid2, char inv1, char inv2)
-{
-	renderScreenQuadGL( glid1, glid2, (float)0, (float)0, (float)getWidth(), (float)getHeight(), inv1, inv2 );
-}
-
 void NVPWindow::renderScreenQuadGL ( int glid1, int glid2, float x1, float y1, float x2, float y2, char inv1, char inv2 )
 
 {

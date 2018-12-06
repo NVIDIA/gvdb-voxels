@@ -147,7 +147,7 @@ function( _INSTALL_PTX )
     foreach ( _file IN ITEMS ${_INSTALL_PTX_FILES} )
       get_filename_component ( _ptxpath ${_file} DIRECTORY )
       get_filename_component ( _ptxbase ${_file} NAME_WE )
-      string ( SUBSTRING ${_ptxbase} 27 -1 _ptxname )
+      string ( SUBSTRING ${_ptxbase} 29 -1 _ptxname )
       set ( _fixed "${_ptxpath}/${_ptxname}.ptx" )
       add_custom_command ( TARGET ${PROJNAME} PRE_LINK
         COMMAND ${CMAKE_COMMAND} -E copy  ${_file} ${_fixed}
