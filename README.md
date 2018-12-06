@@ -139,7 +139,7 @@ OptiX 3.9.0 or later (InteractivOptix sample only, download from NVIDIA)
   ```
 11. Configure cudpp and install to local install directory (since the CMakeLists is currently wonky)
   ```
-  cmake -DCUDA_SDK_ROOT_DIR=/usr/local/cuda-9.2/samples -DCMAKE_BUILD_TYPE=Release ../../source/shared_cudpp/ -DCUDA_TOOLKIT_VERSION=9.2 -DCMAKE_INSTALL_PREFIX=./install
+  cmake -DCUDA_SDK_ROOT_DIR=/usr/local/cuda-9.2/samples -DCMAKE_BUILD_TYPE=Release ../../source/shared_cudpp/ -DCMAKE_INSTALL_PREFIX=./install
 
   make install
   ```
@@ -155,7 +155,7 @@ OptiX 3.9.0 or later (InteractivOptix sample only, download from NVIDIA)
   ```
   14. Invoke cmake to generate config files (Using the appropriate CUDA version) and pointing to above build/install of shared_cudpp, and installing the library in a new root level install directory
   ```
-  cmake -DCUDA_SDK_ROOT_DIR=/usr/local/cuda-9.2/samples -DCMAKE_BUILD_TYPE=Release ~/packages/gvdb/source/gvdb_library -DCUDA_TOOLKIT_VERSION=9 -DCUDPP_ROOT_DIR=~/packages/gvdb2/build/shared_cudpp -DCMAKE_INSTALL_PREFIX=../../install
+  cmake -DCUDA_SDK_ROOT_DIR=/usr/local/cuda-9.2/samples -DCMAKE_BUILD_TYPE=Release ~/packages/gvdb/source/gvdb_library  -DCUDPP_ROOT_DIR=~/packages/gvdb/build/shared_cudpp -DCMAKE_INSTALL_PREFIX=../../install
 
   make install
   ```
@@ -163,7 +163,7 @@ OptiX 3.9.0 or later (InteractivOptix sample only, download from NVIDIA)
 ### Build sample(s)
 15. Follow a similar procedure for creating build directories for samples. The appropriate cmake command looks like (an additional command pointing to the extracted optix directory is needed for samples that use optix)
   ```
-  cmake -DCUDA_SDK_ROOT_DIR=/usr/local/cuda-9.2/samples -DCMAKE_BUILD_TYPE=Release ~/packages/gvdb/source/gFluidSurface/ -DCUDA_TOOLKIT_VERSION=9 -DCUDPP_ROOT_DIR=~/packages/gvdb/build/shared_cudpp -DGVDB_ROOT_DIR=~/packages/gvdb/install -DCMAKE_INSTALL_PREFIX=~/packages/gvdb/install -DOPTIX_ROOT_DIR=~/packages/optix
+  cmake -DCUDA_SDK_ROOT_DIR=/usr/local/cuda-9.2/samples -DCMAKE_BUILD_TYPE=Release ~/packages/gvdb/source/gFluidSurface/  -DCUDPP_ROOT_DIR=~/packages/gvdb/build/shared_cudpp -DGVDB_ROOT_DIR=~/packages/gvdb/install -DCMAKE_INSTALL_PREFIX=~/packages/gvdb/install -DOPTIX_ROOT_DIR=~/packages/optix
   ```
 ### Running the samples
   16. Set LD_LIBRARY_PATH
