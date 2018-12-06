@@ -80,6 +80,10 @@ option(CUDPP_GENCODE_SM50
        "ON to generate code for Compute Capability 5.0 devices (e.g. GeForce GTX 750)"
        OFF)
 
+option(CUDPP_GENCODE_SM61
+       "ON to generate code for Compute Capability 6.1 devices (e.g. GeForce GTX 1030-80)"
+       ON)
+
 if (CUDPP_GENCODE_SM12)
   set(GENCODE ${GENCODE} ${GENCODE_SM12})
 endif(CUDPP_GENCODE_SM12)
@@ -103,6 +107,10 @@ endif(CUDPP_GENCODE_SM35)
 if (CUDPP_GENCODE_SM50)
   set(GENCODE ${GENCODE} ${GENCODE_SM50})
 endif(CUDPP_GENCODE_SM50)
+
+if (CUDPP_GENCODE_SM61)
+  set(GENCODE ${GENCODE} ${GENCODE_SM61})
+endif(CUDPP_GENCODE_SM61)
 
 if (CUDA_VERBOSE_PTXAS)
   set(VERBOSE_PTXAS --ptxas-options=-v)
