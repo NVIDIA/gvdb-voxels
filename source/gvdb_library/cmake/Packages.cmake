@@ -116,6 +116,24 @@ macro(_add_project_definitions name)
   add_definitions(-DPROJECT_RELDIRECTORY="${TOPROJECT}/")
   add_definitions(-DPROJECT_ABSDIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/")
   add_definitions(-DPROJECT_NAME="${name}")  
+
+  set(KERNELS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/kernels/)
+  file(GLOB KERNELS_SOURCE_FILES RELATIVE ${KERNELS_SOURCE_DIR} kernels/*.cu)
+  foreach( _FILE ${KERNELS_SOURCE_FILES} )
+    string(REPLACE ".cu" ".ptx" _FILE_PTX ${_FILE})
+    string(TOUPPER ${_FILE_PTX} _FILE_UPPER)
+    string(REPLACE "." "_" _MACRO ${_FILE_UPPER})
+    add_definitions(-D${_MACRO}="${CMAKE_INSTALL_PREFIX}/lib/${_FILE_PTX}")
+  endforeach ( _FILE )
+
+  set(SHADERS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders/)
+  file(GLOB SHADERS_SOURCE_FILES RELATIVE ${SHADERS_SOURCE_DIR} shaders/*.glsl)
+  foreach( _FILE ${SHADERS_SOURCE_FILES} )
+    string(TOUPPER ${_FILE} _FILE_UPPER)
+    string(REPLACE "." "_" _MACRO ${_FILE_UPPER})
+    add_definitions(-D${_MACRO}="${CMAKE_INSTALL_PREFIX}/lib/${_FILE}")
+  endforeach ( _FILE )
+
   
 endmacro(_add_project_definitions)
 

@@ -102,7 +102,7 @@ extern "C" __global__ void gvdbUpdateApronF (VDBInfo* gvdb, uchar chan, int bric
 	float3 offs, vmin, vdel; uint64 nid;
 	node = getNodeAtPoint(gvdb, wpos, &offs, &vmin, &vdel, &nid);		// Evaluate at world position
 	offs += (wpos - vmin) / vdel;
-	
+
 	float v = (node == 0x0) ? boundval : tex3D<float>(gvdb->volIn[chan], offs.x, offs.y, offs.z);	// Sample at world point
 	surf3Dwrite(v, gvdb->volOut[chan], vox.x * sizeof(float), vox.y, vox.z);					// Write to apron voxel
 }

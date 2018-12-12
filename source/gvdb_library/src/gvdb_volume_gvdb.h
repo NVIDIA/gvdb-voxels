@@ -346,7 +346,7 @@
 			VolumeGVDB ();			
 			
 			// Setup
-			void SetCudaDevice ( int devid, CUcontext ctx=NULL );			
+			void SetCudaDevice ( int devid, CUcontext ctx=NULL );
 			void Initialize ();			
 			void Clear ();	
 			void SetVoxelSize ( float vx, float vy, float vz );
@@ -432,6 +432,8 @@
 			void AccumulateTopology(int pNumPnts, float pRadius, Vector3DF pOrig, int iDepth=1 );
 			void RequestFullRebuild(bool tf) { mRebuildTopo = tf;  }
 			void SetDiv ( DataPtr div );
+
+			int GetLevels() { return mPool->getNumLevels(); }
 
 			void ReadGridVel( int N);
 			void CheckVal ( float slice, int chanVx, int chanVy, int chanVz, int chanVxOld, int chanVyOld, int chanVzOld );

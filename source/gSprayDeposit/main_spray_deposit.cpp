@@ -150,7 +150,7 @@ bool Sample::init()
 	gvdb.CommitTransferFunc (); 
 
 	// Configure a new GVDB volume
-	gvdb.Configure ( 3, 3, 3, 3, 5 );	
+	gvdb.Configure ( 3, 3, 3, 3, 5 );
 
 	// Atlas memory expansion will be supported in the Fall 2016 release, 
 	// allowing the number of bricks to change dynamically. 
@@ -299,7 +299,8 @@ void Sample::simulate()
 	DataPtr pntpos, pntclr; 
 	gvdb.SetDataGPU ( pntpos, m_numrays, m_rays.gpu, 0, sizeof(ScnRay) );
 	gvdb.SetDataGPU ( pntclr, m_numrays, m_rays.gpu, 48, sizeof(ScnRay) );
-	gvdb.SetPoints ( pntpos, DataPtr(), pntclr );  
+	DataPtr data;
+	gvdb.SetPoints ( pntpos, data, pntclr );
 
 	int scPntLen = 0;
 	int subcell_size = 4;
@@ -342,30 +343,17 @@ void Sample::draw_rays ()
 
 void Sample::draw_topology ()
 {
-	Vector3DF clrs[10];
-	clrs[0] = Vector3DF(0,0,1);			// blue
-	clrs[1] = Vector3DF(0,1,0);			// green
-	clrs[2] = Vector3DF(1,0,0);			// red
-	clrs[3] = Vector3DF(1,1,0);			// yellow
-	clrs[4] = Vector3DF(1,0,1);			// purple
-	clrs[5] = Vector3DF(0,1,1);			// aqua
-	clrs[6] = Vector3DF(1,0.5,0);		// orange
-	clrs[7] = Vector3DF(0,0.5,1);		// green-blue
-	clrs[8] = Vector3DF(0.7f,0.7f,0.7f);	// grey
-
-	Camera3D* cam = gvdb.getScene()->getCamera();		
-	
 	start3D ( gvdb.getScene()->getCamera() );		// start 3D drawing
 	
 	Vector3DF bmin, bmax;
 	Node* node;
 	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = gvdb.getNumNodes(lev);				
+		int node_cnt = gvdb.getNumNodes(lev);
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb.getNodeAtLevel ( n, lev );
 			bmin = gvdb.getWorldMin ( node );		// get node bounding box
 			bmax = gvdb.getWorldMax ( node );		// draw node as a box
-			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, clrs[lev].x, clrs[lev].y, clrs[lev].z, 1 );			
+			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, gvdb.getClrDim(lev).x, gvdb.getClrDim(lev).y, gvdb.getClrDim(lev).z, 1 );
 		}		
 	}
 	end3D();										// end 3D drawing
