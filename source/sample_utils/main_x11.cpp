@@ -564,6 +564,11 @@ void NVPWindow::setTitle(const char *title){
 
 }
 
+void NVPWindow::resize_window ( int w, int h )
+{	
+
+}
+
 void NVPWindow::maximize(){
     //handle maximize
 }

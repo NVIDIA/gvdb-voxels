@@ -426,7 +426,8 @@ void Sample::SetupGVDB()
 		gvdb.SetColorChannel(1);
 		gvdb.FillChannel(1, Vector4DF(0, 0, 0, 0));
 	}
-	gvdb.SetPoints(m_pnts, DataPtr(), (m_use_color ? m_clrs : DataPtr()));
+	DataPtr dptr = DataPtr();
+	gvdb.SetPoints(m_pnts, dptr, (m_use_color ? m_clrs : dptr));
 }
 
 bool Sample::init() 
