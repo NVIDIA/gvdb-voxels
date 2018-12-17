@@ -102,7 +102,7 @@ int main (int argc, char* argv)
 
 	// Save as png
 	printf ( "Saving out_rendkernel.png\n");
-	save_png ( "out_rendkernel.png", buf, w, h, 4 );				
+	save_png ( "out_rendkernel.png", buf, w, h, 4 );
 
 	free ( buf );
 	delete cam;

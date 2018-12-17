@@ -239,7 +239,7 @@ void Sample::render_section ()
 
 	gvdb1.ReadRenderTexGL ( 1, gl_section_tex );
 	
-	renderScreenQuadGL ( gl_section_tex );
+	renderScreenQuadGL ( gl_section_tex, -1, 0, 0, getWidth()/4, getHeight()/4, 0  );
 }
 
 void Sample::display()

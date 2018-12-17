@@ -28,6 +28,7 @@
 #if defined(_WIN32)
 #	include <windows.h>
 #endif
+
 #include <cstdlib>
 #include <cuda_runtime.h>
 #include <cuda.h>
@@ -44,7 +45,7 @@ Allocator::Allocator ()
 {
 	mVFBO[0] = -1;
 
-	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, "cuda_gvdb_copydata.ptx" ), "Allocator", "Allocator", "cuModuleLoad", "cuda_gvdb_copydata.ptx", mbDebug);
+	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, CUDA_GVDB_COPYDATA_PTX), "Allocator", "Allocator", "cuModuleLoad", CUDA_GVDB_COPYDATA_PTX, mbDebug);
 		
 	cudaCheck ( cuModuleGetFunction ( &cuFillTex,		cuAllocatorModule, "kernelFillTex" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuFillTex",  mbDebug);
 	cudaCheck ( cuModuleGetFunction ( &cuCopyTexC,		cuAllocatorModule, "kernelCopyTexC" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuCopyTexC", mbDebug);
@@ -1047,6 +1048,15 @@ void StartCuda ( int devsel, CUcontext ctxsel, CUdevice& dev, CUcontext& ctx, CU
 	for (int n=0; n < cnt; n++ ) {
 		cuDeviceGet(&dev_id, n);
 		cuDeviceGetName ( name, 128, dev_id);
+
+		int pi;
+		cuDeviceGetAttribute ( &pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_WIDTH, dev_id ) ;
+		if (verbose) gprintf ("Max. texture3D width: %d\n", pi);
+		cuDeviceGetAttribute ( &pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_HEIGHT, dev_id ) ;
+		if (verbose) gprintf ("Max. texture3D height: %d\n", pi);
+		cuDeviceGetAttribute ( &pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_DEPTH, dev_id ) ;
+		if (verbose) gprintf ("Max. texture3D depth: %d\n", pi);
+
 		if (verbose) gprintf ( "   %d. %s\n", n, name );
 	}			
 
