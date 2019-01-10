@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 // ObjarReader.cpp                                           
 // Chris Wyman (9/2/2014)   
@@ -56,7 +57,7 @@
 	class OBJARReader {
 	public:
 		int LoadHeader( FILE *fp, OBJARHeader *hdr );		
-		bool LoadFile ( Model* model, const char *filename, char** searchPaths, int numPaths );
+		bool LoadFile ( Model* model, char *filename, std::vector<std::string>& paths);
 		static bool isMyFile ( const char* filename );		
 
 		friend Model;

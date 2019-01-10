@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #include "gvdb_vec.h"
@@ -99,13 +100,14 @@ using namespace nvdb;
 		void setToPos ( float x, float y, float z )		{ to_pos.Set(x,y,z);		updateMatricies(); }
 		void setFov (float fov)							{ mFov = fov;				updateMatricies(); }
 		void setNearFar (float n, float f )				{ mNear = n; mFar = f;		updateMatricies(); }
+		void setDolly(float d)							{ mDolly = d;				updateMatricies();  }
 		void setDist ( float d )						{ mOrbitDist = d;			updateMatricies(); }
 		void setTile ( float x1, float y1, float x2, float y2 )		{ mTile.Set ( x1, y1, x2, y2 );		updateMatricies(); }
 		void setProjection (eProjection proj_type);
 		void setModelMatrix ( float* mtx );
 		void setViewMatrix ( float* mtx, float* invmtx );
 		void setProjMatrix ( float* mtx, float* invmtx );
-		void setMatrices ( const float* view_mtx, const float* proj_mtx );
+		void setMatrices ( const float* view_mtx, const float* proj_mtx, Vector3DF model_pos );
 		
 		// Camera motion
 		void setOrbit  ( float ax, float ay, float az, Vector3DF tp, float dist, float dolly );
@@ -166,7 +168,7 @@ using namespace nvdb;
 		Vector4DF		mTile;
 		
 		// Transform Matricies
-		Matrix4F    invviewproj_matrix;
+		Matrix4F		invviewproj_matrix;
 		Matrix4F		rotate_matrix;							// Vr matrix (rotation only)
 		Matrix4F		view_matrix;							// V matrix	(rotation + translation)
 		Matrix4F		proj_matrix;							// P matrix
@@ -180,10 +182,11 @@ using namespace nvdb;
 		bool			mOps[8];
 		int				mWire;
 				
-		Vector4DF   tlRayWorld;
-    	Vector4DF   trRayWorld;
-    	Vector4DF   blRayWorld;
-    	Vector4DF   brRayWorld;
+		Vector3DF		origRayWorld;
+		Vector4DF		tlRayWorld;
+    	Vector4DF		trRayWorld;
+    	Vector4DF		blRayWorld;
+    	Vector4DF		brRayWorld;
 	};
 
 	}

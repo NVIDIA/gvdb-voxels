@@ -83,7 +83,6 @@ extern void				gprintf(const char * fmt, ...);
 #define PERF_PRINTF		gprintf
 
 bool				g_perfInit = false;			// Is perf started? Checks for DLL
-bool				g_perfOn = false;			// Is perf on? DLL was found. Otherwise no perf.
 
 #ifdef USE_NVTX
 	nvtxRangePushFunc	g_nvtxPush = 0x0;			// Pointer to nv-perfmarker func
@@ -98,8 +97,8 @@ sjtime				g_perfStack[1024];			// Stack of recorded CPU timings
 char				g_perfMsg[1024][256];			// Stack of recorded messages
 FILE*				g_perfCons = 0x0;			// On-screen console to output CPU timing
 int					g_perfPrintLev = 2;			// Maximum level to print. Set with PERF_SET
-bool				g_perfCPU = true;			// Do CPU timing? Set with PERF_SET
-bool				g_perfGPU = true;			// Do GPU timing? Set with PERF_SET
+bool				g_perfCPU = false;			// Do CPU timing? Set with PERF_SET
+bool				g_perfGPU = false;			// Do GPU timing? Set with PERF_SET
 bool				g_perfConsOut = true;
 std::string			g_perfFName = "";			// File name for CPU output. Set with PERF_SET
 FILE*				g_perfFile = 0x0;			// File handle for output
@@ -131,34 +130,34 @@ float PERF_STOP ()
 
 void PERF_PUSH ( const char* msg )
 {
-	if ( g_perfOn ) {
-		#ifdef USE_NVTX
-			if ( g_perfGPU ) (*g_nvtxPush) (msg);	
-		#endif
-		if ( g_perfCPU && g_perfLevel < g_perfPrintLev ) {
+	#ifdef USE_NVTX
+		if ( g_perfGPU ) (*g_nvtxPush) (msg);	
+	#endif
+	if ( g_perfCPU ) {
+		if ( ++g_perfLevel < g_perfPrintLev ) {
 			strncpy ( (char*) g_perfMsg[ g_perfLevel ], msg, 256 );
 			g_perfStack [ g_perfLevel ] = TimeX::GetSystemNSec ();				
 			if ( g_perfConsOut ) PERF_PRINTF ( "%*s%s\n", g_perfLevel <<1, "", msg );
 			if ( g_perfFile != 0x0 ) fprintf ( g_perfFile, "%*s%s\n", g_perfLevel <<1, "", msg );
-		}
-		g_perfLevel++;
+		}		
 	}
 }
 float PERF_POP ()
 {
-	if ( g_perfOn ) {
-		#ifdef USE_NVTX
-			if ( g_perfGPU ) (*g_nvtxPop) ();
-		#endif
-		g_perfLevel--;
-		if ( g_perfCPU && g_perfLevel < g_perfPrintLev ) {
+	#ifdef USE_NVTX
+		if ( g_perfGPU ) (*g_nvtxPop) ();
+	#endif
+	if ( g_perfCPU ) {
+		if ( g_perfLevel < g_perfPrintLev) {
 			sjtime curr = TimeX::GetSystemNSec ();
 			curr -= g_perfStack [ g_perfLevel ];		
 			if ( g_perfConsOut ) PERF_PRINTF ( "%*s%s: %f ms\n", g_perfLevel <<1, "", g_perfMsg[g_perfLevel], ((float) curr)/MSEC_SCALAR );		
 			if ( g_perfFile != 0x0 ) fprintf ( g_perfFile, "%*s%s: %f ms\n", g_perfLevel <<1, "", g_perfMsg[g_perfLevel], ((float) curr)/MSEC_SCALAR );
+			g_perfLevel--;
 			return ((float) curr) / MSEC_SCALAR;
-		}		
-	}	
+		}	
+		g_perfLevel--;
+	}
 	return 0;
 }
 
@@ -172,7 +171,6 @@ void PERF_SET ( bool cons, int lev )
 
 void PERF_INIT ( int buildbits, bool cpu, bool gpu, bool cons, int lev, char* fname )
 {
-	g_perfOn = true;
 	g_perfCPU = cpu;
 	g_perfGPU = gpu;
 	g_perfConsOut = cons;
@@ -209,6 +207,7 @@ void PERF_INIT ( int buildbits, bool cpu, bool gpu, bool cons, int lev, char* fn
 			g_nvtxPush = (nvtxRangePushFunc) GetProcAddress( mod, "nvtxRangePushA");
 			g_nvtxPop  = (nvtxRangePopFunc)  GetProcAddress( mod, "nvtxRangePop");
 		#else
+			if (g_perfConsOut) PERF_PRINTF("WARNING: GPU markers not enabled for GVDB Library. Set cmake flag USE_NVTX.\n");
 			g_perfGPU = false;
 		#endif
 
@@ -235,8 +234,7 @@ void PERF_INIT ( int buildbits, bool cpu, bool gpu, bool cons, int lev, char* fn
 			PERF_PRINTF ( "PERF_INIT: No GPU markers.\n" );
 		}
 		if ( !g_perfCPU && !g_perfGPU ) {
-			PERF_PRINTF ( "PERF_INIT: Disabling perf. No CPU or GPU markers.\n" );
-			g_perfOn = false;
+			PERF_PRINTF ( "PERF_INIT: Disabling perf. No CPU or GPU markers.\n" );			
 		}
 	#else
 		#ifdef USE_NVTX

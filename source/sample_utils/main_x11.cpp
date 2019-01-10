@@ -174,6 +174,10 @@ void checkGL( char* msg )
         LOGE("%s, ERROR: 0x%x\n", msg, errCode );
     }
 }
+
+#else
+//------------------------------------------------------------------------------
+void checkGL( char* msg ) {}
 #endif
 
 struct WINinternal{
@@ -437,7 +441,7 @@ bool NVPWindow::create(const char *title, const ContextFlags *cflags, int width,
     return false;
 }
 
-int NVPWindow::run ( const std::string& title, int argc, const char** argv, int width, int height, int Major, int Minor )
+int NVPWindow::run ( const std::string& title, const std::string& shortname, int argc, const char** argv, int width, int height, int Major, int Minor, int GoldenFrame )
 {
     bool vsyncstate = true;
     unsigned int intervalSeconds = 2;
@@ -493,6 +497,12 @@ int NVPWindow::run ( const std::string& title, int argc, const char** argv, int 
 
     bool   lastVsync = m_vsync;
 
+    m_display_frame = 0;
+    m_golden_frame = GoldenFrame;
+   
+  char	outpng[1024];				// golden frame, png output filename
+  sprintf ( outpng, "out_%s.png", shortname.c_str() );
+
     if (Run) {
 		while ( m_active )
 		{
@@ -503,6 +513,8 @@ int NVPWindow::run ( const std::string& title, int argc, const char** argv, int 
 			   NVPWindow *pWin = g_windows[i];
 			   if(pWin->m_renderCnt > 0) {
 			      pWin->m_renderCnt--;
+			      if ( m_display_frame==m_golden_frame ) save_frame ( outpng );
+			      m_display_frame++;
 			      pWin->display();
 			      pWin->m_doSwap = true;
 			   }
@@ -516,8 +528,13 @@ int NVPWindow::run ( const std::string& title, int argc, const char** argv, int 
 			frames++;        
 
 			if ( m_keyPressed[KEY_ESCAPE] ) {
-			  nvprintf ( "ESC pressed.\n" );
-			  m_active = false;	
+			  m_keyPressed[KEY_ESCAPE] = false;
+			  if ( m_fullscreen ) {
+				restore ();					
+			  } else {
+			       nvprintf ( "ESC pressed.\n" );
+			       m_active = false;	 
+                          }
 			}
 		}
     }
@@ -573,7 +590,7 @@ void NVPWindow::makeContextNonCurrent(){
 
 void NVPWindow::swapInterval(int i){
     //do nothing.
-    glXSwapIntervalEXT(m_internal->m_dpy,m_internal->m_window,i);
+  //    glXSwapIntervalEXT (m_internal->m_dpy,m_internal->m_window,i);
 }
 
 
@@ -751,26 +768,36 @@ double NVPWindow::sysGetTime(){
     return 1.0/(double)getMilliCount();
 }
 
-static const char *g_screenquad_vert = 
+static const char *g_screenquad_vert =
 	"#version 440 core\n"
 	"layout(location = 0) in vec3 vertex;\n"
 	"layout(location = 1) in vec3 normal;\n"
 	"layout(location = 2) in vec3 texcoord;\n"
-	"uniform vec4 uCoords;\n"  
-	"uniform vec2 uScreen;\n"  
-	"out vec3 vtexcoord;\n"
+	"uniform vec4 uCoords;\n"
+	"uniform vec2 uScreen;\n"
+	"out vec3 vtc;\n"
 	"void main() {\n"
-	"   vtexcoord = texcoord*0.5+0.5;\n"
-	"   gl_Position = vec4( (uCoords.x*2.0/uScreen.x)-1.0+(vertex.x+1.0)*uCoords.z/uScreen.x, (uCoords.y*2.0/uScreen.y)+1.0-(1.0-vertex.y)*uCoords.w/uScreen.y, 0.0f, 1.0f );\n"						    
+	"   vtc = texcoord*0.5+0.5;\n"
+	"   gl_Position = vec4( -1.0 + (uCoords.x/uScreen.x) + (vertex.x+1.0f)*(uCoords.z-uCoords.x)/uScreen.x,\n"
+	"                       -1.0 + (uCoords.y/uScreen.y) + (vertex.y+1.0f)*(uCoords.w-uCoords.y)/uScreen.y,\n"
+	"                       0.0f, 1.0f );\n"
 	"}\n";
 
-static const char *g_screenquad_frag = 
-	"#version 440\n"	
-	"uniform sampler2D uTex;\n"
-	"in vec3 vtexcoord;\n"
+static const char *g_screenquad_frag =
+	"#version 440\n"
+	"uniform sampler2D uTex1;\n"
+	"uniform sampler2D uTex2;\n"
+	"uniform int uTexFlags;\n"
+	"in vec3 vtc;\n"
 	"out vec4 outColor;\n"
 	"void main() {\n"
-    "   outColor = vec4( texture ( uTex, vtexcoord.xy).xyz, 1 );\n"	
+	"   vec4 op1 = ((uTexFlags & 0x01)==0) ? texture ( uTex1, vtc.xy) : texture ( uTex1, vec2(vtc.x, 1.0-vtc.y));\n"
+	"   if ( (uTexFlags & 0x02) != 0 ) {\n"
+	"		vec4 op2 = ((uTexFlags & 0x04)==0) ? texture ( uTex2, vtc.xy) : texture ( uTex2, vec2(vtc.x, 1.0-vtc.y));\n"
+	"		outColor = vec4( op1.xyz*(1.0-op2.w) + op2.xyz * op2.w, 1 );\n"
+	"   } else { \n"
+	"		outColor = vec4( op1.xyz, 1 );\n"
+	"   }\n"
 	"}\n";
 
 
@@ -785,73 +812,76 @@ struct nvFace {
 	unsigned int  a, b, c;
 };
 
-void NVPWindow::initScreenQuadGL ()
+void NVPWindow::initScreenQuadGL()
 {
 	int status;
 	int maxLog = 65536, lenLog;
 	char log[65536];
 
 	// Create a screen-space shader
-	m_screenquad_prog = (int) glCreateProgram ();	
-	GLuint vShader = (int) glCreateShader ( GL_VERTEX_SHADER );
-	glShaderSource ( vShader , 1, (const GLchar**) &g_screenquad_vert, NULL );
-	glCompileShader ( vShader );
-	glGetShaderiv( vShader, GL_COMPILE_STATUS, &status );
-	if (!status) { 
-		glGetShaderInfoLog ( vShader, maxLog, &lenLog, log );		
-		nvprintf ("*** Compile Error in init_screenquad vShader\n"); 
-		nvprintf ("  %s\n", log );				
-	}	
-
-	GLuint fShader = (int) glCreateShader ( GL_FRAGMENT_SHADER );
-	glShaderSource ( fShader , 1, (const GLchar**) &g_screenquad_frag, NULL );
-	glCompileShader ( fShader );
-	glGetShaderiv( fShader, GL_COMPILE_STATUS, &status );
+	m_screenquad_prog = (int)glCreateProgram();
+	GLuint vShader = (int)glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vShader, 1, (const GLchar**)&g_screenquad_vert, NULL);
+	glCompileShader(vShader);
+	glGetShaderiv(vShader, GL_COMPILE_STATUS, &status);
 	if (!status) {
-		glGetShaderInfoLog ( vShader, maxLog, &lenLog, log );		
-		nvprintf ("*** Compile Error in init_screenquad fShader\n"); 
-		nvprintf ("  %s\n", log );				
+		glGetShaderInfoLog(vShader, maxLog, &lenLog, log);
+		nvprintf("*** Compile Error in init_screenquad vShader\n");
+		nvprintf("  %s\n", log);
 	}
-	glAttachShader ( m_screenquad_prog, vShader );
-	glAttachShader ( m_screenquad_prog, fShader );
-	glLinkProgram ( m_screenquad_prog );		  
-    glGetProgramiv( m_screenquad_prog, GL_LINK_STATUS, &status );
-    if ( !status ) { 
+
+	GLuint fShader = (int)glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fShader, 1, (const GLchar**)&g_screenquad_frag, NULL);
+	glCompileShader(fShader);
+	glGetShaderiv(fShader, GL_COMPILE_STATUS, &status);
+	if (!status) {
+		glGetShaderInfoLog(fShader, maxLog, &lenLog, log);
+		nvprintf("*** Compile Error in init_screenquad fShader\n");
+		nvprintf("  %s\n", log);
+	}
+	glAttachShader(m_screenquad_prog, vShader);
+	glAttachShader(m_screenquad_prog, fShader);
+	glLinkProgram(m_screenquad_prog);
+	glGetProgramiv(m_screenquad_prog, GL_LINK_STATUS, &status);
+	if (!status) {
 		nvprintf("*** Error! Failed to link in init_screenquad\n");
 	}
 	checkGL ( "glLinkProgram (init_screenquad)" );
 	
 	// Get texture parameter
-	m_screenquad_utex = glGetUniformLocation ( m_screenquad_prog, "uTex" );
+	m_screenquad_utex1 = glGetUniformLocation (m_screenquad_prog, "uTex1" );
+	m_screenquad_utex2 = glGetUniformLocation (m_screenquad_prog, "uTex2");
+	m_screenquad_utexflags = glGetUniformLocation(m_screenquad_prog, "uTexFlags");
 	m_screenquad_ucoords = glGetUniformLocation ( m_screenquad_prog, "uCoords" );
 	m_screenquad_uscreen = glGetUniformLocation ( m_screenquad_prog, "uScreen" );
+
 
 	// Create a screen-space quad VBO
 	std::vector<nvVertex> verts;
 	std::vector<nvFace> faces;
-	verts.push_back ( nvVertex(-1,-1,0, -1,1,0) );
-	verts.push_back ( nvVertex( 1,-1,0,  1,1,0) );
-	verts.push_back ( nvVertex( 1, 1,0,  1,-1,0) );
-	verts.push_back ( nvVertex(-1, 1,0, -1,-1,0) );
-	faces.push_back ( nvFace(0,1,2) );
-	faces.push_back ( nvFace(2,3,0) );
+	verts.push_back(nvVertex(-1, -1, 0, -1, 1, 0));
+	verts.push_back(nvVertex(1, -1, 0, 1, 1, 0));
+	verts.push_back(nvVertex(1, 1, 0, 1, -1, 0));
+	verts.push_back(nvVertex(-1, 1, 0, -1, -1, 0));
+	faces.push_back(nvFace(0, 1, 2));
+	faces.push_back(nvFace(2, 3, 0));
 
-	glGenBuffers ( 1, (GLuint*) &m_screenquad_vbo[0] );
-	glGenBuffers ( 1, (GLuint*) &m_screenquad_vbo[1] );
-	checkGL ( "glGenBuffers (init_screenquad)" );
-	glGenVertexArrays ( 1, (GLuint*) &m_screenquad_vbo[2] );
-	glBindVertexArray ( m_screenquad_vbo[2] );
-	checkGL ( "glGenVertexArrays (init_screenquad)" );
-	glBindBuffer ( GL_ARRAY_BUFFER, m_screenquad_vbo[0] );
-	glBufferData ( GL_ARRAY_BUFFER, verts.size() * sizeof(nvVertex), &verts[0].x, GL_STATIC_DRAW_ARB);		
-	checkGL ( "glBufferData[V] (init_screenquad)" );
-	glVertexAttribPointer ( 0, 3, GL_FLOAT, false, sizeof(nvVertex), 0 );				// pos
-	glVertexAttribPointer ( 1, 3, GL_FLOAT, false, sizeof(nvVertex), (void*) 12 );	// norm
-	glVertexAttribPointer ( 2, 3, GL_FLOAT, false, sizeof(nvVertex), (void*) 24 );	// texcoord
-	glBindBuffer ( GL_ELEMENT_ARRAY_BUFFER, m_screenquad_vbo[1] );
-	glBufferData ( GL_ELEMENT_ARRAY_BUFFER, faces.size()*3*sizeof(int), &faces[0].a, GL_STATIC_DRAW_ARB);
-	checkGL ( "glBufferData[F] (init_screenquad)" );
-	glBindVertexArray ( 0 );
+	glGenBuffers(1, (GLuint*)&m_screenquad_vbo[0]);
+	glGenBuffers(1, (GLuint*)&m_screenquad_vbo[1]);
+	checkGL("glGenBuffers (init_screenquad)");
+	glGenVertexArrays(1, (GLuint*)&m_screenquad_vbo[2]);
+	glBindVertexArray(m_screenquad_vbo[2]);
+	checkGL("glGenVertexArrays (init_screenquad)");
+	glBindBuffer(GL_ARRAY_BUFFER, m_screenquad_vbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(nvVertex), &verts[0].x, GL_STATIC_DRAW_ARB);
+	checkGL("glBufferData[V] (init_screenquad)");
+	glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(nvVertex), 0);				// pos
+	glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(nvVertex), (void*)12);	// norm
+	glVertexAttribPointer(2, 3, GL_FLOAT, false, sizeof(nvVertex), (void*)24);	// texcoord
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_screenquad_vbo[1]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, faces.size() * 3 * sizeof(int), &faces[0].a, GL_STATIC_DRAW_ARB);
+	checkGL("glBufferData[F] (init_screenquad)");
+	glBindVertexArray(0);
 }
 
 void NVPWindow::initGL()
@@ -885,40 +915,67 @@ void NVPWindow::clearScreenGL ()
 	glClear ( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 }
 
-void NVPWindow::renderScreenQuadGL ( int glid, float x1, float y1, float x2, float y2 )
+void NVPWindow::renderScreenQuadGL(int glid, char inv1)
+{
+	renderScreenQuadGL ( glid, -1, (float)0, (float)0, (float)getWidth(), (float)getHeight(), inv1); 
+}
+
+void NVPWindow::compositeScreenQuadGL(int glid1, int glid2, char inv1, char inv2)
+{
+	renderScreenQuadGL( glid1, glid2, (float)0, (float)0, (float)getWidth(), (float)getHeight(), inv1, inv2 );
+}
+
+void NVPWindow::renderScreenQuadGL ( int glid1, int glid2, float x1, float y1, float x2, float y2, char inv1, char inv2 )
+
 {
 	// Prepare pipeline
-	glDisable ( GL_DEPTH_TEST );
-	glDisable ( GL_CULL_FACE );	
-	glDepthMask ( GL_FALSE );
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glDepthMask(GL_FALSE);
 	// Select shader	
-	glBindVertexArray ( m_screenquad_vbo[2] );
-	glUseProgram ( m_screenquad_prog );
-	checkGL ( "glUseProgram" );
+	glBindVertexArray(m_screenquad_vbo[2]);
+	glUseProgram(m_screenquad_prog);
+	checkGL("glUseProgram");
 	// Select VBO	
-	glBindBuffer ( GL_ARRAY_BUFFER, m_screenquad_vbo[0] );		
-	glVertexAttribPointer ( 0, 3, GL_FLOAT, false, sizeof(nvVertex), 0 );		
-	glVertexAttribPointer ( 1, 3, GL_FLOAT, false, sizeof(nvVertex), (void*) 12 );		
-	glVertexAttribPointer ( 2, 3, GL_FLOAT, false, sizeof(nvVertex), (void*) 24 );
-	glEnableVertexAttribArray ( 0 );	
-	glEnableVertexAttribArray ( 1 );
-	glEnableVertexAttribArray ( 2 );
-	glBindBuffer ( GL_ELEMENT_ARRAY_BUFFER, m_screenquad_vbo[1] );	
-	checkGL ( "glBindBuffer" );
+	glBindBuffer(GL_ARRAY_BUFFER, m_screenquad_vbo[0]);
+	glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(nvVertex), 0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(nvVertex), (void*)12);
+	glVertexAttribPointer(2, 3, GL_FLOAT, false, sizeof(nvVertex), (void*)24);
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_screenquad_vbo[1]);
+	checkGL("glBindBuffer");
 	// Select texture
 	glEnable ( GL_TEXTURE_2D );
-	glProgramUniform1i ( m_screenquad_prog, m_screenquad_utex, 0 );
 	glProgramUniform4f ( m_screenquad_prog, m_screenquad_ucoords, x1, y1, x2, y2 );
 	glProgramUniform2f ( m_screenquad_prog, m_screenquad_uscreen, (float) getWidth(), (float) getHeight() );
+
 	glActiveTexture ( GL_TEXTURE0 );
-	glBindTexture ( GL_TEXTURE_2D, glid );
+	glBindTexture ( GL_TEXTURE_2D, glid1 );
+
+	glProgramUniform1i(m_screenquad_prog, m_screenquad_utex1, 0);
+	int flags = 0;
+	if (inv1 > 0) flags |= 1;												// y-invert tex1
+
+	if (glid2 >= 0) {
+		flags |= 2;															// enable tex2 compositing
+		if (inv2 > 0) flags |= 4;											// y-invert tex2
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, glid2);
+		glProgramUniform1i(m_screenquad_prog, m_screenquad_utex2, 1);
+	}
+
+	glProgramUniform1i(m_screenquad_prog, m_screenquad_utexflags, flags );	
+
 	// Draw
-	glDrawElementsInstanced ( GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1);	
-	checkGL ( "glDraw" );
-	glUseProgram ( 0 );
-	
-	glDepthMask ( GL_TRUE );
+	glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1);
+	checkGL("glDraw");
+	glUseProgram(0);
+
+	glDepthMask(GL_TRUE);
 }
+
 
 void NVPWindow::sysSleep(double seconds){
     //handle process sleep.
@@ -946,6 +1003,37 @@ void NVPWindow::sysVisibleConsole(){
     //Handle console stdout display.
 
 }
+
+
+// from file_png.cpp
+extern void save_png ( char* fname, unsigned char* img, int w, int h, int ch );
+
+void NVPWindow::save_frame ( char* fname )
+{
+	int w = getWidth();
+	int h = getHeight();
+
+	// Read back pixels
+	unsigned char* pixbuf = (unsigned char*) malloc ( w*h*3 );
+
+	glReadPixels ( 0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixbuf );
+
+	// Flip Y
+	int pitch = w*3;
+	unsigned char* buf = (unsigned char*) malloc ( pitch );
+	for (int y=0; y < h/2; y++ ) {
+		memcpy ( buf, pixbuf + (y*pitch), pitch );		
+		memcpy ( pixbuf + (y*pitch), pixbuf + ((h-y-1)*pitch), pitch );		
+		memcpy ( pixbuf + ((h-y-1)*pitch), buf, pitch );
+	}
+
+	// Save png
+	save_png ( fname, pixbuf, w, h, 3 );
+
+	free ( pixbuf );
+	free ( buf );
+}
+
 
 
 

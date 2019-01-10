@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #include "gvdb_allocator.h"
@@ -31,14 +32,13 @@ CallbackParser* Scene::gParse = 0x0;
 
 Scene::Scene ()
 {
-	mCamera = 0x0;
-	mNumPaths = 0;
+	mCamera = 0x0;	
 	mOutFile = "out.scn";
 	mOutModel = "";
 	mOutFrame = 0;
 	mOutCam = new Camera3D;
 	mOutLight = new Light;
-	mShadowParams.Set ( 1.0, 1.0, -5e-4f, 0.01 );   // Default FTIZB params
+	mShadowParams.Set ( 0.8, 1.0, 0 );
 	mTransferFunc = 0x0;
 	mFrameSamples = 8;
 	mVClipMin.Set (  -1000000, -1000000, -1000000 );
@@ -47,6 +47,11 @@ Scene::Scene ()
 	mVLeaf.Set ( 0, 0, 0 );
 	mVFrames.Set ( 0, 0, 0 );
 	mVName = "density";
+	mShading = SHADE_TRILINEAR;
+	mFilterMode = 0;
+	mFrame = 0;
+	mSample = 0;	
+	mDepthBuf = 255;   // no depth buf
 	
 	// Scene and Parse must be global singletons because 
 	// the callback parser accepts pointers-to-member function
@@ -64,6 +69,11 @@ Scene::Scene ()
 Vector4DF lerp4 ( Vector4DF a, Vector4DF b, float u )
 {
 	return Vector4DF( a.x+u*(b.x-a.x), a.y+u*(b.y-a.y), a.z+u*(b.z-a.z), a.w+u*(b.w-a.w) );
+}
+
+int Scene::getShaderProgram (int i)
+{
+	return mProgram[ i ];
 }
 
 void Scene::LinearTransferFunc ( float t0, float t1, Vector4DF a, Vector4DF b )
@@ -92,47 +102,57 @@ Scene::~Scene ()
 	
 }
 
+
 void Scene::AddPath ( std::string path )
 {
-	if ( mNumPaths < MAX_PATHS ) {
-		int n = mNumPaths;
-		mSearchPaths[ n ] = (char*) malloc ( path.length() + 1 );
-		strcpy ( mSearchPaths[n], path.c_str() );	
-		mNumPaths++;
-	}
+	mSearchPaths.push_back ( path );	
+}
+void Scene::ClearModel ( Model* m )
+{
+	if ( m->vertBuffer != 0x0 ) free ( m->vertBuffer );
+	if ( m->elemBuffer != 0x0 ) free ( m->elemBuffer );
 }
 
-int Scene::AddModel ( std::string filestr, float scale, float tx, float ty, float tz)
+void Scene::LoadModel ( Model* m, std::string filestr, float scale, float tx, float ty, float tz )
 {
 	char filename[1024];
 	strncpy ( filename, filestr.c_str(), 1024 );
-
-	Model* m = new Model;
-	m->modelType = 0;	// polygonal model
-	mModels.push_back ( m );
 
 	// polygonal model
 	if ( OBJARReader::isMyFile ( filename ) ) {
 		// OBJAR File
 		OBJARReader load_objar;
-		load_objar.LoadFile ( m, filename, mSearchPaths, mNumPaths );		
+		load_objar.LoadFile ( m, filename, mSearchPaths );
 	
 	} else if ( OBJReader::isMyFile ( filename ) ) {
 		// OBJ FIle
 		OBJReader load_obj;
-		load_obj.LoadFile ( m, filename, mSearchPaths, mNumPaths );				
+		load_obj.LoadFile ( m, filename, mSearchPaths );
 	}
 	// Rescale if desired
 	m->Transform ( Vector3DF(tx,ty,tz), Vector3DF(scale,scale,scale) );
-
+	
 	// Save name of model (for recording)
 	char buf[32];
 	sprintf ( buf, "%f", scale );
 	mOutModel = " model " + std::string(filename) + " " + std::string(buf);
-
-	return mModels.size()-1;
 }
 
+Model* Scene::AddModel ()
+{
+	Model* m = new Model;
+	m->modelType = 0;	// polygonal model
+	mModels.push_back ( m );
+	return m;
+}
+
+// backward compatibility function
+int Scene::AddModel ( std::string filestr, float scale, float tx, float ty, float tz)
+{
+	Model* m = AddModel ();	
+	LoadModel ( m, filestr, scale, tx, ty, tz );
+	return mModels.size()-1;
+}
 
 int Scene::AddVolume ( std::string filestr, Vector3DI res, char vtype, float scale)
 {
@@ -160,7 +180,7 @@ int	Scene::AddGround ( float hgt, float scale )
 
 	if ( OBJReader::isMyFile ( "ground.obj" ) ) {		
 		OBJReader load_obj;
-		load_obj.LoadFile ( m, "ground.obj", mSearchPaths, mNumPaths );				
+		load_obj.LoadFile ( m, "ground.obj", mSearchPaths );
 	}
 	// Rescale if desired
 	m->Transform ( Vector3DF(0,hgt,0), Vector3DF(scale,scale,scale) );
@@ -200,19 +220,19 @@ char *ReadShaderSource( char *fileName )
 }
 
 // Create a GLSL program object from vertex and fragment shader files
-int Scene::AddShader (char* vertfile, char* fragfile )
+int Scene::AddShader ( int prog_id, char* vertfile, char* fragfile )
 {
-	return AddShader ( vertfile, fragfile, 0x0 );
+	return AddShader ( prog_id, vertfile, fragfile, 0x0 );
 }
 
 bool Scene::FindFile ( std::string fname, char* path )
 {
 	char fbuf[1024];
 	strcpy ( fbuf, fname.c_str() );
-	return getFileLocation ( fbuf, path, mSearchPaths, mNumPaths );	
+	return getFileLocation ( fbuf, path, mSearchPaths );	
 }
 
-int Scene::AddShader (char* vertfile, char* fragfile, char* geomfile )
+int Scene::AddShader ( int prog_id, char* vertfile, char* fragfile, char* geomfile )
 {
 	mLastShader = vertfile;
 	int maxLog = 65536, lenLog;
@@ -315,26 +335,28 @@ int Scene::AddShader (char* vertfile, char* fragfile, char* geomfile )
 	mParams.push_back ( params );
 	
 	mProgToSlot[ program ] = mParams.size()-1;
+	mProgram[ prog_id ] = program;
 
     return program;
 }
 
-int	Scene::getSlot ( int prog )
+int	Scene::getSlot ( int prog_id )
 {
 	// Get abstract slot from a program ID
 	for (int n=0; n < mShaders.size(); n++ ) {
-		if ( mShaders[n]==prog )
+		if ( mShaders[n] == mProgram[prog_id] )
 			return n;
 	}
 	return -1;
 }
 
-int	Scene::AddParam ( int prog, int id, char* name )
+int	Scene::AddParam ( int prog_id, int id, char* name )
 {
+	int prog = mProgram[prog_id];
 	int active = 0;
 	glGetProgramiv ( prog, GL_ACTIVE_UNIFORMS, &active );
 	int ndx = glGetProgramResourceIndex ( prog, GL_UNIFORM, name );	
-	int slot = getSlot ( prog );
+	int slot = getSlot ( prog_id );
 	if ( slot == -1 || ndx == -1 ) {
 		gprintf ( "ERROR: Unable to access %s in %s. Active uniforms = %d\n", name, mLastShader.c_str(), active );
 		gerror ();
@@ -343,13 +365,14 @@ int	Scene::AddParam ( int prog, int id, char* name )
 	return ndx;
 }
 
-int	Scene::AddAttrib ( int prog, int id, char* name )
+int	Scene::AddAttrib ( int prog_id, int id, char* name )
 {
+	int prog = mProgram[prog_id];
 	//int ndx = glGetProgramResourceIndex ( prog, GL_BUFFER_VARIABLE, name );		
 	int active = 0;
 	glGetProgramiv ( prog, GL_ACTIVE_ATTRIBUTES, &active );
 	int ndx = glGetAttribLocation ( prog, name );	
-	int slot = getSlot ( prog );
+	int slot = getSlot ( prog_id );
 	if ( slot == -1 || ndx == -1 ) {
 		gprintf ( "ERROR: Unable to access %s in %s. Active attribs = %d\n", name, mLastShader.c_str(), active );
 		gerror ();
@@ -447,8 +470,7 @@ void Scene::VolumeThresh ()
 	Vector3DF vec;
 	gParse->GetToken( val );	vec.x = atof(val);	
 	gParse->GetToken( val );	vec.y = atof(val);
-	gParse->GetToken( val );	vec.z = atof(val);
-	gprintf ( "thresh: %f\n", vec.x );
+	gParse->GetToken( val );	vec.z = atof(val);	
 	gScene->mVThreshold = vec;
 }
 
@@ -492,7 +514,7 @@ void Scene::LoadCamera ()
 	while ( pos != std::string::npos ) {
 		var = line.substr ( 0, pos );
 		value = line.substr ( pos+1 );		
-		Vector3DF vec; strToVec3( value, vec.Data() );		
+		Vector3DF vec; strToVec3( value, "", " ", "", vec.Data() );		
 		gScene->UpdateValue ( 'C', 0, strToID(var), vec );		
 		line = gParse->ReadNextLine(false);
 		pos = line.find_first_of ( ':' );
@@ -511,7 +533,7 @@ void Scene::LoadLight ()
 	while ( pos != std::string::npos ) {
 		var = line.substr ( 0, pos );
 		value = line.substr ( pos+1 );
-		Vector3DF vec; strToVec3( value, vec.Data() );		
+		Vector3DF vec; strToVec3( value, "", " ", "", vec.Data() );		
 		gScene->UpdateValue ( 'L', 0, strToID(var), vec );			
 		line = gParse->ReadNextLine(false);
 		pos = line.find_first_of ( ':' );
@@ -526,7 +548,7 @@ void Scene::LoadShadow ()
 	while ( pos != std::string::npos ) {
 		var = line.substr ( 0, pos );
 		value = line.substr ( pos+1 );
-		Vector3DF vec; strToVec3( value, vec.Data() );
+		Vector3DF vec; strToVec3( value, "", " ", "", vec.Data() );
 		gScene->UpdateValue ( 'S', 0, strToID(var), vec );			
 		line = gParse->ReadNextLine(false);
 		pos = line.find_first_of ( ':' );
@@ -549,16 +571,16 @@ void Scene::LoadAnimation ()
 		var = line.substr( 0, pos );
 		if ( var=="frames" ) {
 			str1 = line.substr ( pos+1 );			
-			strToVec3 ( str1, frames.Data() );	
+			strToVec3 ( str1, "", " ", "", frames.Data() );	
 			gScene->setFrameSamples ( frames.z );
 		} else {
 			obj = strParse ( var, "(", ")" );	// read variable and object
 			if ( obj != "" ) {
 				str2 = line.substr ( pos+1 );		
 				str1 = strSplit ( str2, "," );		// read start and end values
-				strToVec3 ( str1, val1.Data() );
-				strToVec3 ( str2, val2.Data() );			// convert values to vec3
-				gprintf ( "%s: %f %f %f -> %f %f %f\n", obj.c_str(), val1.x, val1.y, val1.z, val2.x, val2.y, val2.z );
+				strToVec3 ( str1, "", " ", "", val1.Data() );
+				strToVec3 ( str2, "", " ", "", val2.Data() );			// convert values to vec3
+				// gprintf ( "%s: %f %f %f -> %f %f %f\n", obj.c_str(), val1.x, val1.y, val1.z, val2.x, val2.y, val2.z );
 				gScene->AddKey ( obj, var, frames.x, frames.y, val1, val2 );
 			}
 		}
@@ -631,10 +653,9 @@ void Scene::UpdateValue ( char obj, int objid, long varid, Vector3DF val )
 	} else if ( obj=='S' ) {
 		// Shadows
 		switch ( varid ) {
-		case 'lamb': mShadowParams.x = val.x;	break;
-		case 'dila': mShadowParams.y = val.x;	break;
-		case 'epsi': mShadowParams.z = val.x;	break;
-		case 'over': mShadowParams.w = val.x;	break;
+		case 'x': mShadowParams.x = val.x;	break;
+		case 'y': mShadowParams.y = val.x;	break;
+		case 'z': mShadowParams.z = val.x;	break;		
 		};
 	}
 }
@@ -649,7 +670,7 @@ void Scene::Clear ()
 	mMaterials.clear ();
 }
 
-void Scene::LoadFile ( std::string filestr  )
+void Scene::LoadFile ( std::string filestr )
 {
 	// Create new parse
 	if ( gParse != 0x0 ) delete gParse;
@@ -660,7 +681,6 @@ void Scene::LoadFile ( std::string filestr  )
 		return;	
 
 	// Load model(s)
-	gprintf ( "Loading '%s'...\n", filepath );
 
 	// Set keywords & corresponding callbacks to process the data
 	gParse->SetCallback( "path",            &Scene::LoadPath );
@@ -676,7 +696,7 @@ void Scene::LoadFile ( std::string filestr  )
 	gParse->SetCallback( "shadow",			&Scene::LoadShadow );	
 
 	// Go ahead and parse the file	
-	gParse->ParseFile ( filepath, mSearchPaths, mNumPaths );	
+	gParse->ParseFile ( filepath, mSearchPaths );	
 }
 
 void Scene::RecordKeypoint ( int w, int h )

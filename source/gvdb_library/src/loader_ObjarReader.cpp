@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,12 +17,14 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <GL/glew.h>
 
+#include "string_helper.h"
 #include "loader_Parser.h"
 #include "loader_ObjarReader.h"
 
@@ -49,23 +51,16 @@ int OBJARReader::LoadHeader( FILE *fp, OBJARHeader *hdr )
 }
 
 
-
 // Do a really simple load of a binary model format into a shadow library usable model format.
-bool OBJARReader::LoadFile ( Model* model, const char *filename, char** searchPaths, int numPaths )
+bool OBJARReader::LoadFile ( Model* model, char *filename, std::vector<std::string>& paths )
 {
-	char curFileName[512];
+	char filePath[512];
 
 	// Open the file.  Check all the specified search directories
-	FILE *fp = fopen( filename, "rb" );
-	if ( fp == 0x0 ) {
-		for (int i=0; i < numPaths; i++) {
-			if (!fp) {
-				sprintf(curFileName, "%s%s", searchPaths[i], filename );
-				fp = fopen( curFileName, "rb" );
-			}
-		}
-	}
-	if (!fp) return NULL;
+	if ( !getFileLocation ( filename, filePath, paths ) ) 
+		return false;
+
+	FILE* fp = fopen ( filePath, "rb" );
 
 	// Read the OBJAR header.  If the header isn't version 2, exit now.
 	OBJARHeader hdr;

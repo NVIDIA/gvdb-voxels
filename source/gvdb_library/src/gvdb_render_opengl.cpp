@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,20 +17,14 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 #include "gvdb_render.h"
 
-int GLS_SIMPLE = -1;	// GL Shader Programs
-int GLS_OUTLINE = -1;
-int GLS_SLICE = -1;
-int GLS_VOXELIZE = -1;
-int GLS_RAYCAST = -1;
-int GLS_INSTANCE = -1;
-int GLS_SCREENTEX = -1;
 
 #ifdef BUILD_OPENGL
 
-	void checkGL( char* msg )
+	void gchkGL ( char* msg )
 	{
 		GLenum errCode;
 		//const GLubyte* errString;
@@ -41,9 +35,9 @@ int GLS_SCREENTEX = -1;
 		}
 	}
 
-	void renderAddShaderGL ( Scene* scene, char* vertname, char* fragname )
+	void makeSimpleShaderGL ( Scene* scene, char* vertname, char* fragname )
 	{
-		GLS_SIMPLE = scene->AddShader ( vertname, fragname );
+		scene->AddShader ( GLS_SIMPLE, vertname, fragname );
 		scene->AddParam ( GLS_SIMPLE, UVIEW, "uView" );
 		scene->AddParam ( GLS_SIMPLE, UPROJ, "uProj" );
 		scene->AddParam ( GLS_SIMPLE, UMODEL, "uModel" );	
@@ -53,7 +47,7 @@ int GLS_SCREENTEX = -1;
 	}
 	void makeOutlineShader ( Scene* scene, char* vertname, char* fragname )
 	{
-		GLS_OUTLINE = scene->AddShader ( vertname, fragname );
+		scene->AddShader (GLS_OUTLINE, vertname, fragname );
 		scene->AddParam ( GLS_OUTLINE, UVIEW, "uView" );
 		scene->AddParam ( GLS_OUTLINE, UPROJ, "uProj" );
 		scene->AddParam ( GLS_OUTLINE, UMODEL, "uModel" );	
@@ -62,7 +56,7 @@ int GLS_SCREENTEX = -1;
 
 	void makeSliceShader ( Scene* scene, char* vertname, char* fragname )
 	{
-		GLS_SLICE = scene->AddShader ( vertname, fragname );
+		scene->AddShader ( GLS_SLICE, vertname, fragname );
 		scene->AddParam ( GLS_SLICE, UVIEW, "uView" );
 		scene->AddParam ( GLS_SLICE, UPROJ, "uProj" );
 		scene->AddParam ( GLS_SLICE, ULIGHTPOS, "uLightPos" );
@@ -70,14 +64,14 @@ int GLS_SCREENTEX = -1;
 	}
 	void makeVoxelizeShader ( Scene* scene, char* vertname, char* fragname, char* geomname )
 	{
-		GLS_VOXELIZE = scene->AddShader ( vertname, fragname, geomname );
+		scene->AddShader ( GLS_VOXELIZE, vertname, fragname, geomname );
 		scene->AddParam ( GLS_VOXELIZE, UW, "uW" );
 		scene->AddParam ( GLS_VOXELIZE, UTEXRES, "uTexRes" );
 		scene->AddParam ( GLS_VOXELIZE, USAMPLES, "uSamples" );
 	}
 	void makeRaycastShader ( Scene* scene, char* vertname, char* fragname )
 	{
-		GLS_RAYCAST = scene->AddShader ( vertname, fragname );	
+		scene->AddShader ( GLS_RAYCAST, vertname, fragname );
 		scene->AddParam ( GLS_RAYCAST, UINVVIEW, "uInvView" );
 		scene->AddParam ( GLS_RAYCAST, UCAMPOS,  "uCamPos" );
 		scene->AddParam ( GLS_RAYCAST, UCAMDIMS, "uCamDims" );
@@ -90,7 +84,7 @@ int GLS_SCREENTEX = -1;
 	}
 	void makeInstanceShader ( Scene* scene, char* vertname, char* fragname )
 	{
-		GLS_INSTANCE = scene->AddShader ( vertname, fragname );	
+		scene->AddShader ( GLS_INSTANCE, vertname, fragname );
 		scene->AddParam ( GLS_INSTANCE, UVIEW, "uView" );
 		scene->AddParam ( GLS_INSTANCE, UPROJ, "uProj" );	
 	
@@ -102,14 +96,16 @@ int GLS_SCREENTEX = -1;
 	}
 	void makeScreenShader ( Scene* scene, char* vertname, char* fragname )
 	{
-		GLS_SCREENTEX = scene->AddShader ( vertname, fragname );	
+		scene->AddShader ( GLS_SCREENTEX, vertname, fragname );
 		scene->AddParam ( GLS_SCREENTEX, UTEX,     "uTex" );	
 	}
 
-	void renderCamSetupGL ( Scene* scene, int prog, Matrix4F* model )
+	
+	void renderCamSetupGL ( Scene* scene, int prog_id, Matrix4F* model )
 	{
-		int attr_model = scene->getParam(prog, UMODEL);
-		int attr_cam = scene->getParam(prog, UCAMPOS);
+		int prog = scene->getProgram(prog_id);
+		int attr_model = scene->getParam(prog_id, UMODEL);
+		int attr_cam = scene->getParam(prog_id, UCAMPOS);
 
 		// Set model, view, projection matrices
 		if ( attr_model != -1 ) {		
@@ -121,60 +117,64 @@ int GLS_SCREENTEX = -1;
 			}
 		}
 		Camera3D* cam = scene->getCamera ();		
-		glProgramUniformMatrix4fv( prog, scene->getParam(prog, UVIEW), 1, GL_FALSE, cam->getViewMatrix().GetDataF() ); 
-		glProgramUniformMatrix4fv( prog, scene->getParam(prog, UPROJ), 1, GL_FALSE, cam->getProjMatrix().GetDataF() );
+		glProgramUniformMatrix4fv( prog, scene->getParam(prog_id, UVIEW), 1, GL_FALSE, cam->getViewMatrix().GetDataF() );
+		glProgramUniformMatrix4fv( prog, scene->getParam(prog_id, UPROJ), 1, GL_FALSE, cam->getProjMatrix().GetDataF() );
 		if ( attr_cam != -1 ) glProgramUniform3fv ( prog, attr_cam, 1, &cam->getPos().x );	
 	}
 
-	void renderLightSetupGL ( Scene* scene, int prog ) 
+    void renderLightSetupGL ( Scene* scene, int prog_id ) 
 	{
 		Light* light = scene->getLight ();	
-		glProgramUniform3fv  ( prog, scene->getParam(prog, ULIGHTPOS), 1, &light->getPos().x );	
+		glProgramUniform3fv  (scene->getProgram(prog_id), scene->getParam(prog_id, ULIGHTPOS), 1, &light->getPos().x );
 	}
-	void renderSetMaterialGL ( Scene* scene, int prog, Vector4DF amb, Vector4DF diff, Vector4DF spec )
+	void renderSetMaterialGL(Scene* scene, int prog_id, Vector4DF amb, Vector4DF diff, Vector4DF spec)
 	{
-		glProgramUniform4fv  ( prog, scene->getParam(prog, UCLRAMB),  1, &amb.x );
-		glProgramUniform4fv  ( prog, scene->getParam(prog, UCLRDIFF), 1, &diff.x );
-		glProgramUniform4fv  ( prog, scene->getParam(prog, UCLRSPEC), 1, &spec.x );
+		int prog = scene->getProgram(prog_id);
+		glProgramUniform4fv(prog, scene->getParam(prog_id, UCLRAMB), 1, &amb.x);
+		glProgramUniform4fv(prog, scene->getParam(prog_id, UCLRDIFF), 1, &diff.x);
+		glProgramUniform4fv(prog, scene->getParam(prog_id, UCLRSPEC), 1, &spec.x);
 	}
-	void renderSetTex3D ( Scene* scene, int prog, int tex, Vector3DF res )
+	void renderSetTex3D ( Scene* scene, int prog_id, int tex, Vector3DF res )
 	{
-		if ( scene->getParam(prog, UTEXRES) != -1 )
-			glProgramUniform3fv ( prog, scene->getParam(prog, UTEXRES), 1, &res.x );
+		int prog = scene->getProgram(prog_id);
+		if ( scene->getParam(prog_id, UTEXRES) != -1 )
+			glProgramUniform3fv ( prog, scene->getParam(prog_id, UTEXRES), 1, &res.x );
 
-		glProgramUniform1i ( prog, scene->getParam(prog, UTEX), 0 );	
+		glProgramUniform1i ( prog, scene->getParam(prog_id, UTEX), 0 );	
 		glActiveTexture ( GL_TEXTURE0 );
 		glBindTexture ( GL_TEXTURE_3D, tex );
 	}
-	void renderSetTex2D ( Scene* scene, int prog, int tex )
+	void renderSetTex2D ( Scene* scene, int prog_id, int tex )
 	{
-		glProgramUniform1i ( prog, scene->getParam(prog, UTEX), 0 );	
+		glProgramUniform1i (scene->getProgram(prog_id), scene->getParam(prog_id, UTEX), 0 );
 		glActiveTexture ( GL_TEXTURE0 );
 		glBindTexture ( GL_TEXTURE_2D, tex );
 	}
-	void renderSetUW ( Scene* scene, int prog, Matrix4F* model, Vector3DF res )
+	void renderSetUW ( Scene* scene, int prog_id, Matrix4F* model, Vector3DF res )
 	{
-		glProgramUniformMatrix4fv( prog, scene->getParam(prog, UW ), 1, GL_FALSE, model->GetDataF() );
-		glProgramUniform3fv ( prog, scene->getParam(prog, UTEXRES ), 1, &res.x );
+		glProgramUniformMatrix4fv( scene->getProgram(prog_id), scene->getParam(prog_id, UW ), 1, GL_FALSE, model->GetDataF() );
+		glProgramUniform3fv ( scene->getProgram(prog_id), scene->getParam(prog_id, UTEXRES ), 1, &res.x );
 	}
 
-	void renderSceneGL ( Scene* scene, int prog )
+	void renderSceneGL ( Scene* scene, int prog_id )
 	{
 		glEnable ( GL_CULL_FACE );
 		glEnable ( GL_DEPTH_TEST );		
-		renderSceneGL ( scene, prog, true );
+		renderSceneGL ( scene, prog_id, true );
 	}
 
-	void renderSceneGL ( Scene* scene, int prog, bool bMat )
+	void renderSceneGL ( Scene* scene, int prog_id, bool bMat )
 	{	
 		// Render each model
 		Model* model;
 		if ( scene->useOverride() && bMat )
-			renderSetMaterialGL ( scene, prog, scene->clrAmb, scene->clrDiff, scene->clrSpec );
+			renderSetMaterialGL ( scene, prog_id, scene->clrAmb, scene->clrDiff, scene->clrSpec );
 
 		for (int n = 0; n < scene->getNumModels(); n++ ) {
 			model = scene->getModel( n );		
-			if ( !scene->useOverride() && bMat ) renderSetMaterialGL ( scene, prog, model->clrAmb, model->clrDiff, model->clrSpec );
+			if ( !scene->useOverride() && bMat ) 
+				renderSetMaterialGL ( scene, prog_id, model->clrAmb, model->clrDiff, model->clrSpec );
+			
 			glBindVertexArray ( model->vertArrayID );
 			glBindBuffer ( GL_ELEMENT_ARRAY_BUFFER, model->elemBufferID );
 			glDrawElements ( GL_TRIANGLES, model->elemCount * 3, GL_UNSIGNED_INT, 0 );
@@ -193,20 +193,21 @@ int GLS_SCREENTEX = -1;
 		glDrawElements ( model->elemDataType, model->elemCount*3, GL_UNSIGNED_INT, 0 );	*/
 	}
 
-	void renderScreenspaceGL ( Scene* scene, int prog )
+	void renderScreenspaceGL ( Scene* scene, int prog_id )
 	{
+		int prog = scene->getProgram(prog_id);
 		Camera3D* cam = scene->getCamera ();		
 
-		if ( scene->getParam(prog,UINVVIEW) != -1 ) 
-			glProgramUniformMatrix4fv( prog, scene->getParam(prog, UINVVIEW ), 1, GL_FALSE, cam->getInvView().GetDataF() );	
+		if ( scene->getParam(prog_id, UINVVIEW) != -1 ) 
+			glProgramUniformMatrix4fv( prog, scene->getParam(prog_id, UINVVIEW ), 1, GL_FALSE, cam->getInvView().GetDataF() );	
 	
-		if ( scene->getParam(prog,UCAMPOS) != -1 ) {
-			glProgramUniform3fv ( prog, scene->getParam(prog, UCAMPOS), 1, &cam->getPos().x );	
+		if ( scene->getParam(prog_id, UCAMPOS) != -1 ) {
+			glProgramUniform3fv ( prog, scene->getParam(prog_id, UCAMPOS), 1, &cam->getPos().x );	
 			Vector3DF cd;
 			cd.x = tan ( cam->getFov() * 0.5 * 3.141592/180.0f );
 			cd.y = cd.x / cam->getAspect();
 			cd.z = cam->getNear();
-			glProgramUniform3fv	( prog, scene->getParam(prog, UCAMDIMS), 1, &cd.x );	
+			glProgramUniform3fv	( prog, scene->getParam(prog_id, UCAMDIMS), 1, &cd.x );	
 		}
 
 		//scene->getScreenquad().SelectVBO ();

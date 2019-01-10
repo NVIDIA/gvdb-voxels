@@ -1,0 +1,95 @@
+/*! \page example_simpleCUDPP A Simple CUDPP Example
+ 
+  This code sample demonstrates a basic usage of CUDPP for computing the
+  parallel prefix sum of a floating point array on the GPU.
+  
+  \section codeWalkthrough Sample Code Walkthrough
+ 
+  The simpleCUDPP sample is the "hello" world example for CUDPP.  Its aim is 
+  to show you how to initialize, run, and shut down CUDPP functions.
+  
+  The main function in simpleCUDPP.cu is \c runTest().
+   
+  \subsection runTest runTest()
+
+  \dontinclude simpleCUDPP.cu   
+  
+  \c runTest starts by initializing the CUDA device and then declaring the number 
+  of elements and the array size for the arrays we plan to scan.  It then allocates 
+  the host-side (CPU-side) input array, \c h_idata, and initializes the data it 
+  contains with some random values between 0 and 15.
+  
+  \skip Run a simple test
+  \skip void
+  \until prop.clockRate
+  \until }
+  
+  After the input data is created on the host, we allocate a device (GPU) array
+  \c d_idata and copy the input data from the host using \c cudaMemcpy().  We also
+  allocate a device array for the output results, \c d_odata.
+  
+  \until d_odata
+  \until }
+  
+  \subsection initialization CUDPP Initialization
+  
+  Before we use the CUDPP library, we must initialize it.  We do this by calling
+  cudppCreate(), which returns a handle to the CUDPP library object.  This 
+  handle must be used when creating CUDPP plans (described next), so it must be 
+  held by the calling thread until it is ready to shut down CUDPP.
+  
+  \until cudppCreate(&theCudpp);
+  
+  \subsection plans CUDPP Plans
+  
+  Next comes the real CUDPP stuff.  First we have to configure CUDPP to scan 
+  our array. Configuration of algorithms in CUDPP relies on the concept of the
+  \em plan. A plan is a data structure that maintains intermediate storage for 
+  the algorithm, as well as information that CUDPP may use to optimize 
+  execution of the present hardware.  When invoked using cudppPlan(), the CUDPP
+  planner takes the configuration details passed to it and generates an 
+  internal plan object.  It returns a CUDPPHandle -- an opaque pointer type 
+  that is used to refer to the plan object -- that must be passed to other
+  CUDPP functions in order to execute algorithms.  
+  
+  In this case we are going to do a forward exclusive \c float sum-scan of 
+  \c numElements elements.  We tell the planner this by filling out a 
+  CUDPPConfiguration struct with the algorithm (CUDPP_SCAN), datatype 
+  (CUDPP_FLOAT), operation (CUDPP_ADD), and options (CUDPP_OPTION_FORWARD,
+  CUDPP_OPTION_EXCLUSIVE).  We then pass this \a config to cudppPlan along
+  with the maximum number of elements we want to scan, \a numElements.  Finally,
+  we pass 1 and 0 for the \a numRows and \a rowPitch parameters, since we only
+  want to scan a one-dimensional array.  See the documentation for cudppPlan() 
+  for more details on these parameters.
+  
+  \until CUDPPResult res = cudppPlan(theCudpp, &scanplan, config, numElements, 1, 0);  
+  \until }
+  
+  We now have a handle to our plan object in \a scanplan. Next, after making 
+  sure that cudppPlan() did not return an error, we put CUDPP to work by 
+  invoking cudppScan(), to which we pass our plan handle, the output and input 
+  device arrays, and the number of elements to scan.
+  
+  \skip Run the scan
+  \until cudppScan
+  \until }
+  
+  Next, we read the results of the scan from d_odata back to the host, compute a reference
+  solution on the CPU (\c computeSumScanGold()), and compare the results for correctness.
+  
+  \until printf
+  \until }
+  
+  Finally, we tell CUDPP to clean up the memory used for our plan object, using 
+  cudppDestroyPlan().  Then we shut down the CUDPP library using cudppDestroy(),
+  passing it the handle we received from cudppCreate().  Finally we free the host and 
+  device arrays using \c free() and \c cudaFree, respectively.
+  
+  \until }
+  \until }
+  
+  Using CUDPP for parallel prefix sums is easy!
+  
+ */
+ 
+ 

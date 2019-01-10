@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,13 +17,10 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #include "gvdb_volume_gvdb.h"
 using namespace nvdb;
 
-int		Node::getMaskBits()		{ int r = gVDB->getRes(mLev); return (uint64) r*r*r; }
-int		Node::getMaskBytes()	{ int r = gVDB->getRes(mLev); return imax( ((uint64) r*r*r) >> 3, 1); }		// divide by bits per byte (2^3=8)
-uint64	Node::getMaskWords()	{ int r = gVDB->getRes(mLev); return imax( ((uint64) r*r*r) >> 6, 1); }		// divide by bits per 64-bit word (2^6=64)
-uint64*  Node::getMask()			{ return (uint64*) &mMask; }
-int		Node::getNumChild()		{ return (mLev==0) ? 0 : countOn(); }
+

@@ -24,7 +24,7 @@ inline __host__ __device__ float3 reflect3 (float3 i, float3 n)
 }
 
 // Custom raycast kernel
-extern "C" __global__ void raycast_kernel ( uchar4* outBuf )
+extern "C" __global__ void raycast_kernel ( VDBInfo* gvdb, uchar chan, uchar4* outBuf )
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -36,7 +36,7 @@ extern "C" __global__ void raycast_kernel ( uchar4* outBuf )
 	float3 rdir = normalize ( getViewRay ( (float(x)+0.5)/scn.width, (float(y)+0.5)/scn.height ) );	
 
 	// Ray march - trace a ray into GVDB and find the closest hit point
-	rayCast ( SCN_SHADE, gvdb.top_lev, 0, scn.campos, rdir, hit, norm, clr, raySurfaceTrilinearBrick );
+	rayCast ( gvdb, chan, scn.campos, rdir, hit, norm, clr, raySurfaceTrilinearBrick );
 
 	if ( hit.z != NOHIT) {		
 		float3 lightdir = normalize ( scn.light_pos - hit );

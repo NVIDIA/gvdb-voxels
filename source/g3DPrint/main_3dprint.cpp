@@ -1,3 +1,4 @@
+
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
 // Copyright 2017, NVIDIA Corporation
@@ -24,8 +25,8 @@
 // EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 2/20/2018
 //----------------------------------------------------------------------------------
-
 
 // GVDB library
 #include "gvdb.h"			
@@ -37,7 +38,10 @@ using namespace nvdb;
 #include <GL/glew.h>
 #include <algorithm>
 
-VolumeGVDB	gvdb;
+VolumeGVDB	gvdb1;
+VolumeGVDB	gvdb2;
+
+//#define USE_GVDB2
 
 class Sample : public NVPWindow {
 public:
@@ -48,7 +52,7 @@ public:
 	virtual void keyboardchar(unsigned char key, int mods, int x, int y);
 	virtual void mouse (NVPWindow::MouseButton button, NVPWindow::ButtonAction state, int mods, int x, int y);
 	
-	void		draw_topology ();	// draw gvdb topology		
+	void		draw_topology (VolumeGVDB* gvdb);	// draw gvdb topology		
 	void		render_section ();
 	void		start_guis ( int w, int h );
 
@@ -57,11 +61,13 @@ public:
 	int			mouse_down;
 	bool		m_show_topo;	
 	int			m_shade_style;
+	int			m_chan;
 };
 
 
 void Sample::start_guis (int w, int h)
 {
+	clearGuis();
 	setview2D ( w, h );
 	guiSetCallback ( 0x0 );		
 	addGui ( 10, h-30, 130, 20, "Topology", GUI_CHECK, GUI_BOOL, &m_show_topo, 0.f, 1.f );	
@@ -79,34 +85,57 @@ bool Sample::init ()
 	gl_screen_tex = -1;	
 	m_show_topo = false;
 	m_shade_style = 0;
+	m_chan = 0;
 	srand ( 6572 );
 
 	init2D ( "arial" );
 	setview2D ( w, h );
 
 	// Initialize GVDB
-	printf ( "Starting GVDB.\n" );	
-	int devid = -1;	
-	gvdb.SetVerbose ( true );		// enable/disable console output from gvdb
-	gvdb.SetCudaDevice ( devid );
-	gvdb.Initialize ();								
-	gvdb.StartRasterGL ();			// Start GVDB Rasterizer. Requires an OpenGL context.
-	gvdb.AddPath ( std::string("../source/shared_assets/") );
-	gvdb.AddPath ( std::string(ASSET_PATH) );
+	printf ( "Starting GVDB.\n" );		
+	gvdb1.SetDebug ( true );
+	gvdb1.SetVerbose ( true );		// enable/disable console output from gvdb
+	gvdb1.SetCudaDevice ( GVDB_DEV_FIRST );
+	gvdb1.Initialize ();								
+	gvdb1.StartRasterGL ();			// Start GVDB Rasterizer. Requires an OpenGL context.
+	gvdb1.AddPath ( "../source/shared_assets/" );
+	gvdb1.AddPath ( ASSET_PATH );
 
+#ifdef USE_GVDB2
+	// GVDB #2
+	gvdb2.SetVerbose(true);		// enable/disable console output from gvdb
+	gvdb2.SetCudaDevice(devid);
+	gvdb2.Initialize();
+	gvdb2.StartRasterGL();			// Start GVDB Rasterizer. Requires an OpenGL context.
+	gvdb2.AddPath("../source/shared_assets/");
+	gvdb2.AddPath(ASSET_PATH);
+#endif
+
+	
 	// Load polygons
 	// This loads an obj file into scene memory on cpu.
 	printf ( "Loading polygon model.\n" );
-	gvdb.getScene()->AddModel ( "lucy.obj", 1.0, 0, 0, 0 );
-	gvdb.CommitGeometry( 0 );					// Send the polygons to GPU as OpenGL VBO
-	
+	gvdb1.getScene()->AddModel ( "lucy.obj", 1.0, 0, 0, 0 );
+	gvdb1.CommitGeometry( 0 );					// Send the polygons to GPU as OpenGL VBO
+
+#ifdef USE_GVDB2
+	gvdb2.getScene()->AddModel("lucy.obj", 1.1, 0, 0, 0);
+	gvdb2.CommitGeometry(0);			
+#endif
+
 	// Configure the GVDB tree to the desired topology. We choose a 
 	// topology with small upper nodes (3=8^3) and large bricks (5=32^3) for performance.
 	// An apron of 1 is used for correct smoothing and trilinear surface rendering.
-	gvdb.Configure ( 3, 3, 3, 3, 5 );	
+	printf ( "Configure.\n" );
+	gvdb1.Configure ( 3, 3, 3, 3, 5 );	
+	gvdb1.SetChannelDefault ( 16, 16, 1 );
+	gvdb1.AddChannel ( 0, T_FLOAT, 1 );
 
-	gvdb.SetChannelDefault ( 8, 8, 8 );
-	gvdb.AddChannel ( 0, T_FLOAT, 1 );
+#ifdef USE_GVDB2
+	gvdb2.Configure ( 3, 3, 3, 3, 4);
+	gvdb2.SetChannelDefault( 16, 16, 1 );
+	gvdb2.AddChannel ( 0, T_FLOAT, 1 );
+#endif
 
 	// Create a transform	
 	// The input polygonal model has been normalized with 1 unit height, so we 
@@ -126,47 +155,72 @@ bool Sample::init ()
 	// We can specify the voxel size directly to GVDB. This is the size of a single voxel in world units.
 	// The voxel resolution of a rasterized part is the maximum number of voxels along each axis, 
 	// and is found by dividing the part size by the voxel size.
-	// To limit the resolution, one can invert the equation and find the voxel size for a given resolution.
-	Vector3DF voxelsize ( 0.12f, 0.12f, 0.12f );	// Voxel size (mm)
-	gvdb.SetVoxelSize ( voxelsize.x, voxelsize.y, voxelsize.z );
+	// To limit the resolution, one can invert the equation and find the voxel size for a given resolution.	
+	Vector3DF voxelsize ( 0.2f, 0.2f, 0.2f );	// Voxel size (mm)
 
 	// Poly-to-Voxels
-	// Converts polygons-to-voxels using the GPU graphics pipeline.	
-	Model* m = gvdb.getScene()->getModel(0);
-	gvdb.SurfaceVoxelizeGL ( 0, m, &xform );
+	// Converts polygons-to-voxels using the GPU graphics pipeline.		
+	Model* m = gvdb1.getScene()->getModel(0);
+	
+	gvdb1.SetVoxelSize ( voxelsize.x, voxelsize.y, voxelsize.z );	
 
-	// Write VBX file
-	gvdb.SaveVBX ( "lucy.vbx" );
+	gvdb1.SolidVoxelize ( 0, m, &xform, 1.0, 0.5 );
+
+#ifdef USE_GVDB2
+	printf ( "SurfaceVoxelizeGL 2.\n" );
+	gvdb2.SetVoxelSize(voxelsize.x, voxelsize.y, voxelsize.z);	
+	gvdb2.SurfaceVoxelizeGL ( 0, m, &xform );
+#endif
 
 	// Set volume params
-	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, 1.0f );	// Set volume value range
-	gvdb.getScene()->SetSteps ( 0.5f, 16.f, 0.f );			// Set raycasting steps
-	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.f );		// Set volume extinction	
-	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.f );
-	gvdb.getScene()->LinearTransferFunc ( 0.0f, 0.1f, Vector4DF(0,0,0,0), Vector4DF(1.f,1.f,1.f,0.5f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.1f, 1.0f, Vector4DF(1.f,1.f,1.f,0.5f), Vector4DF(1,1,1,1.f) );	
-	gvdb.CommitTransferFunc ();
-	gvdb.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0f );
+	printf ( "Volume params.\n" );
+	gvdb1.getScene()->SetSteps ( 0.25f, 16.f, 0.25f );			// Set raycasting steps
+	gvdb1.getScene()->SetVolumeRange ( 0.25f, 0.0f, 1.0f );		// Set volume value range
+	gvdb1.getScene()->SetExtinct ( -1.0f, 1.1f, 0.f );			// Set volume extinction	
+	gvdb1.getScene()->SetCutoff ( 0.005f, 0.005f, 0.f );
+	gvdb1.getScene()->SetShadowParams ( 0, 0, 0 );
+	gvdb1.getScene()->LinearTransferFunc ( 0.0f, 0.5f, Vector4DF(0,0,0,0), Vector4DF(1.f,1.f,1.f,0.5f) );
+	gvdb1.getScene()->LinearTransferFunc ( 0.5f, 1.0f, Vector4DF(1.f,1.f,1.f,0.5f), Vector4DF(1,1,1,0.8f) );	
+	gvdb1.CommitTransferFunc ();
+	gvdb1.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0f );	
 
+#ifdef USE_GVDB2
+	gvdb2.getScene()->SetSteps(0.25f, 16.f, 0.25f);			// Set raycasting steps
+	gvdb2.getScene()->SetVolumeRange(0.5f, 0.0f, 1.0f);	// Set volume value range	
+	gvdb2.getScene()->SetExtinct(-1.0f, 1.5f, 0.f);		// Set volume extinction	
+	gvdb2.getScene()->SetCutoff(0.005f, 0.01f, 0.f);
+	gvdb2.getScene()->LinearTransferFunc(0.0f, 0.1f, Vector4DF(0, 0, 0, 0), Vector4DF(1.f, 1.f, 1.f, 0.5f));
+	gvdb2.getScene()->LinearTransferFunc(0.1f, 1.0f, Vector4DF(1.f, 1.f, 1.f, 0.5f), Vector4DF(1, 1, 1, 1.f));
+	gvdb2.CommitTransferFunc();
+	gvdb2.getScene()->SetBackgroundClr(0.1f, 0.2f, 0.4f, 1.0f);
+#endif
+	
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
 	cam->setOrbit ( Vector3DF(-45.f, 30.f, 0.f ), Vector3DF(50,55,50), 300.f, 1.0f );	
-	gvdb.getScene()->SetCamera( cam );		
-	
+	gvdb1.getScene()->SetCamera( cam );		
+
 	// Create Light
 	Light* lgt = new Light;								
 	lgt->setOrbit ( Vector3DF(299.0f, 57.3f, 0.f), Vector3DF(132.0f, -20.0f, 50.f), 200.f, 1.0f );
-	gvdb.getScene()->SetLight ( 0, lgt );	
+	gvdb1.getScene()->SetLight ( 0, lgt );	
 
 	// Add render buffer 
-	printf ( "Creating screen buffer. %d x %d\n", w, h );
+	printf ( "Creating screen buffer. %d x %d\n", w, h );	
+	gvdb1.AddRenderBuf ( 0, w, h, 4 );	
+	gvdb1.AddRenderBuf ( 1, 256, 256, 4 );
+
+#ifdef USE_GVDB2
+	gvdb2.getScene()->SetCamera(cam);
+	gvdb2.getScene()->SetLight(0, lgt);
+	gvdb2.AddRenderBuf ( 0, w, h, 4);
+	gvdb2.AddRenderBuf ( 1, 256, 256, 4);
+#endif
+	
+	// Screen textures
 	glViewport ( 0, 0, w, h );
-	gvdb.AddRenderBuf ( 0, w, h, 4 );	
-	gvdb.AddRenderBuf ( 1, 256, 256, 4 );
-
 	createScreenQuadGL ( &gl_screen_tex, w, h );			// screen render
-
 	createScreenQuadGL ( &gl_section_tex, 256, 256 );		// cross section inset
 
 	start_guis ( w, h );
@@ -179,38 +233,46 @@ void Sample::render_section ()
 {
 	// Render cross-section
 	float h = (float) getHeight();
-	gvdb.getScene()->SetCrossSection ( Vector3DF(50.0f, 100.0f-(getCurY()*100.0f/h), 50.0f), Vector3DF(30.0f, 1.f, 30.0f) );
+	gvdb1.getScene()->SetCrossSection ( Vector3DF(50.0f, 100.0f-(getCurY()*100.0f/h), 50.0f), Vector3DF(30.0f, 1.f, 30.0f) );
 
-	gvdb.Render ( 1, SHADE_SECTION2D, 0, 0, 1, 1, 1.0 );
+	gvdb1.Render ( SHADE_SECTION2D, 0, 1 );		
 
-	gvdb.ReadRenderTexGL ( 1, gl_section_tex );
+	gvdb1.ReadRenderTexGL ( 1, gl_section_tex );
 	
-	renderScreenQuadGL ( gl_section_tex, 0, 0, 256, 256 );
+	renderScreenQuadGL ( gl_section_tex, -1, 0, 0, getWidth()/4, getHeight()/4, 0  );
 }
 
-void Sample::display ()
-{	
-	clearScreenGL ();
-			
-	float h = (float) getHeight();
-	gvdb.getScene()->SetCrossSection ( Vector3DF(0.0f, 100.0f-(getCurY()*100.0f/h), 0.0f), Vector3DF(0.f, 1.f, 0.f) );
+void Sample::display()
+{
+	VolumeGVDB* gvdb;
 
+	clearScreenGL();
+
+	float h = (float)getHeight();
+	float yslice = 100.0f - (getCurY()*100.0f / h);		// mouse to select section 
+	if ( isFirstFrame() ) yslice = 50.0;				// first frame
+
+	gvdb1.getScene()->SetCrossSection(Vector3DF(0.0f, yslice, 0.0f), Vector3DF(0.f, 1.f, 0.f));
+	
 	int sh;
-	switch ( m_shade_style ) {	
+	switch (m_shade_style) {
 	case 0: sh = SHADE_VOXEL;		break;
 	case 1: sh = SHADE_TRILINEAR;	break;
 	case 2: sh = SHADE_SECTION3D;	break;
 	case 3: sh = SHADE_VOLUME;		break;
 	};
-	gvdb.Render ( 0, sh, 0, 0, 1, 1, 1.0 );	// Render voxels
-
-	gvdb.ReadRenderTexGL ( 0, gl_screen_tex );		// Copy internal buffer into opengl texture
-
+	if (m_chan == 0) gvdb = &gvdb1;
+	if (m_chan == 1) gvdb = &gvdb2;
+	
+	gvdb->Render( sh, m_chan, 0 );	// Render voxels
+	
+	gvdb->ReadRenderTexGL(0, gl_screen_tex);		// Copy internal buffer into opengl texture
+	
 	renderScreenQuadGL ( gl_screen_tex );			// Render screen-space quad with texture 
 
 	render_section ();	
 
-	if ( m_show_topo ) draw_topology ();			// Draw GVDB topology
+	if ( m_show_topo ) draw_topology ( gvdb );			// Draw GVDB topology
 
 	draw3D ();										// Render the 3D drawing groups
 
@@ -223,7 +285,7 @@ void Sample::display ()
 }
 
 
-void Sample::draw_topology ()
+void Sample::draw_topology ( VolumeGVDB* gvdb )
 {
 	Vector3DF clrs[10];
 	clrs[0] = Vector3DF(0,0,1);			// blue
@@ -236,18 +298,18 @@ void Sample::draw_topology ()
 	clrs[7] = Vector3DF(0,0.5,1);		// green-blue
 	clrs[8] = Vector3DF(0.7f,0.7f,0.7f);	// grey
 
-	Camera3D* cam = gvdb.getScene()->getCamera();		
+	Camera3D* cam = gvdb->getScene()->getCamera();
 	
-	start3D ( gvdb.getScene()->getCamera() );		// start 3D drawing
+	start3D ( gvdb->getScene()->getCamera() );		// start 3D drawing
 	
 	Vector3DF bmin, bmax;
 	Node* node;
 	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = gvdb.getNumNodes(lev);				
+		int node_cnt = gvdb->getNumNodes(lev);
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
-			node = gvdb.getNodeAtLevel ( n, lev );
-			bmin = gvdb.getWorldMin ( node );		// get node bounding box
-			bmax = gvdb.getWorldMax ( node );		// draw node as a box
+			node = gvdb->getNodeAtLevel ( n, lev );
+			bmin = gvdb->getWorldMin ( node );		// get node bounding box
+			bmax = gvdb->getWorldMax ( node );		// draw node as a box
 			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, clrs[lev].x, clrs[lev].y, clrs[lev].z, 1 );			
 		}		
 	}
@@ -257,8 +319,8 @@ void Sample::draw_topology ()
 void Sample::motion(int x, int y, int dx, int dy) 
 {
 	// Get camera for GVDB Scene
-	Camera3D* cam = gvdb.getScene()->getCamera();	
-	Light* lgt = gvdb.getScene()->getLight();
+	Camera3D* cam = gvdb1.getScene()->getCamera();	
+	Light* lgt = gvdb1.getScene()->getLight();
 	bool shift = (getMods() & NVPWindow::KMOD_SHIFT);		// Shift-key to modify light
 
 	switch ( mouse_down ) {	
@@ -302,17 +364,22 @@ void Sample::keyboardchar(unsigned char key, int mods, int x, int y)
 	switch ( key ) {
 	case '1':  m_show_topo = !m_show_topo; break;	
 	case '2':  m_shade_style = ( m_shade_style==3 ) ? 0 : m_shade_style+1; break;
+	case ' ':  m_chan = 1 - m_chan; break;
 	};
 }
 
 
 void Sample::reshape (int w, int h)
-{
+{	
 	// Resize the opengl screen texture
+	glViewport(0, 0, w, h);
 	createScreenQuadGL ( &gl_screen_tex, w, h );
 
 	// Resize the GVDB render buffers
-	gvdb.ResizeRenderBuf ( 0, w, h, 4 );
+	gvdb1.ResizeRenderBuf ( 0, w, h, 4 );
+
+	// Resize 2D UI
+	start_guis(w, h);
 
 	postRedisplay();
 }
@@ -320,7 +387,7 @@ void Sample::reshape (int w, int h)
 int sample_main ( int argc, const char** argv ) 
 {
 	Sample sample_obj;
-	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - g3DPrint", argc, argv, 1024, 768, 4, 4 );
+	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - g3DPrint", "3dprint", argc, argv, 1024, 768, 4, 4 );
 }
 
 void sample_print( int argc, char const *argv)

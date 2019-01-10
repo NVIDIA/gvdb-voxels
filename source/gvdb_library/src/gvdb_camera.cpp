@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 
@@ -56,7 +57,7 @@ Camera3D::Camera3D ()
 	mDolly = 5.0;
 	mFov = 40.0;	
 	mNear = (float) 0.1;
-	mFar = (float) 6000.0;
+	mFar = (float) 5000.0;
 	mTile.Set ( 0, 0, 1, 1 );
 
 	for (int n=0; n < 8; n++ ) mOps[n] = false;	
@@ -400,9 +401,9 @@ void Camera3D::Copy ( Camera3D& op )
 void Camera3D::setAngles ( float ax, float ay, float az )
 {
 	ang_euler = Vector3DF(ax,ay,az);
-	to_pos.x = from_pos.x - (float) (cos ( ang_euler.y * DEGtoRAD ) * sin ( ang_euler.x * DEGtoRAD ) * mDolly);
-	to_pos.y = from_pos.y - (float) (sin ( ang_euler.y * DEGtoRAD ) * mDolly);
-	to_pos.z = from_pos.z - (float) (cos ( ang_euler.y * DEGtoRAD ) * cos ( ang_euler.x * DEGtoRAD ) * mDolly);
+	to_pos.x = from_pos.x - (float) (cos ( ang_euler.y * DEGtoRAD ) * sin ( ang_euler.x * DEGtoRAD ) * mOrbitDist);
+	to_pos.y = from_pos.y - (float) (sin ( ang_euler.y * DEGtoRAD ) * mOrbitDist);
+	to_pos.z = from_pos.z - (float) (cos ( ang_euler.y * DEGtoRAD ) * cos ( ang_euler.x * DEGtoRAD ) * mOrbitDist);
 	updateMatricies ();
 }
 
@@ -454,7 +455,7 @@ void Camera3D::updateMatricies ()
 	proj_matrix(3,2) = -1.0f;
 
 	// construct tile projection matrix --- MATCHES OpenGL's glFrustum function (DO NOT MODIFY) 
-	float l, r, t, b;
+	/*float l, r, t, b;
 	l = -sx + 2.0f*sx*mTile.x;						// Tile is in range 0 <= x,y <= 1
 	r = -sx + 2.0f*sx*mTile.z;
 	t =  sy - 2.0f*sy*mTile.y;
@@ -466,12 +467,12 @@ void Camera3D::updateMatricies ()
 	tileproj_matrix(1,2) = (t + b) / (t - b);		// B
 	tileproj_matrix(2,2) = proj_matrix(2,2);		// C
 	tileproj_matrix(2,3) = proj_matrix(2,3);		// D
-	tileproj_matrix(3,2) = -1.0f; 
+	tileproj_matrix(3,2) = -1.0f; */
 	tileproj_matrix = proj_matrix;
 
 	// construct inverse rotate and inverse projection matrix
 	Vector3DF tvz(0, 0, 0);
-	invrot_matrix.InverseView ( view_matrix.GetDataF(), tvz );		// Computed using rule: "Inverse of a basis rotation matrix is its transpose." (So long as translation is taken out)
+	invrot_matrix.InverseView ( rotate_matrix.GetDataF(), tvz );		// Computed using rule: "Inverse of a basis rotation matrix is its transpose." (So long as translation is taken out)
 	invproj_matrix.InverseProj ( tileproj_matrix.GetDataF() );		
 
 	Matrix4F view_matrix_notranslation = view_matrix;
@@ -482,6 +483,8 @@ void Camera3D::updateMatricies ()
 	invviewproj_matrix = tileproj_matrix;
 	invviewproj_matrix *= view_matrix_notranslation;
 	invviewproj_matrix.InvertTRS();
+
+	origRayWorld = from_pos;
 	updateFrustum();
 }
 
@@ -490,45 +493,43 @@ void Camera3D::setModelMatrix ( float* mtx )
 	memcpy ( model_matrix.GetDataF(), mtx, sizeof(float)*16 );
 }
 
-void Camera3D::setMatrices(const float* view_mtx, const float* proj_mtx)
+void Camera3D::setMatrices(const float* view_mtx, const float* proj_mtx, Vector3DF model_pos )
 {
 	// Assign the matrices we have
+	//  p = Tc V P M p		
 	view_matrix = Matrix4F(view_mtx);
 	proj_matrix = Matrix4F(proj_mtx);
-
-	// Assign model matrix
-	Matrix4F mdl_matrix(view_mtx);
-	mdl_matrix.InvertTRS();
-
-	// Extract position
-	from_pos = Vector3DF(mdl_matrix(0, 3), mdl_matrix(1, 3), mdl_matrix(2, 3));
-
-	// construct tile projection matrix --- MATCHES OpenGL's glFrustum function (DO NOT MODIFY) 
 	tileproj_matrix = proj_matrix;
-  
-	// construct inverse rotate and inverse projection matrix
-	Vector3DF tvz(0, 0, 0);
-	invrot_matrix.InverseView(view_matrix.GetDataF(), tvz);
-	invproj_matrix.InverseProj(tileproj_matrix.GetDataF());
+
+	// From position
+	Matrix4F tmp( view_mtx );
+	tmp.InvertTRS ();
+	Vector3DF from ( tmp(0,3), tmp(1,3), tmp(2,3) );
+
+	// Construct inverse matrices
+    Vector3DF zero(0, 0, 0);
+	invrot_matrix.InverseView ( view_matrix.GetDataF(), zero );		// Computed using rule: "Inverse of a basis rotation matrix is its transpose." (So long as translation is taken out)
+	invproj_matrix.InverseProj ( tileproj_matrix.GetDataF() );		
 
 	Matrix4F view_matrix_notranslation = view_matrix;
 	view_matrix_notranslation(12) = 0.0f;
 	view_matrix_notranslation(13) = 0.0f;
 	view_matrix_notranslation(14) = 0.0f;
 
-	invviewproj_matrix = tileproj_matrix;
-	invviewproj_matrix *= view_matrix_notranslation;
-	invviewproj_matrix.InvertTRS();
+	invviewproj_matrix = tileproj_matrix;					// Used for GVDB raytracing
+	invviewproj_matrix *= view_matrix_notranslation;			
+	invviewproj_matrix.InvertTRS();			
 
-	// mFov, mAspect, mNear, mFar
-	mNear = (2.0f * proj_matrix(2, 3)) / (2.0f * proj_matrix(2, 2) - 2.0f);
-	mFar = ((proj_matrix(2, 2) - 1.0f) * mNear) / (proj_matrix(2, 2) + 1.0);
-	float sx = 2.0f * mNear / proj_matrix(0, 0);
-	float sy = 2.0f * mFar / proj_matrix(1, 1);
+	// Compute mFov, mAspect, mNear, mFar
+	mNear = double(proj_matrix(2, 3)) / double(proj_matrix(2, 2) - 1.0f );
+	mFar  = double(proj_matrix(2, 3)) / double(proj_matrix(2, 2) + 1.0f );
+	double sx = 2.0f * mNear / proj_matrix(0, 0);
+	double sy = 2.0f * mNear / proj_matrix(1, 1);
 	mAspect = sx / sy;
-	mFov = atan(sx / mNear) * 2.0f / DEGtoRAD;
+	mFov = 2.0f * atan(sx / mNear) / DEGtoRAD;
 
-	updateFrustum();
+	origRayWorld = from - model_pos;
+	updateFrustum();								// DO NOT call updateMatrices here. We have just set them.
 }
 
 void Camera3D::setViewMatrix ( float* mtx, float* invmtx )
@@ -594,10 +595,10 @@ void Camera3D::updateFrustum ()
    t = sqrt( frustum[5][0] * frustum[5][0] + frustum[5][1] * frustum[5][1] + frustum[5][2]    * frustum[5][2] );
    frustum[5][0] /= t; frustum[5][1] /= t; frustum[5][2] /= t; frustum[5][3] /= t;
 
-   tlRayWorld = inverseRayProj(-1.0f,  1.0f, 1.0f);
-   trRayWorld = inverseRayProj(1.0f, 1.0f, 1.0f);
-   blRayWorld = inverseRayProj(-1.0f, -1.0f, 1.0f);
-   brRayWorld = inverseRayProj(1.0f, -1.0f, 1.0f);
+   tlRayWorld = inverseRayProj(-1.0f,  1.0f, mNear );
+   trRayWorld = inverseRayProj(1.0f, 1.0f, mNear );
+   blRayWorld = inverseRayProj(-1.0f, -1.0f, mNear );
+   brRayWorld = inverseRayProj(1.0f, -1.0f, mNear );
 }
 
 float Camera3D::calculateLOD ( Vector3DF pnt, float minlod, float maxlod, float maxdist )

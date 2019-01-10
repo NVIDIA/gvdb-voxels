@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 // Chris Wyman (9/2/2014)                                    
 //
@@ -72,11 +73,9 @@ bool OBJReader::isMyFile( const char* filename )
 	return getExtension( filename ) == "obj";
 }
 
-bool OBJReader::LoadFile ( Model* model, char *filename, char** searchPaths, int numPaths )
+bool OBJReader::LoadFile ( Model* model, char *filename, std::vector<std::string>& paths )
 {
-	gprintf ("Loading and parsing model '%s'...\n", filename);
-
-	ParseFile ( filename, searchPaths, numPaths );
+	ParseFile ( filename, paths );
 
 	// For clarity (later), we have a pointer to the Read_???_Token() method we will
 	//    use when reading a facet.  This will be set when we first see a 'f' line.
@@ -185,7 +184,7 @@ bool OBJReader::LoadFile ( Model* model, char *filename, char** searchPaths, int
 	//	m_vertArr->EnableAttribute( IGLU_ATTRIB_NORMAL, 3, GL_FLOAT, m_vertStride, BUFFER_OFFSET(m_normOff));
 	//}
 
-	gprintf ( " Model reading completed successfully! (%d verts, %d tris)\n", m_numVertices, m_numTris );
+	// gprintf( " Model reading completed successfully! (%d verts, %d tris)\n", m_numVertices, m_numTris );
 
 	return true;
 }
@@ -437,7 +436,7 @@ void OBJReader::GetCompactArrayBuffer( Model* model )
 	m_vertStride = numComponents * sizeof( float );
 	m_vertOff    = 0 * sizeof( float );
 	m_normOff    = (m_hasNormals||m_guessNorms? 3 : 0) * sizeof( float );
-	gprintf ("    (*) Stride: %d, Offsets: v %d, m %d, o %d, n %d t %d\n", m_vertStride, m_vertOff, 0, 0, m_normOff, 0);
+	// gprintf ("    (*) Stride: %d, Offsets: v %d, m %d, o %d, n %d t %d\n", m_vertStride, m_vertOff, 0, 0, m_normOff, 0);
 
 	// Add a vertex buffer to the model
 	if ( model->vertBuffer != 0x0 )		free ( model->vertBuffer );

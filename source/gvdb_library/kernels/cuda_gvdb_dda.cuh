@@ -26,21 +26,21 @@
 //-----------------------------------------------
 
 // Tranfser function
-inline __device__ float4 transfer ( float v )
+inline __device__ float4 transfer ( VDBInfo* gvdb, float v )
 {
-	return TRANSFER_FUNC [ int(min( 1.0, max( 0.0,  (v - gvdb.thresh.y) / (gvdb.thresh.z - gvdb.thresh.y) ) ) * 16300.0f) ];
+	return TRANSFER_FUNC [ int(min( 1.0, max( 0.0,  (v - SCN_THRESH) / (SCN_VMAX - SCN_VMIN) ) ) * 16300.0f) ];
 }
 
 // Prepare DDA - This macro sets up DDA variables to start stepping sequence
 #define PREPARE_DDA {											\
-	p = ( pos + t.x*dir - vmin) / gvdb.vdel[lev];				\
-	tDel = fabs3 ( gvdb.vdel[lev] / dir );						\
+	p = ( pos + t.x*dir - vmin) / gvdb->vdel[lev];				\
+	tDel = fabs3 ( gvdb->vdel[lev] / dir );						\
 	tSide	= (( floor3(p) - p + 0.5)*pStep+0.5) * tDel + t.x;	\
 	p = floor3(p);												\
 }
 #define PREPARE_DDA_LEAF {										\
-	p = ( pos + t.x*dir - vmin) / gvdb.vdel[0];					\
-	tDel = fabs3 ( gvdb.vdel[0] / dir );						\
+	p = ( pos + t.x*dir - vmin) / gvdb->vdel[0];				\
+	tDel = fabs3 ( gvdb->vdel[0] / dir );						\
 	tSide	= (( floor3(p) - p + 0.5)*pStep+0.5) * tDel;		\
 	p = floor3(p);												\
 }
@@ -52,9 +52,15 @@ inline __device__ float4 transfer ( float v )
 	mask.z = float ( (tSide.z < tSide.x) & (tSide.z <= tSide.y) );		\
 	t.y = mask.x ? tSide.x : (mask.y ? tSide.y : tSide.z);				\
 }					
-// Step DDA - This macro advances the DDA to next point
+// Step DDA - This macro steps the DDA to next point, updating t
 #define STEP_DDA {						\
 	t.x = t.y;							\
+	tSide	+= mask * tDel;				\
+	p		+= mask * pStep;			\
+}
+
+// Advance DDA - This macro advances the DDA, *without* updating t
+#define ADVANCE_DDA {					\
 	tSide	+= mask * tDel;				\
 	p		+= mask * pStep;			\
 }

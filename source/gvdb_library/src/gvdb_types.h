@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #ifndef GVDB_TYPES
@@ -64,12 +65,13 @@
 	#define	ID_UNDEFB		0xFF			// 1 byte
 	#define	ID_UNDEFS		0xFFFF			// 2 byte
 	#define	ID_UNDEFL		0xFFFFFFFF		// 4 byte
+	#define	ID_UNDEF64		0xFFFFFFFFFFFFFFFF		// 8 byte
 	#define CHAN_UNDEF		255
 
 	#define DEGtoRAD		(3.141592f/180.0f)
 
 	#define CLRVAL			uint
-	#define COLOR(r,g,b)	( (uint((r)*255.0f)<<24) | (uint((g)*255.0f)<<16) | (uint((b)*255.0f)<<8) )
+	#define COLOR(r,g,b)	(						   (uint((b)*255.0f)<<16) | (uint((g)*255.0f)<<8) | uint((r)*255.0f) ) 
 	#define COLORA(r,g,b,a)	( (uint((a)*255.0f)<<24) | (uint((b)*255.0f)<<16) | (uint((g)*255.0f)<<8) | uint((r)*255.0f) )
 	#define ALPH(c)			(float((c>>24) & 0xFF)/255.0f)
 	#define BLUE(c)			(float((c>>16) & 0xFF)/255.0f)
@@ -80,7 +82,7 @@
 		#define UINT64_C(c) (c ## ULL)
 	#endif
 
-	#define T_UCHAR			0
+	#define T_UCHAR			0		// channel types
 	#define T_UCHAR3		1
 	#define T_UCHAR4		2
 	#define	T_FLOAT			3
@@ -90,12 +92,22 @@
 	#define T_INT3			7
 	#define T_INT4			8
 
+	#define F_LINEAR		0		// filter modes	
+	#define F_POINT			1		
+
+	#define F_BORDER		0		// border modes
+	#define F_CLAMP			1
+	#define F_WRAP			2
+	
+
+	#define MAX_CHANNEL		32
+
 	#undef min
 	#undef max
 
 	// forward references
-	struct cudaGraphicsResource;
-	struct cudaArray;
+	// struct cudaGraphicsResource;
+	// struct cudaArray;
 
 	// these will be eliminated in the final API
 	#define ENGINE_GLPREVIEW	0	// Engine
@@ -110,7 +122,13 @@
 	#define SHADE_TRICUBIC	5
 	#define SHADE_LEVELSET	6
 	#define SHADE_VOLUME	7
+
+	#define SHADE_MAX		10
 	#define SHADE_OFF		100
+
+	#define GVDB_DEV_FIRST		-1
+	#define GVDB_DEV_CURRENT	-2
+	#define GVDB_DEV_EXISTING	-3
 
 	// gprintf
 	extern void GVDB_API gprintf(const char * fmt, ...);

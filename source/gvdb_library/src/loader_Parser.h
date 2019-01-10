@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 // A class that opens a file and does some parsing				  
 // Chris Wyman (06/09/2010)                                       
@@ -31,6 +32,7 @@
 	#include <cstdio>
 	#include <cstdlib>
 	#include <string>
+	#include <vector>
 
 	// Utility function to get the file extension
 	extern std::string getExtension( const std::string& filename );
@@ -40,7 +42,7 @@
 		Parser();
 		virtual ~Parser();
 
-		void ParseFile ( char *filename, char **searchPaths = 0, int numPaths = 0 );	
+		void ParseFile ( char *filename, std::vector<std::string>& paths );	
 
 		// Read the next line into an internal buffer
 		char *ReadNextLine( bool discardBlanks=true );  
@@ -135,7 +137,7 @@
 		CallbackParser ();
 		virtual ~CallbackParser();
 
-		void ParseFile ( char *filename, char **searchPaths = 0, int numPaths = 0 );
+		void ParseFile ( char *filename, std::vector<std::string>& paths );
 
 		// Add a callback to the list of token / function pairs
 		//   -> Matching with 'token' is not case sensitive.

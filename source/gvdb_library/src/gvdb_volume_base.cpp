@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #include "gvdb_volume_base.h"
@@ -41,12 +42,22 @@ void VolumeBase::getTiming ( float& render_time )
 	render_time = mRenderTime.x;
 }
 
+void VolumeBase::ClearGeometry ( Model* m )
+{
+	if ( m->vertArrayID != -1 ) glDeleteVertexArrays ( 1,  (GLuint*) &m->vertArrayID );
+	if ( m->vertBufferID != -1 ) glDeleteBuffers ( 1,  (GLuint*) &m->vertBufferID );
+	if ( m->elemBufferID != -1 ) glDeleteBuffers ( 1,  (GLuint*) &m->elemBufferID );
+}
+
 void VolumeBase::CommitGeometry ( int model_id )
 {
+	Model* m = mScene->getModel( model_id );
+	CommitGeometry ( m );
+}
+
+void VolumeBase::CommitGeometry ( Model* m )
+{
 	#ifdef BUILD_OPENGL
-
-		Model* m = mScene->getModel( model_id );
-
 		// Create VAO
 		if ( m->vertArrayID == -1 )  glGenVertexArrays ( 1, (GLuint*) &m->vertArrayID );
 		glBindVertexArray ( m->vertArrayID );
@@ -78,3 +89,5 @@ void VolumeBase::CommitGeometry ( int model_id )
 
 	#endif
 }
+	
+	

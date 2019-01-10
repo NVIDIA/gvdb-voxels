@@ -330,6 +330,8 @@
 		std::string getResolvedName ( bool bIn, int frame );
 
 		CUdeviceptr getBufferGPU ( int id )	{ return m_Fluid.gpu(id); }
+
+		void SetDebug(bool b) { mbDebug = b; }
 	
 	private:
 		bool						m_Cmds[10];
@@ -340,6 +342,7 @@
 		std::string					m_OutFile;
 		std::string					m_WorkPath;
 		float						m_Thresh;
+		bool						mbDebug;
 
 		std::string					mSceneName;
 

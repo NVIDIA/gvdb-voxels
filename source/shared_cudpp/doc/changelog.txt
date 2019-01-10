@@ -1,0 +1,129 @@
+CUDPP Change Log
+
+Release 2.3
+31 Aug 2016
+- Release czar: Jason Mak. Thanks!
+- Added cudppMultiSplit to split an array of elements into buckets
+- The CMake option CUDA_SEPARABLE_COMPILATION generates device-relocatable code 
+  and must be turned on to use the function cudppMultiSplitCustomBucketMapper.
+  In addition, the user's code must be compiled with separable compilation to use that function.
+- Due to certain intrinsic functions used in MultiSplit, SM architectures below 3.0 are no longer supported
+
+Release 2.2
+31 Aug 2014
+- Release czar: Leyuan Wang. Thanks!
+- Added cudppSuffixArray parallel skew algorithm for computing suffix array
+- Replaced the cudppStringSort in burrowsWheelerTransform in cudppCompress
+  with cudppSuffixArray to achieve better performance
+- Fixed bugs in cudppMoveToFrontTransform where originally only inputs with
+  value smaller than 15 work
+- Fixed bugs to support cudppCompress to compress text containing all possible unsigned char values with the range of [1...255]
+- Changed test files for cudppCompress and cudppMoveToFrontTransform to
+  target the new BWT method
+- Added -skiplargetests for MTF tests in order to avoid launch-timed-out errors
+- Fixed bugs to make cudppStringSort compatible for compute capability less than 2.0
+- Makefile fixes for OS X with clang compilation
+
+Release 2.1
+9 October 2013
+- Release czar: Edmund Yan. Thanks!
+- Added cudppCompress lossless data compression algorithms which implement
+  the Move-to-Front transform, Burrows-Wheeler Transform, and
+  Huffman encoding
+- Added cudppMoveToFrontTransform and cudppBurrowsWheelerTransform
+- Added cudppListRank parallel list ranking
+- Renamed cudppSort to cudppRadixSort
+- Added cudppMergeSort parallel merge sort
+- Added cudppStringSort parallel string sort
+- Moved source code to Github: http://cudpp.github.io
+- Moved documentation pages from cudpp.h to README.md
+- Added CUDPP_GENCODE_* CMake options to make CUDA target architecture compilation more flexible
+
+Release 2.0
+9 August 2011
+- New thread-safe public interface -- requires creating a CUDPP instance
+  with cudppCreate, and passing it to all functions
+- Added cudppReduce parallel reductions
+- Added cudppTridiagonal parallel tridiagonal linear system solver
+- Added cudppHashTable parallel hash table data structure
+- Added 64-bit type support (double, long long, and unsigned long long),
+  implemented in cudppReduce, cudppScan, cudppMultiscan, cudppSegmentedScan,
+  cudppCompact, cudppRadixSort, cudppTridiagonal
+- Fixed various bugs in cudppSegmentedScan
+- Replaced radix sort implementation with thrust::sort() due to performance
+  advantages and simplicity. There are regressions in sort performance for
+  smaller-sized arrays, which will be addressed in the next release.
+- Reverse sorting now supported (use CUDPP_OPTION_BACKWARD option when
+  creating the sort plan)
+- cudppRadixSort now supports char, uchar, int, uint, float, double, longlong,
+  and ulonglong keys.
+- Removed all support for device emulation
+- Removed all dependencies on CUTIL; removed common/ subdirectory, added
+  minimal set of app utilities in apps/common/ subdirectory
+- Improved coverage of cudpp_testrig
+
+Release: 1.1.1 (Bugfix release)
+29 April 2010
+- Fix scan, segmented scan, and radix sort correctness on Fermi (sm_20)
+  architecture GPUs(proper use of "volatile" keyword)
+- Some initial small optimizations for radix sort and scan on Fermi
+  (sm_20) architecture
+- Fix emulation mode radix sort of very small arrays
+- Fix radix sort on 64-bit OSes by using __launch_bounds__ in CUDA 3.0
+- Minor efficiency improvement to radix sort test in cudpp_testrig
+- Fixed incorrect identity for min operator
+- Fixes for unix and Mac OS X Snow Leopard builds
+- Fixes for 64-bit windows builds
+- Bibliography updates
+- Minor documentation fixes
+
+Release: 1.1
+1 July 2009
+- Switched to pure BSD license.
+- Added new radix sort implementation under cudppSort() (based on Satish et al.
+  IPDPS '09 paper).  All previous sorts have been removed.
+- Added cudppRand() pseudorandom number generation (based on Tzeng and Wei I3D 08
+  paper).
+- Added support for backward segmented scan.
+- Fixed satGL example to run in a native window on OS X, rather than an X11 window.
+- Removed Visual Studio 7.1 (2003) project files.  CUDA 2.1 and later dropped
+  support for VS7.1.
+- Miscellaneous bug fixes.
+- In docs, Added list of publications that use CUDPP, including both text and
+  bibtex citation format.
+- In docs, Updated list of publications of algorithms includedin CUDPP.
+- Miscellaneous Documentation improvements.
+
+Release: 1.0 alpha
+20 April 2008
+- Implemented new public interface based on plan objects
+- Changed the interface for cudppCompact so that it takes a user-defined isValid
+  flags array rather than
+  computing it based on the values in the input array.
+- Fixed various bugs in cudppCompact, and made backwards compact (aka reverse-and-
+  compact) work correctly.
+- Fixed emudebug memory fault with global radix sorts of non-block-aligned sizes
+  (change was in setFlagBit)
+- Added segmented scan - works with add, multiply, min, max operators
+- Added support for inclusive scans and segmented scans
+- Scan now supports operators add, multiply, min, and max
+- Replaced tree-based "Blelloch" scan algorithm with new "warp scan" algorithm.
+  About 10% faster on current GPUs and far simpler code (no need for bank conflict
+  avoidance code, hacky #defines in inner loop, etc.).
+- Added typename keyword in front of "TypeToVector::Result" so that CUDPP compiles
+  with CUDA 2.0.
+
+Release: cudpp_gems3-2
+19 November 2007
+- Fixed performance regression in cudppScan introduced by CUDA 1.1.  Improves
+  performance of scan in CUDA 1.1 by up to 16%.
+- Scans with MAX operator now function correctly for signed floats (float MAX
+  identity is now -FLT_MAX, was FLT_MIN)
+- Added a 64-bit (windows XP) configuration to cudpp.vcproj (64-bit windows
+  currently only minimally tested)
+- Changed Makefile to add "64" to the libcudpp names in 64-bit linux.
+- Added changelog
+
+Release: cudpp_gems3-1
+5 November 2007
+- Initial CUDPP public beta release

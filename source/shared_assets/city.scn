@@ -1,0 +1,96 @@
+
+
+points
+  path: d:/codes/gvdb_kui2/
+  file: pnt%04d.dat
+  fstep: 0
+  mat: 0
+
+model
+  file: city.obj
+  scale: 6.0
+  offset: <256, 0, 132>
+  mat: 1
+
+model
+  file: ground.obj
+  scale: 1.0
+  offset: <0,2,0>
+  mat: 2
+
+render
+  width: 1920
+  height: 1080
+  samples: 128
+  backclr: <.1, .2, .4>
+  envmap: sky.png
+  outpath: c:/videos/city2/
+  outfile: img%04d.png
+
+volume
+  scale: 2.0
+  steps: <.5, 16, .5>
+  extinct: <-1, 1.1, 0.0>
+  range: <0, -1, 3>
+  cutoff: <0.005, 0.001, 0.0>
+  smooth: 1
+  smoothp: <1.0, +0.0, 0.0>
+
+camera
+  angs: <49, 31, 0>
+  target: <163, -74, 161>
+  dist: 898
+  fov: 50
+
+light
+  angs: <141, 63, 0>
+  target: <256, 0, 256>
+  dist: 2000
+
+material
+  lightwid: 0.9
+  shwid: 0.1
+  shbias: 0.5
+  ambient: <0.1, 0.15, 0.15>
+  diffuse: <0.1, 0.12, 0.18>
+  spec: <1.2, 1.2, 1.2>
+  spow: 200
+  env: <0,0,0>
+  reflwid: 0.2
+  reflbias: 0.5
+  reflcolor: <0.3, 0.3, 0.3>
+  refrwid: 0.05
+  refrcolor: <0.1, 0.1, 0.2>
+  refrior: 1.2
+  reframt: 0.8
+  refroffs: 50
+  refrbias: 0.5
+
+material
+  lightwid: 0.9
+  shwid: 0.1
+  shbias: 0.5
+  ambient: <0.1, 0.1, 0.1>
+  diffuse: <1.0, 1.0, 1.0>
+  spec: <0.1, 0.1, 0.1>
+  spow: 20
+  env: <0,0,0>
+  reflwid: 0.8
+  reflbias: 0.5
+  reflcolor: <0.5, 0.5, 0.5>
+  refrwid: 0.0 
+
+material
+  lightwid: 0.9
+  shwid: 0.1
+  shbias: 0.5
+  ambient: <0.1, 0.1, 0.1>
+  diffuse: <1.0, 1.0, 1.0>
+  spec: <0.0, 0.0, 0.0>
+  spow: 20
+  env: <0,0,0>
+  reflwid: 0.0
+  reflbias: 0.5
+  reflcolor: <0.5, 0.5, 0.5>
+  refrwid: 0.0 
+

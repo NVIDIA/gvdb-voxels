@@ -198,6 +198,10 @@ inline __host__ __device__ uint3 make_uint3(int3 a)
 {
     return make_uint3(uint(a.x), uint(a.y), uint(a.z));
 }
+inline __host__ __device__ uint3 make_uint3(float3 a)
+{
+	return make_uint3(uint(a.x), uint(a.y), uint(a.z));
+}
 
 inline __host__ __device__ float4 make_float4(float s)
 {
@@ -1460,6 +1464,18 @@ inline __host__ __device__ int4 abs(int4 v)
 {
     return make_int4(abs(v.x), abs(v.y), abs(v.z), abs(v.w));
 }
+////////////////////////////////////////////////////////////////////////////
+// 4x4 matrix operations
+////////////////////////////////////////////////////////////////////////////
+
+inline __host__ __device__ float3 mmult ( float3 vec, float* mtx)
+{
+    float3 p;
+	p.x = vec.x * mtx[0] + vec.y*mtx[4] + vec.z*mtx[8] + mtx[12];
+	p.y = vec.x * mtx[1] + vec.y*mtx[5] + vec.z*mtx[9] + mtx[13];
+	p.z = vec.x * mtx[2] + vec.y*mtx[6] + vec.z*mtx[10] + mtx[14];
+	return p;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // reflect
@@ -1587,6 +1603,10 @@ static __host__ __device__ __inline__ float rnd(unsigned int &prev)
 }
 
 static __host__ __device__ float3 lerp3 ( float3 a, float3 b, float t )
+{
+	return make_float3 ( a.x+t*(b.x-a.x), a.y+t*(b.y-a.y), a.z+t*(b.z-a.z) );
+}
+static __host__ __device__ float3 lerp3 ( float4 a, float4 b, float t )
 {
 	return make_float3 ( a.x+t*(b.x-a.x), a.y+t*(b.y-a.y), a.z+t*(b.z-a.z) );
 }

@@ -1,6 +1,6 @@
 //--------------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2017, NVIDIA Corporation. 
+// Copyright 2016-2018, NVIDIA Corporation. 
 //
 // Redistribution and use in source and binary forms, with or without modification, 
 // are permitted provided that the following conditions are met:
@@ -17,6 +17,7 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 // Version 1.0: Rama Hoetzlein, 5/1/2017
+// Version 1.1: Rama Hoetzlein, 3/25/2018
 //----------------------------------------------------------------------------------
 
 #include "gvdb_vec.h"
@@ -554,7 +555,48 @@ Matrix4F &Matrix4F::RotateTZYX (const Vector3DF& angs, const Vector3DF& t)
 	data[15] = 1;
 	return *this;
 }
+Matrix4F &Matrix4F::RotateTZYXS (const Vector3DF& angs, const Vector3DF& t, const Vector3DF& s)
+{
+	float cx, sx, cy, sy, cz, sz;
+	cx = (float)cos(angs.x * 3.141592 / 180);
+	sx = (float)sin(angs.x * 3.141592 / 180);
+	cy = (float)cos(angs.y * 3.141592 / 180);
+	sy = (float)sin(angs.y * 3.141592 / 180);
+	cz = (float)cos(angs.z * 3.141592 / 180);
+	sz = (float)sin(angs.z * 3.141592 / 180);
+	data[0] = (VTYPE) (cz * cy) *s.x;
+	data[1] = (VTYPE) (sz * cy) *s.y;
+	data[2] = (VTYPE)-sy *s.z;
+	data[3] = (VTYPE)0;
+	data[4] = (VTYPE) (-sz * cx + cz*sy*sx) *s.x;
+	data[5] = (VTYPE) (cz * cx + sz*sy*sz) *s.y;
+	data[6] = (VTYPE) (cy * sx) *s.z;
+	data[7] = (VTYPE) 0;
+	data[8] = (VTYPE) (sz * sx + cz*sy*cx)*s.x;
+	data[9] = (VTYPE) (-cz * sx + sz*sy*cx)*s.y;
+	data[10] = (VTYPE) (cy * cx)*s.z;
+	data[11] = 0;
+	data[12] = (VTYPE) t.x;
+	data[13] = (VTYPE) t.y;
+	data[14] = (VTYPE) t.z;
+	data[15] = 1;
+	return *this;
+}
 
+Matrix4F &Matrix4F::RotateX (const double ang)
+{
+	memset (data, 0, 16*sizeof(VTYPE));			
+	double c,s;
+	c = cos(ang * 3.141592/180);
+	s = sin(ang * 3.141592/180);
+	data[0] = 1;				
+	data[5] = (VTYPE) c;
+	data[6] = (VTYPE) -s;	
+	data[9] = (VTYPE) s;
+	data[10] = (VTYPE) c;
+	data[15] = 1;
+	return *this;
+}
 
 
 // rotates points >>counter-clockwise<< when looking down the Y+ axis toward the origin
@@ -780,7 +822,7 @@ Matrix4F &Matrix4F::InverseProj ( const float* mat )
 	return *this;
 }
 
-Matrix4F &Matrix4F::InverseView ( const float* mat, Vector3DF& pos)
+Matrix4F &Matrix4F::InverseView ( const float* mat, const Vector3DF& pos)
 {
 	// NOTE: Assumes there is no scaling in input matrix.
 	// Although there can be translation (typical of a view matrix)

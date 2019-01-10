@@ -53,8 +53,9 @@ int main (int argc, char* argv)
 	int devid = -1;
 	gvdb.SetCudaDevice ( devid );
 	gvdb.Initialize ();				
-	gvdb.AddPath ( std::string ( "../source/shared_assets/" ) );
-	gvdb.AddPath ( std::string (ASSET_PATH) );
+	gvdb.AddPath ( "../source/shared_assets/" );
+	gvdb.AddPath ( "../shared_assets/" );
+	gvdb.AddPath ( ASSET_PATH );
 
 	// Load VBX
 	char scnpath[1024];
@@ -93,15 +94,15 @@ int main (int argc, char* argv)
 	printf ( "Render custom kernel.\n" );
 	gvdb.getScene()->SetSteps ( 0.25f, 16, 0.25f );
 	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0, 1.0f );
-	gvdb.RenderKernel ( 0, cuRaycastKernel, SHADE_TRILINEAR, 0, 0, 1, 1, 1 );	
+	gvdb.RenderKernel ( cuRaycastKernel, 0, 0 );	
 
 	// Read render buffer
 	unsigned char* buf = (unsigned char*) malloc ( w*h*4 );
 	gvdb.ReadRenderBuf ( 0, buf );						
 
 	// Save as png
-	printf ( "Saving img_rendkernel.png\n");
-	save_png ( "img_rendkernel.png", buf, w, h, 4 );				
+	printf ( "Saving out_rendkernel.png\n");
+	save_png ( "out_rendkernel.png", buf, w, h, 4 );
 
 	free ( buf );
 	delete cam;

@@ -1,6 +1,6 @@
 
 NVIDIA(R) GVDB VOXELS
-Release 1.0
+Release 1.1
 
 ## OVERVIEW
 NVIDIA GVDB is a new library and SDK for compute, simulation and rendering of 
@@ -9,6 +9,24 @@ found at:
    http://developer.nvidia.com/gvdb
 
 ## RELEASE NOTES
+
+3/25/2018, GVDB Voxels 1.1 
+- Dynamic topology on GPU
+- Multiple contexts and GVDB objects
+- Multiple samples with OptiX support
+- Improved compute and raytrace performance
+- Render from any channel
+- Resampling functions
+- Grid transforms for rendering
+- All limitations in Programming Guide 1.0 addressed
+
+9/19/2017, GVDB Voxels, Incremental fix
+- Fixed Depth map integrated raycasting
+- Fixed Resample function
+- New gDepthMap sample, shows how to render OpenGL and GVDB volumes with proper depth integration.
+- New gResample sample, shows how to load a dense RAW file into GVDB as sparse data.
+- RAW data courtesy of the [Visible Human Project, National Library of Medicine, National Institutes of Health, USA](https://www.nlm.nih.gov/research/visible/getting_data.html)
+
 5/1/2017, GVDB Voxels, Release 1.0 
 Created: Rama Hoetzlein, 2017
 - First public release
@@ -33,16 +51,16 @@ The library and each sample is built separately, using cmake.
 ## WHAT'S IN THE PACKAGE?
 	
    - GVDB VOXELS Library
-   - Code Samples
-	See the included GVDB_Samples_Description.pdf for detailed sample descriptions.
-	- gRenderToFile     - Renders a sparse volume to a file using GVDB
-	- gRenderToKernel   - Renders a sparse volume using a custom user-kernel
-	- gInteractiveGL    - Interactive rendering of a volume using GVDB and OpenGL
-	- gInteractiveOptiX - Interactive rendering of a volume and a polygonal model, with poly-to-poly and poly-to-voxel interactions.
-	- g3DPrint          - Demonstrates generating cross section slices for 3D printing from a polygonal model
-	- gSprayDeposit     - Demostrates simulated spray deposition onto a 3D part
-	- gFluidSim         - Demostrates a dynamic simulation with surface rendering by GVDB
-        - gJetsonTX         - Simple 3D Printing Driver for the JetsonTX1/2 with volume slicing on Tegra chip
+   - Code Samples<br />
+	See the included GVDB_Samples_Description.pdf for detailed sample descriptions.<br />
+		* gRenderToFile     - Renders a sparse volume to a file using GVDB
+		* gRenderToKernel   - Renders a sparse volume using a custom user-kernel
+		* gInteractiveGL    - Interactive rendering of a volume using GVDB and OpenGL
+		* gInteractiveOptiX - Interactive rendering of a volume and a polygonal model, with poly-to-poly and poly-to-voxel interactions.
+		* g3DPrint          - Demonstrates generating cross section slices for 3D printing from a polygonal model
+		* gSprayDeposit     - Demostrates simulated spray deposition onto a 3D part
+		* gFluidSurface     - Demostrates a dynamic simulation with surface rendering by GVDB (also point clouds from CPU)
+		* gJetsonTX         - Simple 3D Printing Driver for the JetsonTX1/2 with volume slicing on Tegra chip
    - GVDB VBX File Specfication
    - GVDB Sample Descriptions
    - GVDB Programming Guide
