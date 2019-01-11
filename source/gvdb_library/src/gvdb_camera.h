@@ -180,6 +180,7 @@ using namespace nvdb;
 		float			frustum[6][4];							// frustum plane equations
 
 		bool			mOps[8];
+		bool			orbit_set_;
 		int				mWire;
 				
 		Vector3DF		origRayWorld;
