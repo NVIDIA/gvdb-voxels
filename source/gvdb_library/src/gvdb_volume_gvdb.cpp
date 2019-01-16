@@ -790,12 +790,21 @@ void VolumeGVDB::SetupAtlasAccess ()
 			cudaCheck ( cuSurfObjectDestroy ( mVDBInfo.volOut[chan] ), "VolumeGVDB", "SetupAtlasAccess", "cuSurfObjectDestroy", chanmsg, mbDebug);
 			mVDBInfo.volOut[ chan ] = ID_UNDEFL;
 		}
-						
-		cudaCheck ( cuTexObjectCreate ( &mVDBInfo.volIn[chan], &resDesc, &texDesc, NULL ), "VolumeGVDB", "SetupAtlasAccess", "cuTexObjectCreate", chanmsg, mbDebug);
-		cudaCheck ( cuSurfObjectCreate ( &mVDBInfo.volOut[chan], &resDesc ), "VolumeGVDB", "SetupAtlasAccess", "cuSurfObjectCreate", chanmsg, mbDebug);
+
+		if(mPool->getAtlasTexMem(chan )){						
+			cudaCheck ( cuTexObjectCreate ( &mVDBInfo.volIn[chan], &resDesc, &texDesc, NULL ), "VolumeGVDB", "SetupAtlasAccess", "cuTexObjectCreate", chanmsg, mbDebug);
+			cudaCheck ( cuSurfObjectCreate ( &mVDBInfo.volOut[chan], &resDesc ), "VolumeGVDB", "SetupAtlasAccess", "cuSurfObjectCreate", chanmsg, mbDebug);
+			mVDBInfo.use_tex_mem[chan] = true;
+		}
+		else{
+			// Copy over the corresponding atlas pointer to atlas_dev_mem
+			mVDBInfo.atlas_dev_mem[chan] = atlas.gpu;
+			mVDBInfo.use_tex_mem[chan] = false;
+		}
 
 		if ( atlas.grsc != 0x0 )
 			cudaCheck ( cuGraphicsUnmapResources(1, &atlas.grsc, mStream), "VolumeGVDB", "SetupAtlasAccess", "cuGraphicsUnmapResources", chanmsg, mbDebug);
+	
 	}	
 	// Require VDBInfo update
 	mVDBInfo.update = true;
@@ -2646,7 +2655,7 @@ void VolumeGVDB::Configure ( int levs, int* r, int* numcnt, bool use_masks )
 }
 
 // Add a data channel (voxel attribute)
-void VolumeGVDB::AddChannel ( uchar chan, int dt, int apron, int filter, int border, Vector3DI axiscnt )
+void VolumeGVDB::AddChannel ( uchar chan, int dt, int apron, int filter, int border, Vector3DI axiscnt, bool use_tex_mem )
 {
 	PUSH_CTX
 
@@ -2656,11 +2665,9 @@ void VolumeGVDB::AddChannel ( uchar chan, int dt, int apron, int filter, int bor
 	}
 	mApron = apron;
 
-	mPool->AtlasCreate ( chan, dt, getRes3DI(0), axiscnt, apron, sizeof(AtlasNode), false, mbUseGLAtlas );
+	mPool->AtlasCreate ( chan, dt, getRes3DI(0), axiscnt, apron, sizeof(AtlasNode), false, mbUseGLAtlas, use_tex_mem );
 	mPool->AtlasSetFilter ( chan, filter, border );
-
 	SetupAtlasAccess ();	
-
 	POP_CTX
 }
 

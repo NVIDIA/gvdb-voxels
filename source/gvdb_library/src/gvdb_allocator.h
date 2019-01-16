@@ -113,8 +113,11 @@
 		void	AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve );
 		void	AllocateTextureCPU ( DataPtr& p, uint64 sz, bool bCPU, uint64 preserve );		
 
+		// Custom Extension for allocating device memory instead of texture
+		void 	AllocateAtlasMemGPU( DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve );
+
 		// Atlas functions
-		bool	AtlasCreate ( uchar chan, uchar dtype, Vector3DI leafdim, Vector3DI axiscnt, char apr, uint64 map_wid, bool bCPU, bool bGL );		
+		bool	AtlasCreate ( uchar chan, uchar dtype, Vector3DI leafdim, Vector3DI axiscnt, char apr, uint64 map_wid, bool bCPU, bool bGL , bool use_tex_mem = true );		
 		bool	AtlasResize ( uchar chan, uint64 max_leaf );
 		bool	AtlasResize ( uchar chan, int cx, int cy, int cz );
 		void	AtlasSetNum ( uchar chan, int n );
@@ -161,6 +164,7 @@
 		int		getSize ( uchar dtype );
 		int		getNumAtlas ()					{ return (int) mAtlas.size(); }
 		DataPtr	getAtlas ( uchar chan )			{ return mAtlas[chan]; }	
+		bool 	getAtlasTexMem ( uchar chan )	{ return mAtlasTexMem[chan]; }	
 		float*	getAtlasCPU ( uchar chan )		{ return (float*) mAtlas[chan].cpu; }
 		int		getAtlasGLID ( uchar chan )		{ return mAtlas[chan].glid; }
 		uint64  getAtlasSize ( uchar chan )		{ return (uint64) mAtlas[chan].size; }
@@ -185,6 +189,7 @@
 		std::vector< DataPtr >		mPool[ MAX_POOL ];
 		std::vector< DataPtr >		mAtlas;
 		std::vector< DataPtr >		mAtlasMap;
+		std::vector< bool >			mAtlasTexMem;
 		DataPtr						mNeighbors;
 		bool						mbDebug;
 

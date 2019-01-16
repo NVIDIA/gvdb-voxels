@@ -98,13 +98,32 @@ extern "C" __global__ void gvdbUpdateApronF (VDBInfo* gvdb, uchar chan, int bric
 
 	// Get apron value
 	float3 wpos;
+	uint3 temp = make_uint3(node->mValue) - make_uint3(1,1,1);
 	if (!getAtlasToWorld(gvdb, vox, wpos)) return;
 	float3 offs, vmin, vdel; uint64 nid;
 	node = getNodeAtPoint(gvdb, wpos, &offs, &vmin, &vdel, &nid);		// Evaluate at world position
 	offs += (wpos - vmin) / vdel;
+	if(gvdb->use_tex_mem[chan]){
+		float v = (node == 0x0) ? boundval : tex3D<float>(gvdb->volIn[chan], offs.x, offs.y, offs.z);	// Sample at world point
+		surf3Dwrite(v, gvdb->volOut[chan], vox.x * sizeof(float), vox.y, vox.z);					// Write to apron voxel
+	}
+	else{
+		// if(blockIdx.x ==0 && blockIdx.y == 0 && threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0){
+		// 	printf("Brick id is %d, temp is %d %d %d\n", brk, temp.x, temp.y, temp.z);
+		// }
+		// if(brk == 0 && side == 3 && node != 0x0){
 
-	float v = (node == 0x0) ? boundval : tex3D<float>(gvdb->volIn[chan], offs.x, offs.y, offs.z);	// Sample at world point
-	surf3Dwrite(v, gvdb->volOut[chan], vox.x * sizeof(float), vox.y, vox.z);					// Write to apron voxel
+		// 	printf("temp:%u %u %u vox: %u %u %u brickres %d wpos: %f %f %f offs: %f %f %f\n", temp.x, temp.y, temp.z, vox.x, vox.y, vox.z, brickres, wpos.x, wpos.y, wpos.z, offs.x, offs.y, offs.z);
+		// }
+		uint3 off = make_uint3(offs.x, offs.y, offs.z);
+		int3 res = gvdb->atlas_res;
+		unsigned long int atlas_id = off.z * (res.x*res.y) + off.y * res.x + off.x ;
+		float *atlas_mem = (float *) (gvdb->atlas_dev_mem[chan]) + atlas_id;
+		float v = (node == 0x0) ? boundval : *atlas_mem;
+		atlas_id = vox.z * (res.x*res.y) + vox.y * res.x + vox.x ;
+		atlas_mem = (float *) (gvdb->atlas_dev_mem[chan]) + atlas_id;
+		*atlas_mem = v;
+	}
 }
 
 
