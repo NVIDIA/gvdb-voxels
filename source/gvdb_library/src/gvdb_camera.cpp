@@ -535,6 +535,7 @@ void Camera3D::setMatrices(const float* view_mtx, const float* proj_mtx, Vector3
 	mFov = 2.0f * atan(sx / mNear) / DEGtoRAD;
 
 	origRayWorld = from - model_pos;
+	dir_vec = inverseRayProj(0,0,mNear).Normalize();
 	updateFrustum();								// DO NOT call updateMatrices here. We have just set them.
 }
 

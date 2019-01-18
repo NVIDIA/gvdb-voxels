@@ -140,7 +140,8 @@
 		Vector3DF	thresh;
 		CUdeviceptr	transfer;
 		CUdeviceptr outbuf;
-		CUdeviceptr dbuf;		
+		CUdeviceptr dbuf;	
+		Vector3DF	dir_vec;	
 	};
 
 	// CUDA modules

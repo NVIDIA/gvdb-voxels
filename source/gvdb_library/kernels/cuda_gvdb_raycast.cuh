@@ -530,7 +530,8 @@ __device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, flo
 
 		// depth buffer test [optional]
 		if (SCN_DBUF != 0x0) {
-			if (t.x > getLinearDepth(SCN_DBUF) ) {
+			float dist = t.x * dot(scn.dir_vec, dir);
+			if (dist > getLinearDepth(SCN_DBUF) ) {
 				hit.z = 0;
 				return;
 			}

@@ -78,6 +78,7 @@ struct ALIGN(16) ScnInfo {
 	float4*		transfer;
 	char*		outbuf;
   	char*   	dbuf;	
+	float3		dir_vec ;
 };
 
 struct ALIGN(16) ScnRay {
