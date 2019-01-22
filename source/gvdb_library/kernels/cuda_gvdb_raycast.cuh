@@ -470,7 +470,8 @@ __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, 
 
 		// depth buffer test [optional]
 		if (SCN_DBUF != 0x0) {
-			if (t.x > getLinearDepth(SCN_DBUF) ) {
+			float dist = t.x * fabsf(dot(scn.dir_vec, normalize(dir)));
+			if (dist > getLinearDepth(SCN_DBUF) ) {
 				hit.y = length(wp - pos);
 				hit.z = 1;
 				clr = make_float4(fmin(clr.x, 1.f), fmin(clr.y, 1.f), fmin(clr.z, 1.f), fmax(clr.w, 0.f));
@@ -506,6 +507,8 @@ __device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, flo
 	int		nodeid[MAXLEV];					// level variables
 	float	tMax[MAXLEV];
 	int		b;	
+	// Normalize incoming ray direction
+	dir = normalize(dir);
 
 	// GVDB - Iterative Hierarchical 3DDA on GPU
 	float3 vmin;	
@@ -530,7 +533,7 @@ __device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, flo
 
 		// depth buffer test [optional]
 		if (SCN_DBUF != 0x0) {
-			float dist = t.x * dot(scn.dir_vec, dir);
+			float dist = t.x * fabsf(dot(scn.dir_vec, normalize(dir)));
 			if (dist > getLinearDepth(SCN_DBUF) ) {
 				hit.z = 0;
 				return;
