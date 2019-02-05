@@ -110,6 +110,10 @@ list( APPEND ALL_SOURCE_FILES ${PACKAGE_SOURCE_FILES} )
 # Definitions
 add_definitions(-DGVDB_EXPORTS)					# Export dll symbols
 
+add_definitions(-DCUDA_GVDB_MODULE_PTX="${LIB_INSTALL_PATH}/cuda_gvdb_module.ptx")
+message ( STATUS "CUDA_GVDB_MODULE_PTX: ${LIB_INSTALL_PATH}/cuda_gvdb_module.ptx" )
+
+
 # Set the library type
 OPTION (BUILD_SHARED_LIBS "Build Shared Libraries" ON)
 set (LIB_TYPE STATIC)
