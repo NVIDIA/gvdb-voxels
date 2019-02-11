@@ -470,7 +470,7 @@ __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, 
 
 		// depth buffer test [optional]
 		if (SCN_DBUF != 0x0) {
-			float dist = t.x * fabsf(dot(scn.dir_vec, normalize(dir)));
+			float dist = t.x * fabsf(dot(scn.dir_vec, dir));
 			if (dist > getLinearDepth(SCN_DBUF) ) {
 				hit.y = length(wp - pos);
 				hit.z = 1;

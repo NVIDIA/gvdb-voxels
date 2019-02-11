@@ -464,7 +464,17 @@ extern "C" __global__ void gvdbOpFillF  ( VDBInfo* gvdb, int3 res, uchar chan, f
 		v += sinf( vox.z*12/(3.141592*30.0) );
 		surf3Dwrite ( v, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
 	} else {
-		surf3Dwrite ( p1, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
+		if(gvdb->use_tex_mem[chan]){
+			surf3Dwrite(p1, gvdb->volOut[chan], vox.x * sizeof(float), vox.y, vox.z);					// Write to apron voxel
+		}
+		else{
+			uint3 vox_fixed = vox - make_uint3(1, 1, 1);
+			int3 atlas_res = gvdb->atlas_res;
+			unsigned long int atlas_id = vox_fixed.z * atlas_res.x * atlas_res.y +
+                               vox_fixed.y * atlas_res.x + vox_fixed.x;
+			float* atlas_mem = (float*)(gvdb->atlas_dev_mem[chan]) + atlas_id;
+			*atlas_mem = p1;
+		}
 	}
 }
 extern "C" __global__ void gvdbOpFillC4 ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
