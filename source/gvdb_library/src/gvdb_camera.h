@@ -107,7 +107,7 @@ using namespace nvdb;
 		void setModelMatrix ( float* mtx );
 		void setViewMatrix ( float* mtx, float* invmtx );
 		void setProjMatrix ( float* mtx, float* invmtx );
-		void setMatrices ( const float* view_mtx, const float* proj_mtx, Vector3DF model_pos );
+		virtual void setMatrices ( const float* view_mtx, const float* proj_mtx, Vector3DF model_pos );
 		
 		// Camera motion
 		void setOrbit  ( float ax, float ay, float az, Vector3DF tp, float dist, float dolly );
@@ -123,7 +123,7 @@ using namespace nvdb;
 		float calculateLOD ( Vector3DF pnt, float minlod, float maxlod, float maxdist );
 
 		// Utility functions
-		void updateMatricies ();					// Updates camera axes and projection matricies
+		virtual void updateMatricies ();				// Updates camera axes and projection matricies
 		void updateFrustum ();						// Updates frustum planes
 		Vector3DF inverseRay ( float x, float y, float z );
 		Vector3DF inverseRayProj ( float x, float y, float z );
