@@ -566,7 +566,9 @@ void NVPWindow::setTitle(const char *title){
 
 void NVPWindow::resize_window ( int w, int h )
 {	
-
+    std::cout<<"Attempting to resize window to "<<w<<"x"<<h<<"...\n";
+    int result = XResizeWindow(m_internal->m_dpy, m_internal->m_window, w, h);
+    std::cout<<result;
 }
 
 void NVPWindow::maximize(){
