@@ -42,7 +42,7 @@ public:
 	OBJReader();
 	virtual ~OBJReader();
 	
-	bool LoadFile ( Model* model, char *filename, std::vector<std::string>& paths );
+	bool LoadFile ( Model* model, const char *filename, std::vector<std::string>& paths );
 	bool Cleanup ();	
 	static bool isMyFile ( const char* filename );
 

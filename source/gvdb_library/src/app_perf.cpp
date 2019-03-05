@@ -169,7 +169,7 @@ void PERF_SET ( bool cons, int lev )
 	g_perfPrintLev = lev;
 }
 
-void PERF_INIT ( int buildbits, bool cpu, bool gpu, bool cons, int lev, char* fname )
+void PERF_INIT ( int buildbits, bool cpu, bool gpu, bool cons, int lev, const char* fname )
 {
 	g_perfCPU = cpu;
 	g_perfGPU = gpu;

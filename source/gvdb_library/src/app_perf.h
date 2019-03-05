@@ -69,7 +69,7 @@
 	extern "C" GVDB_API float PERF_POP ();
 	extern "C" GVDB_API void PERF_START ();
 	extern "C" GVDB_API float PERF_STOP ();
-	extern "C" GVDB_API void PERF_INIT ( int buildbits, bool cpu, bool gpu, bool cons, int lev, char* fname );
+	extern "C" GVDB_API void PERF_INIT ( int buildbits, bool cpu, bool gpu, bool cons, int lev, const char* fname );
 	extern "C" GVDB_API void PERF_SET ( bool cons, int lev );
 	extern "C" GVDB_API void PERF_PRINTF ( char* format, ... );
 

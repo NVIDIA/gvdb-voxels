@@ -460,7 +460,7 @@ void Allocator::AllocateAtlasMemGPU(DataPtr& p, uchar dtype, Vector3DI res, bool
 
     if (res.x > 0 && res.y > 0 && res.z > 0) {
       // Allocate new linear memory according to the size required
-	  printf("Allocating device memory of size %u bytes\n", p.size);
+	  // printf("Allocating device memory of size %u bytes\n", p.size);
       cudaCheck(cuMemAlloc(&p.gpu, p.size), "Allocator", "AllocateAtlasMemGPU", "cuMemAlloc", "", mbDebug);
       if (preserve > 0 && old_array != 0) {
         // Clear channel to 0
@@ -1062,7 +1062,7 @@ void Allocator::AtlasRead ( FILE* fp, uchar chan, uint64 asize )
 }
 #include <assert.h>
 
-bool cudaCheck ( CUresult launch_stat, char* obj, char* method, char* apicall, char* arg, bool bDebug)
+bool cudaCheck ( CUresult launch_stat, const char* obj, const char* method, const char* apicall, const char* arg, bool bDebug)
 {
 	CUresult kern_stat = CUDA_SUCCESS;
 	

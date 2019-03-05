@@ -2494,7 +2494,7 @@ void VolumeGVDB::SaveVDB ( std::string fname )
 }
 
 // Add a search path for assets
-void VolumeGVDB::AddPath ( char* path )
+void VolumeGVDB::AddPath ( const char* path )
 {
 	mScene->AddPath ( path );
 }
@@ -3375,12 +3375,12 @@ void VolumeGVDB::writeCube (  FILE* fp, unsigned char vpix[], slong& numfaces, i
 	v[6] = vbase + vgToVert[ gv[6] ];
 	v[7] = vbase + vgToVert[ gv[7] ];
 
-	if ( vpix[1] == 0 )	{fprintf(fp, "f %d//0 %d//0 %d//0 %d//0\n", v[1], v[2], v[6], v[5] );  numfaces++; }	// x+	
-	if ( vpix[2] == 0 ) {fprintf(fp, "f %d//1 %d//1 %d//1 %d//1\n", v[0], v[3], v[7], v[4] );  numfaces++; }	// x-
-	if ( vpix[3] == 0 ) {fprintf(fp, "f %d//2 %d//2 %d//2 %d//2\n", v[2], v[3], v[7], v[6] );  numfaces++; }	// y+
-	if ( vpix[4] == 0 ) {fprintf(fp, "f %d//3 %d//3 %d//3 %d//3\n", v[1], v[0], v[4], v[5] );  numfaces++; }	// y- 
-	if ( vpix[5] == 0 )	{fprintf(fp, "f %d//4 %d//4 %d//4 %d//4\n", v[4], v[5], v[6], v[7] );  numfaces++; }	// z+
-	if ( vpix[6] == 0 ) {fprintf(fp, "f %d//5 %d//5 %d//5 %d//5\n", v[0], v[1], v[2], v[3] );  numfaces++; }	// z-	
+	if ( vpix[1] == 0 )	{fprintf(fp, "f %ld//0 %ld//0 %ld//0 %ld//0\n", v[1], v[2], v[6], v[5] );  numfaces++; }	// x+	
+	if ( vpix[2] == 0 ) {fprintf(fp, "f %ld//1 %ld//1 %ld//1 %ld//1\n", v[0], v[3], v[7], v[4] );  numfaces++; }	// x-
+	if ( vpix[3] == 0 ) {fprintf(fp, "f %ld//2 %ld//2 %ld//2 %ld//2\n", v[2], v[3], v[7], v[6] );  numfaces++; }	// y+
+	if ( vpix[4] == 0 ) {fprintf(fp, "f %ld//3 %ld//3 %ld//3 %ld//3\n", v[1], v[0], v[4], v[5] );  numfaces++; }	// y- 
+	if ( vpix[5] == 0 )	{fprintf(fp, "f %ld//4 %ld//4 %ld//4 %ld//4\n", v[4], v[5], v[6], v[7] );  numfaces++; }	// z+
+	if ( vpix[6] == 0 ) {fprintf(fp, "f %ld//5 %ld//5 %ld//5 %ld//5\n", v[0], v[1], v[2], v[3] );  numfaces++; }	// z-	
 }
 
 void VolumeGVDB::enableVerts ( int*& vgToVert, std::vector<Vector3DF>& verts, Vector3DF vm, int gv[] )

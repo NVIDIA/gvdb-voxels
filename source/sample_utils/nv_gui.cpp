@@ -94,7 +94,7 @@ void draw3D ()		{ g_2D.draw3D(); }
 
 void drawGui ( nvImg* img)		{ g_Gui.Draw( img ); }
 void clearGuis ()				{ g_Gui.Clear(); }
-int  addGui ( int x, int y, int w, int h, char* name, int gtype, int dtype, void* data, float vmin, float vmax ) { return g_Gui.AddGui ( float(x), float(y), float(w), float(h), name, gtype, dtype, data, vmin, vmax ); }
+int  addGui ( int x, int y, int w, int h, const char* name, int gtype, int dtype, void* data, float vmin, float vmax ) { return g_Gui.AddGui ( float(x), float(y), float(w), float(h), name, gtype, dtype, data, vmin, vmax ); }
 void setBackclr ( float r, float g, float b, float a )	{ return g_Gui.SetBackclr ( r,g,b,a ); }
 int  addItem ( char* name )		{ return g_Gui.AddItem ( name ); }
 int  addItem ( char* name, char* imgname ) { return g_Gui.AddItem ( name, imgname ); }
@@ -1309,7 +1309,7 @@ nvGui::nvGui ()
 	mActiveGui = -1;
 }
 
-int nvGui::AddGui ( float x, float y, float w, float h, char* name, int gtype, int dtype, void* data, float vmin, float vmax  )
+int nvGui::AddGui ( float x, float y, float w, float h, const char* name, int gtype, int dtype, void* data, float vmin, float vmax  )
 {
 	Gui g;
 

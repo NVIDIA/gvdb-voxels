@@ -164,7 +164,7 @@ static void APIENTRY myOpenGLCallback(  GLenum source,
 }
 
 //------------------------------------------------------------------------------
-void checkGL( char* msg )
+void checkGL( const char* msg )
 {
     GLenum errCode;
     //const GLubyte* errString;
@@ -177,7 +177,7 @@ void checkGL( char* msg )
 
 #else
 //------------------------------------------------------------------------------
-void checkGL( char* msg ) {}
+void checkGL( const char* msg ) {}
 #endif
 
 struct WINinternal{

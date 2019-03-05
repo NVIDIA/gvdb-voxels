@@ -386,7 +386,7 @@
 			void SaveVDB ( std::string fname );
 			bool ImportVTK ( std::string fname, std::string field, Vector3DI& res );
 			void WriteObj ( char* fname );
-			void AddPath ( char* path );
+			void AddPath ( const char* path );
 			bool FindFile ( std::string fname, char* path );		
 			void ConvertBitmaskToNonBitmask(int levs);
 
@@ -845,7 +845,7 @@
 			Vector3DF		mPretrans, mAngs, mTrans, mScale;
 			Matrix4F		mXform, mInvXform, mInvXrot;
 
-			char*			mRendName[SHADE_MAX];
+			const char*			mRendName[SHADE_MAX];
 
 			float			m_bias;
 		};

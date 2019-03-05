@@ -37,7 +37,7 @@
 	#define MIN_RUNTIME_VERSION		4010
 	#define MIN_COMPUTE_VERSION		0x20
 	extern void				StartCuda( int devsel, CUcontext ctxsel, CUdevice& dev, CUcontext& ctx, CUstream* strm, bool verbose );
-	extern GVDB_API bool	cudaCheck ( CUresult e, char* obj, char* method, char* apicall, char* arg, bool bDebug);
+	extern GVDB_API bool	cudaCheck ( CUresult e, const char* obj, const char* method, const char* apicall, const char* arg, bool bDebug);
 	extern GVDB_API Vector3DF cudaGetMemUsage();
 
 	namespace nvdb {
