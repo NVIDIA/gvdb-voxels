@@ -55,7 +55,7 @@ using namespace nvdb;
 	#include <cudaGL.h>				// Cuda-GL interop
 	#include <cuda_gl_interop.h>
 	
-	GVDB_API void gchkGL( char* msg );
+	GVDB_API void gchkGL( const char* msg );
 
 	GVDB_API void renderCamSetupGL ( Scene* scene, int prog, Matrix4F* model );
 	GVDB_API void renderLightSetupGL ( Scene* scene, int prog );
@@ -67,12 +67,12 @@ using namespace nvdb;
 	GVDB_API void renderSetUW ( Scene* scene, int prog, Matrix4F* model, Vector3DF res );
 	GVDB_API void renderScreenspaceGL ( Scene* scene, int prog );
 
-	GVDB_API void makeSimpleShaderGL ( Scene* scene, char* vertfile, char* fragfile);
-	GVDB_API void makeSliceShader ( Scene* scene, char* vertname, char* fragname );
-	GVDB_API void makeOutlineShader ( Scene* scene, char* vertname, char* fragname );
-	GVDB_API void makeVoxelizeShader ( Scene* scene, char* vertname, char* fragname, char* geomname );
-	GVDB_API void makeRaycastShader ( Scene* scene, char* vertname, char* fragname );
-	GVDB_API void makeInstanceShader ( Scene* scene, char* vertname, char* fragname );
-	GVDB_API void makeScreenShader ( Scene* scene, char* vertname, char* fragname );
+	GVDB_API void makeSimpleShaderGL ( Scene* scene, const char* vertfile, const char* fragfile);
+	GVDB_API void makeSliceShader ( Scene* scene, const char* vertname, const char* fragname );
+	GVDB_API void makeOutlineShader ( Scene* scene, const char* vertname, const char* fragname );
+	GVDB_API void makeVoxelizeShader ( Scene* scene, const char* vertname, const char* fragname, const char* geomname );
+	GVDB_API void makeRaycastShader ( Scene* scene, const char* vertname, const char* fragname );
+	GVDB_API void makeInstanceShader ( Scene* scene, const char* vertname, const char* fragname );
+	GVDB_API void makeScreenShader ( Scene* scene, const char* vertname, const char* fragname );
 
 #endif

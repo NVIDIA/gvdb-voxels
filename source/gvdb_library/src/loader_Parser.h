@@ -42,7 +42,7 @@
 		Parser();
 		virtual ~Parser();
 
-		void ParseFile ( char *filename, std::vector<std::string>& paths );	
+		void ParseFile ( const char *filename, std::vector<std::string>& paths );	
 
 		// Read the next line into an internal buffer
 		char *ReadNextLine( bool discardBlanks=true );  
@@ -137,11 +137,11 @@
 		CallbackParser ();
 		virtual ~CallbackParser();
 
-		void ParseFile ( char *filename, std::vector<std::string>& paths );
+		void ParseFile ( const char *filename, std::vector<std::string>& paths );
 
 		// Add a callback to the list of token / function pairs
 		//   -> Matching with 'token' is not case sensitive.
-		void SetCallback( char *token, void(*func) () );
+		void SetCallback( const char *token, void(*func) () );
 
 		// Once the callbacks are setup, parse the file.
 		//  -> This also closes the file when done parsing

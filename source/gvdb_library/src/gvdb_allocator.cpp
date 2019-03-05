@@ -990,7 +990,7 @@ void Allocator::AtlasRead ( FILE* fp, uchar chan, uint64 asize )
 }
 #include <assert.h>
 
-bool cudaCheck ( CUresult launch_stat, char* obj, char* method, char* apicall, char* arg, bool bDebug)
+bool cudaCheck ( CUresult launch_stat, const char* obj, const char* method, const char* apicall, const char* arg, bool bDebug)
 {
 	CUresult kern_stat = CUDA_SUCCESS;
 	

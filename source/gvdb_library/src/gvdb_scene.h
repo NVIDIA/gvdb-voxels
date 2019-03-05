@@ -86,10 +86,10 @@
 		void		LoadModel ( Model* m, std::string filestr, float scale, float tx, float ty, float tz );
 		
 		// Shaders
-		int			AddShader ( int prog_id, char* vertfile, char* fragfile );
-		int			AddShader ( int prog_id, char* vertfile, char* fragfile, char* geomfile );
-		int			AddParam (  int prog_id, int id, char* name );
-		int			AddAttrib ( int prog_id, int id, char* name );
+		int			AddShader ( int prog_id, const char* vertfile, const char* fragfile );
+		int			AddShader ( int prog_id, const char* vertfile, const char* fragfile, const char* geomfile );
+		int			AddParam (  int prog_id, int id, const char* name );
+		int			AddAttrib ( int prog_id, int id, const char* name );
 		int			getProgram(int prog_id) { return mProgram[prog_id]; }
 
 		// Materials
@@ -123,7 +123,7 @@
 		int			getNumLights()		{ return (int) mLights.size(); }
 		
 		// Loading scenes
-		void		Load ( char *filename, float windowAspect );
+		void		Load ( const char *filename, float windowAspect );
 		static void	LoadPath ();		
 		static void	LoadModel ();
 		static void	LoadVolume ();

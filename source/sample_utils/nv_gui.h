@@ -347,7 +347,7 @@
 	class nvGui {
 	public:
 		nvGui ();
-		int		AddGui ( float x, float y, float w, float h, char* name, int gtype, int dtype, void* data, float vmin, float vmax );
+		int		AddGui ( float x, float y, float w, float h, const char* name, int gtype, int dtype, void* data, float vmin, float vmax );
 		int		AddItem ( char* name, char* imgname = 0x0 );
 		void    SetBackclr ( float r, float g, float b, float a );
 		bool	guiChanged ( int n );
@@ -401,7 +401,7 @@
 	extern nvGui	g_Gui;
 	extern void		drawGui ( nvImg* img );	
 	extern void     clearGuis ();
-	extern int		addGui ( int x, int y, int w, int h, char* name, int gtype, int dtype, void* data, float vmin, float vmax );
+	extern int		addGui ( int x, int y, int w, int h, const char* name, int gtype, int dtype, void* data, float vmin, float vmax );
 	extern int		addItem ( char* name, char* imgname = 0x0 );
 	extern void		setBackclr ( float r, float g, float b, float a );
 	extern std::string guiItemName ( int n, int v );
