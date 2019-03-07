@@ -30,7 +30,7 @@
 CUmodule		cuCustom;
 CUfunction		cuRaycastKernel;
 
-bool cudaCheck ( CUresult status, char* msg )
+bool cudaCheck ( CUresult status, const char* msg )
 {
 	if ( status != CUDA_SUCCESS ) {
 		const char* stat = "";

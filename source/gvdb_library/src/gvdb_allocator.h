@@ -110,14 +110,13 @@
 
 		// Texture functions
 		bool	TextureCreate ( uchar chan, uchar dtype, Vector3DI res, bool bCPU, bool bGL );
-		void	AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve );
-		void	AllocateTextureCPU ( DataPtr& p, uint64 sz, bool bCPU, uint64 preserve );		
-
+		void	AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve, Vector4DF init_val = {.0f, .0f, .0f, .0f} );
+		void	AllocateTextureCPU ( DataPtr& p, uint64 sz, bool bCPU, uint64 preserve, Vector4DF init_val = {.0f, .0f, .0f, .0f} );		
 		// Custom Extension for allocating device memory instead of texture
-		void 	AllocateAtlasMemGPU( DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve );
+		void 	AllocateAtlasMemGPU( DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve, Vector4DF init_val = {.0f, .0f, .0f, .0f} );
 
 		// Atlas functions
-		bool	AtlasCreate ( uchar chan, uchar dtype, Vector3DI leafdim, Vector3DI axiscnt, char apr, uint64 map_wid, bool bCPU, bool bGL , bool use_tex_mem = true );		
+		bool	AtlasCreate ( uchar chan, uchar dtype, Vector3DI leafdim, Vector3DI axiscnt, char apr, uint64 map_wid, bool bCPU, bool bGL , bool use_tex_mem = true, Vector4DF init_val = {.0f, .0f, .0f, .0f} );		
 		bool	AtlasResize ( uchar chan, uint64 max_leaf );
 		bool	AtlasResize ( uchar chan, int cx, int cy, int cz );
 		void	AtlasSetNum ( uchar chan, int n );
@@ -190,6 +189,7 @@
 		std::vector< DataPtr >		mAtlas;
 		std::vector< DataPtr >		mAtlasMap;
 		std::vector< bool >			mAtlasTexMem;
+		std::vector< Vector4DF >	mAtlasInitVal;
 		DataPtr						mNeighbors;
 		bool						mbDebug;
 

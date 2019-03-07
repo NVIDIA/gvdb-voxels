@@ -2655,7 +2655,7 @@ void VolumeGVDB::Configure ( int levs, int* r, int* numcnt, bool use_masks )
 }
 
 // Add a data channel (voxel attribute)
-void VolumeGVDB::AddChannel ( uchar chan, int dt, int apron, int filter, int border, Vector3DI axiscnt, bool use_tex_mem )
+void VolumeGVDB::AddChannel ( uchar chan, int dt, int apron, int filter, int border, Vector3DI axiscnt, bool use_tex_mem, Vector4DF init_val )
 {
 	PUSH_CTX
 
@@ -2665,7 +2665,7 @@ void VolumeGVDB::AddChannel ( uchar chan, int dt, int apron, int filter, int bor
 	}
 	mApron = apron;
 
-	mPool->AtlasCreate ( chan, dt, getRes3DI(0), axiscnt, apron, sizeof(AtlasNode), false, mbUseGLAtlas, use_tex_mem );
+	mPool->AtlasCreate ( chan, dt, getRes3DI(0), axiscnt, apron, sizeof(AtlasNode), false, mbUseGLAtlas, use_tex_mem, init_val );
 	mPool->AtlasSetFilter ( chan, filter, border );
 	SetupAtlasAccess ();	
 	POP_CTX

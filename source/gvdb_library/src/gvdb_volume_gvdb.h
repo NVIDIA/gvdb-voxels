@@ -396,7 +396,7 @@
 			void DestroyChannels ();
 			void SetChannelDefault ( int cx, int cy, int cz )	{ mDefaultAxiscnt.Set(cx,cy,cz); }
 			void SetApron ( int n )	 { mApron = n;}
-			void AddChannel ( uchar chan, int dt, int apron, int filter=F_LINEAR, int border=F_CLAMP, Vector3DI axiscnt = Vector3DI(0,0,0), bool use_tex_mem=true );
+			void AddChannel ( uchar chan, int dt, int apron, int filter=F_LINEAR, int border=F_CLAMP, Vector3DI axiscnt = Vector3DI(0,0,0), bool use_tex_mem=true, Vector4DF init_val=Vector4DF{.0f,.0f,.0f,.0f});
 			void FillChannel ( uchar chan, Vector4DF val );
 			void ClearAllChannels ();
 			void ClearChannel(uchar chan);
