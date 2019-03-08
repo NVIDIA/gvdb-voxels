@@ -91,7 +91,6 @@ FUNCTION( _COMPILEPTX )
                           DEPENDS ${custom_command_var})
         add_custom_target(${compile_target_ptx} ALL DEPENDS ${input} ${output_with_path} SOURCES ${input})
 
-        message(STATUS "input is ${input}, output with path is ${output_with_path} custom command var is ${custom_command_var}")
         # Add this output file to list of generated ptx files
         LIST(APPEND PTX_FILES ${output})
         LIST(APPEND PTX_FILES_PATH ${output_with_path} )
@@ -174,7 +173,7 @@ function( _INSTALL_PTX )
       get_filename_component ( _ptxparent ${_ptxpath} DIRECTORY )    # parent directory
       set ( _fixed "${_ptxparent}/${_ptxbase}.ptx" )
       add_custom_command ( TARGET ${PROJNAME} PRE_LINK
-        COMMAND ${CMAKE_COMMAND} -E copy  ${_file} ${_fixed}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different  ${_file} ${_fixed}
         )      
       list ( APPEND PTX_FIXED ${_fixed} )
       list ( APPEND OUT_LIST ${_fixed} )
