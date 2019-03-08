@@ -67,7 +67,7 @@ Camera3D::Camera3D ()
 //	mOps[1] = true;
 
 	setOrbit ( 0, 45, 0, Vector3DF(0,0,0), 120.0, 1.0 );
-	orbit_set_ = false;
+	orbit_set_ = true;
 	updateMatricies ();
 }
 
