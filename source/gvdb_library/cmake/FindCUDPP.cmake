@@ -37,54 +37,62 @@ if ( CUDPP_ROOT_DIR )
 	else()
 		message ( STATUS "  Locating: libcudpp_${CUDA_SUFFIX}.so, CUDA: ${CUDA_SUFFIX}")
 	endif()
-     set ( OK_REL "0" )		
-  	_FIND_FILE ( LIB1_REL CUDPP_LIB_DIR "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x64.lib" "libcudpp.so" OK_REL)  
-  	_FIND_FILE ( LIB2_REL CUDPP_LIB_DIR "cudpp_hash_${MSVC_VERSION}${CUDA_SUFFIX}x64.lib" "libcudpp_hash.so" OK_REL )	
+     set ( OK_REL "0" )
+     _FIND_FILE ( LIB1_REL CUDPP_LIB_DIR "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x64.lib" "libcudpp_${CUDA_SUFFIX}.so" OK_REL)
+     _FIND_FILE ( LIB2_REL CUDPP_LIB_DIR "cudpp_hash_${MSVC_VERSION}${CUDA_SUFFIX}x64.lib" "libcudpp_hash_${CUDA_SUFFIX}.so" OK_REL )
 
-     set ( OK_DBG "0" )	
-	_FIND_FILE ( LIB1_DEBUG CUDPP_LIB_DIR "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x64d.lib" "libcudppd.so" OK_DBG )	        	
-	_FIND_FILE ( LIB2_DEBUG CUDPP_LIB_DIR "cudpp_hash_${MSVC_VERSION}${CUDA_SUFFIX}x64d.lib" "libcudpp_hashd.so" OK_DBG  )
+	set (OK_DLL "0")
+	_FIND_FILE( CUDPP_DLL CUDPP_LIB_DIR "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x64.dll" " " OK_DLL)
+	_FIND_FILE( CUDPP_DLL CUDPP_LIB_DIR "cudpp_hash_${MSVC_VERSION}${CUDA_SUFFIX}x64.dll" " " OK_DLL)
 
-	#--------- Locate DLLS		
 	if (OK_REL EQUAL 2)
-		message ( STATUS "  Found LIBs (Release): ${LIB1_REL} ${LIB2_REL}" )	   
-		set (OK_DLL "0")
-		_FIND_FILE( CUDPP_DLL CUDPP_LIB_DIR "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x64.dll" "libcudpp_${CUDA_SUFFIX}.so" OK_DLL)   
-		_FIND_FILE( CUDPP_DLL CUDPP_LIB_DIR "cudpp_hash_${MSVC_VERSION}${CUDA_SUFFIX}x64.dll" "libcudpp_hash_${CUDA_SUFFIX}.so" OK_DLL)  
+		message ( STATUS "  Found LIBs (Release): ${LIB1_REL} ${LIB2_REL}" )
+		set ( CUDPP_LIB1_REL "${LIB1_REL}" CACHE INTERNAL "" FORCE)
+		set ( CUDPP_LIB2_REL "${LIB2_REL}" CACHE INTERNAL "" FORCE)
+		set (CUDPP_LIBRARIES ${CUDPP_LIBRARIES} ${CUDPP_LIB1_REL} ${CUDPP_LIB2_REL})
+		set ( OK_DBG "0" )
+		_FIND_FILE ( LIB1_DEBUG CUDPP_LIB_DIR "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x64d.lib" "libcudppd_${CUDA_SUFFIX}.so" OK_DBG )
+		_FIND_FILE ( LIB2_DEBUG CUDPP_LIB_DIR "cudpp_hash_${MSVC_VERSION}${CUDA_SUFFIX}x64d.lib" "libcudpp_hashd_${CUDA_SUFFIX}.so" OK_DBG  )
 	endif()
+
+	if (OK_DLL EQUAL 2)
+		message ( STATUS "  Found DLLs (Release): ${CUDPP_DLL}")
+		set ( CUDPP_DLL "${CUDPP_DLL}" CACHE PATH "" FORCE)
+		set (CUDPP_LIBRARIES ${CUDPP_LIBRARIES} ${CUDPP_DLL})
+		set ( OK_DBG "0" )
+		_FIND_FILE( LIB1_DEBUG CUDPP_LIB_DIR "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x64d.dll" "cudpp_${CUDA_SUFFIX}d.so" OK_DLL)
+		_FIND_FILE( LIB2_DEBUG CUDPP_LIB_DIR "cudpp_hash_${MSVC_VERSION}${CUDA_SUFFIX}x64d.dll" "cudpp_hash_${CUDA_SUFFIX}d.so" OK_DLL)
+	endif()
+
 	if (OK_DBG EQUAL 2)
-		message ( STATUS "  Found LIBs (Debug): ${LIB1_DEBUG} ${LIB2_DEBUG}" )	   
-		_FIND_FILE( CUDPP_DLL CUDPP_LIB_DIR "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x64d.dll" "libcudpp_${CUDA_SUFFIX}d.so" OK_DLL)   
-		_FIND_FILE( CUDPP_DLL CUDPP_LIB_DIR "cudpp_hash_${MSVC_VERSION}${CUDA_SUFFIX}x64d.dll" "libcudpp_hash_${CUDA_SUFFIX}d.so" OK_DLL)   
+		message ( STATUS "  Found LIBs (Debug): ${LIB1_DEBUG} ${LIB2_DEBUG}" )
+		set (CUDPP_LIBRARIES ${CUDPP_LIBRARIES} ${CUDPP_LIB1_DEBUG} ${CUDPP_LIB2_DEBUG})
+		set ( CUDPP_LIB1_DEBUG "${LIB1_DEBUG}" CACHE INTERNAL "" FORCE)
+		set ( CUDPP_LIB2_DEBUG "${LIB2_DEBUG}" CACHE INTERNAL "" FORCE)
 	endif()
+
 	if ( (NOT OK_DBG EQUAL 2) AND (NOT OK_REL EQUAL 2) )
 		message ( "  NOT FOUND. Missing CUDPP .lib files. Built and install 'shared_cudpp' prior to gvdb" )
 		set ( CUDPP_FOUND "NO" )
 	endif()
-	message ( STATUS "  Found DLLs: ${CUDPP_DLL}")	
-
 endif()
- 
+
 if ( ${CUDPP_FOUND} STREQUAL "NO" )
    message( FATAL_ERROR "
-      Please set CUDPP_ROOT_DIR to the root location 
+      Please set CUDPP_ROOT_DIR to the root location
       of installed CUDPP library containing /include and /lib.
       Not found at CUDPP_ROOT_DIR: ${CUDPP_ROOT_DIR}\n"
    )
 endif()
 
 set ( CUDPP_LIB_DIR ${CUDPP_LIB_DIR} CACHE INTERNAL "" FORCE)
-set ( CUDPP_LIB1_DEBUG "${CUDPP_LIB_DIR}/${LIB1_DEBUG}" CACHE INTERNAL "" FORCE)
-set ( CUDPP_LIB2_DEBUG "${CUDPP_LIB_DIR}/${LIB2_DEBUG}" CACHE INTERNAL "" FORCE)
-set ( CUDPP_LIB1_REL "${CUDPP_LIB_DIR}/${LIB1_REL}" CACHE INTERNAL "" FORCE)
-set ( CUDPP_LIB2_REL "${CUDPP_LIB_DIR}/${LIB2_REL}" CACHE INTERNAL "" FORCE)
-set ( CUDPP_DLL "${CUDPP_DLL}" CACHE PATH "" FORCE)
 
 #-- We do not want user to modified these vars, but helpful to show them
 message ( STATUS "  CUDPP_ROOT_DIR:    ${CUDPP_ROOT_DIR}" )
 message ( STATUS "  CUDPP_INCLUDE_DIR: ${CUDPP_INCLUDE_DIR}" )
 message ( STATUS "  CUDPP_LIB1:        ${CUDPP_LIB1_DEBUG}, ${CUDPP_LIB1_REL}" )
 message ( STATUS "  CUDPP_LIB2:        ${CUDPP_LIB2_DEBUG}, ${CUDPP_LIB2_REL}" )
+message ( STATUS "  CUDPP_LIBRARIES:   ${CUDPP_LIBRARIES}" )
 
 mark_as_advanced(CUDPP_FOUND)
 

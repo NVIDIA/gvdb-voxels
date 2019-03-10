@@ -182,7 +182,7 @@ Parser::Parser() :
 
 }
 
-void Parser::ParseFile ( char *fname, std::vector<std::string>& paths ) 	
+void Parser::ParseFile ( const char *fname, std::vector<std::string>& paths ) 	
 {
 	// Check for this file in the current path, then all the search paths specified
 	char fileName[1024];
@@ -421,7 +421,7 @@ CallbackParser::CallbackParser () : Parser(), numCallbacks(0)
 }
 
 
-void CallbackParser::ParseFile ( char *filename, std::vector<std::string>& paths ) 
+void CallbackParser::ParseFile ( const char *filename, std::vector<std::string>& paths ) 
 {
 	Parser::ParseFile ( filename, paths );
 
@@ -434,7 +434,7 @@ CallbackParser::~CallbackParser()
 		free( callbackTokens[i] );
 }
 
-void CallbackParser::SetCallback( char *token, CallbackFunction func )
+void CallbackParser::SetCallback( const char *token, CallbackFunction func )
 {
 	if (numCallbacks >= 32) return;
 	

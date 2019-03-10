@@ -260,7 +260,7 @@ Sample::Sample()
 	m_key = false;
 	m_renderscale = 0.0;
 	m_infile = "teapot.scn";
-	m_io_method = WIN_IO;
+	m_io_method = C_IO;
 }
 
 void Sample::parse_value ( int mode, std::string tag, std::string val )
@@ -568,6 +568,7 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 
 	// Read header
 	PERF_PUSH ( "  Open file" );
+	#if WINDOWS
 	if (m_io_method == WIN_IO) {
 		HANDLE fph = CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
 			FILE_ATTRIBUTE_NORMAL, // | FILE_FLAG_NO_BUFFERING, 
@@ -582,7 +583,9 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 		ReadFile(fph, &wMax.z, sizeof(float), &bread, NULL);
 		CloseHandle(fph);
 	}
-	else if ( m_io_method == C_IO ) {
+	else 
+	#endif
+	if ( m_io_method == C_IO ) {
 		// Standard read for header info whne using C_IO
 		FILE* fph = fopen(filepath, "rb");
 		if (fph == 0) {
@@ -601,6 +604,7 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 	PERF_POP ();
 
 	// Read data from disk to CPU	
+	#if WINDOWS
 	if (m_io_method == WIN_IO) {
 
 		// Allocate memory for points
@@ -622,7 +626,9 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 		PERF_PUSH("Commit");
 		gvdb.CommitData(m_pnt1);		// Commit to GPU
 		PERF_POP();
-	} else if ( m_io_method==C_IO) {
+	} else 
+	#endif
+	if ( m_io_method==C_IO) {
 		// C-style IO
 		PERF_PUSH("Read");
 		FILE* fph = fopen(filepath, "rb");
@@ -660,8 +666,9 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 	PERF_POP ();
 	
 	// Set points for GVDB	
-	gvdb.SetPoints( m_pnts, DataPtr(), DataPtr());
-
+	DataPtr temp;
+	gvdb.SetPoints( m_pnts, temp, temp);
+	printf("m_numpnts = %d\n", m_numpnts);
 	nvprintf ( "  Done.\n" );
 }
 
@@ -702,7 +709,8 @@ void Sample::ReportMemory()
 void Sample::clear_gvdb ()
 {
 	// Clear
-	gvdb.SetPoints(DataPtr(), DataPtr(), DataPtr());
+	DataPtr temp;
+	gvdb.SetPoints(temp, temp, temp);
 	gvdb.CleanAux();
 }
 

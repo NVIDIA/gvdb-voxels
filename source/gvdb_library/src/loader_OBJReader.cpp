@@ -73,7 +73,7 @@ bool OBJReader::isMyFile( const char* filename )
 	return getExtension( filename ) == "obj";
 }
 
-bool OBJReader::LoadFile ( Model* model, char *filename, std::vector<std::string>& paths )
+bool OBJReader::LoadFile ( Model* model, const char *filename, std::vector<std::string>& paths )
 {
 	ParseFile ( filename, paths );
 

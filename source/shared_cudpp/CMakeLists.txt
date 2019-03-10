@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.0)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../../../LocalPackages/CUDA)
   Message(STATUS "Local CUDA detected. Using it")
-  
+
   set(CUDA_TOOLKIT_VERSION "8.0" CACHE STRING "")
   set(CUDA_LOCAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../../LocalPackages/CUDA/v${CUDA_TOOLKIT_VERSION}_win")
   get_filename_component(CUDA_ABS_PATH ${CUDA_LOCAL_PATH} ABSOLUTE )
@@ -22,15 +22,11 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR})
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 #---------------- GET CUDA VERSION
-if (CUDA_TOOLKIT_VERSION STREQUAL "8.0")
-    set (CUDA_SUFFIX "cu8")
-endif()
-if (CUDA_TOOLKIT_VERSION STREQUAL "9.0")
-    set (CUDA_SUFFIX "cu9")
-endif()
-if (CUDA_TOOLKIT_VERSION STREQUAL "10.0")
-    set (CUDA_SUFFIX "cu10")
-endif()
+set(CUDA_SUFFIX "cu${CUDA_VERSION}")
+
+message("CUDA_SUFFIX IS ${CUDA_SUFFIX}")
+message("CUDA_TOOLKIT_VERSION is ${CUDA_TOOLKIT_VERSION}")
+message("CUDA_VERSION is ${CUDA_VERSION}")
 
 if (WIN32)
 	set ( TARGET_NAME1 "cudpp_${MSVC_VERSION}${CUDA_SUFFIX}x" CACHE STRING "" FORCE)
@@ -72,6 +68,8 @@ set(LIBRARY_OUTPUT_PATH
 set(CMAKE_MODULE_PATH
   ${CMAKE_SOURCE_DIR}/cmake
   )
+include(${CMAKE_SOURCE_DIR}/cmake/CudaComputeTargetFlags.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/CudaAutodetectCompute.cmake)
 
 set(cudpp_INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/include

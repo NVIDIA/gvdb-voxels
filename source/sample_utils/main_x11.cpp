@@ -164,7 +164,7 @@ static void APIENTRY myOpenGLCallback(  GLenum source,
 }
 
 //------------------------------------------------------------------------------
-void checkGL( char* msg )
+void checkGL( const char* msg )
 {
     GLenum errCode;
     //const GLubyte* errString;
@@ -177,7 +177,7 @@ void checkGL( char* msg )
 
 #else
 //------------------------------------------------------------------------------
-void checkGL( char* msg ) {}
+void checkGL( const char* msg ) {}
 #endif
 
 struct WINinternal{
@@ -562,6 +562,13 @@ void NVPWindow::swapBuffers(){
 
 void NVPWindow::setTitle(const char *title){
 
+}
+
+void NVPWindow::resize_window ( int w, int h )
+{	
+    std::cout<<"Attempting to resize window to "<<w<<"x"<<h<<"...\n";
+    int result = XResizeWindow(m_internal->m_dpy, m_internal->m_window, w, h);
+    std::cout<<result;
 }
 
 void NVPWindow::maximize(){

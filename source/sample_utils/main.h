@@ -379,7 +379,7 @@
 	// sample-specific implementation, called by nvprintfLevel. For example to redirect the message to a specific window or part of the viewport
 	extern void sample_print(int level, const char * fmt2);
 
-	extern void checkGL( char* msg );
+	extern void checkGL( const char* msg );
 
 	// sample-specific implementation, called by nvprintf*. For example to redirect the message to a specific window or part of the viewport
 	extern void sample_print(int level, const char * fmt);

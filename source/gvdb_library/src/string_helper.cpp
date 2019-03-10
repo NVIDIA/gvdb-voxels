@@ -248,7 +248,7 @@ unsigned long getFilePos ( FILE* fp )
 	return ftell ( fp );
 }
 
-bool getFileLocation ( char* filename, char* outpath, std::vector<std::string>& searchPaths )
+bool getFileLocation ( const char* filename, char* outpath, std::vector<std::string>& searchPaths )
 {
 	bool found = false;
 	FILE* fp = fopen( filename, "rb" );

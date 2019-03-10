@@ -24,7 +24,7 @@
 
 #ifdef BUILD_OPENGL
 
-	void gchkGL ( char* msg )
+	void gchkGL ( const char* msg )
 	{
 		GLenum errCode;
 		//const GLubyte* errString;
@@ -35,7 +35,7 @@
 		}
 	}
 
-	void makeSimpleShaderGL ( Scene* scene, char* vertname, char* fragname )
+	void makeSimpleShaderGL ( Scene* scene, const char* vertname, const char* fragname )
 	{
 		scene->AddShader ( GLS_SIMPLE, vertname, fragname );
 		scene->AddParam ( GLS_SIMPLE, UVIEW, "uView" );
@@ -45,7 +45,7 @@
 		scene->AddParam ( GLS_SIMPLE, UCLRAMB, "uClrAmb" );
 		scene->AddParam ( GLS_SIMPLE, UCLRDIFF, "uClrDiff" );		
 	}
-	void makeOutlineShader ( Scene* scene, char* vertname, char* fragname )
+	void makeOutlineShader ( Scene* scene, const char* vertname, const char* fragname )
 	{
 		scene->AddShader (GLS_OUTLINE, vertname, fragname );
 		scene->AddParam ( GLS_OUTLINE, UVIEW, "uView" );
@@ -54,7 +54,7 @@
 		scene->AddParam ( GLS_OUTLINE, UCLRAMB, "uClrAmb" );
 	}
 
-	void makeSliceShader ( Scene* scene, char* vertname, char* fragname )
+	void makeSliceShader ( Scene* scene, const char* vertname, const char* fragname )
 	{
 		scene->AddShader ( GLS_SLICE, vertname, fragname );
 		scene->AddParam ( GLS_SLICE, UVIEW, "uView" );
@@ -62,14 +62,14 @@
 		scene->AddParam ( GLS_SLICE, ULIGHTPOS, "uLightPos" );
 		scene->AddParam ( GLS_SLICE, UTEX, "uTex" );	
 	}
-	void makeVoxelizeShader ( Scene* scene, char* vertname, char* fragname, char* geomname )
+	void makeVoxelizeShader ( Scene* scene, const char* vertname, const char* fragname, const char* geomname )
 	{
 		scene->AddShader ( GLS_VOXELIZE, vertname, fragname, geomname );
 		scene->AddParam ( GLS_VOXELIZE, UW, "uW" );
 		scene->AddParam ( GLS_VOXELIZE, UTEXRES, "uTexRes" );
 		scene->AddParam ( GLS_VOXELIZE, USAMPLES, "uSamples" );
 	}
-	void makeRaycastShader ( Scene* scene, char* vertname, char* fragname )
+	void makeRaycastShader ( Scene* scene, const char* vertname, const char* fragname )
 	{
 		scene->AddShader ( GLS_RAYCAST, vertname, fragname );
 		scene->AddParam ( GLS_RAYCAST, UINVVIEW, "uInvView" );
@@ -82,7 +82,7 @@
 		scene->AddParam ( GLS_RAYCAST, ULIGHTPOS, "uLightPos" );
 		//scene->AddParam ( GLS_RAYCAST, USAMPLES, "uSamples" );
 	}
-	void makeInstanceShader ( Scene* scene, char* vertname, char* fragname )
+	void makeInstanceShader ( Scene* scene, const char* vertname, const char* fragname )
 	{
 		scene->AddShader ( GLS_INSTANCE, vertname, fragname );
 		scene->AddParam ( GLS_INSTANCE, UVIEW, "uView" );
@@ -94,7 +94,7 @@
 		scene->AddAttrib ( GLS_INSTANCE, UTEXMAX, "instTMax" );
 		scene->AddAttrib ( GLS_INSTANCE, UCLRAMB, "instClr" );*/
 	}
-	void makeScreenShader ( Scene* scene, char* vertname, char* fragname )
+	void makeScreenShader ( Scene* scene, const char* vertname, const char* fragname )
 	{
 		scene->AddShader ( GLS_SCREENTEX, vertname, fragname );
 		scene->AddParam ( GLS_SCREENTEX, UTEX,     "uTex" );	

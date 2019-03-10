@@ -59,8 +59,8 @@
 	GVDB_API bool strEq ( std::string str, std::string str2 );
 
 	// File helpers
-	GVDB_API unsigned long getFileSize ( char* fname );
+	GVDB_API unsigned long getFileSize ( const char* fname );
 	GVDB_API unsigned long getFilePos ( FILE* fp );
-	GVDB_API bool getFileLocation ( char* filename, char* outpath, std::vector<std::string>& paths );
+	GVDB_API bool getFileLocation ( const char* filename, char* outpath, std::vector<std::string>& paths );
 
 #endif

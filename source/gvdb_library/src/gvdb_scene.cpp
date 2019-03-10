@@ -220,19 +220,19 @@ char *ReadShaderSource( char *fileName )
 }
 
 // Create a GLSL program object from vertex and fragment shader files
-int Scene::AddShader ( int prog_id, char* vertfile, char* fragfile )
+int Scene::AddShader ( int prog_id, const char* vertfile, const char* fragfile )
 {
 	return AddShader ( prog_id, vertfile, fragfile, 0x0 );
 }
 
 bool Scene::FindFile ( std::string fname, char* path )
 {
-	char fbuf[1024];
-	strcpy ( fbuf, fname.c_str() );
-	return getFileLocation ( fbuf, path, mSearchPaths );	
+	// char fbuf[1024];
+	// strcpy ( fbuf, fname.c_str() );
+	return getFileLocation ( fname.c_str(), path, mSearchPaths );	
 }
 
-int Scene::AddShader ( int prog_id, char* vertfile, char* fragfile, char* geomfile )
+int Scene::AddShader ( int prog_id, const char* vertfile, const char* fragfile, const char* geomfile )
 {
 	mLastShader = vertfile;
 	int maxLog = 65536, lenLog;
@@ -350,7 +350,7 @@ int	Scene::getSlot ( int prog_id )
 	return -1;
 }
 
-int	Scene::AddParam ( int prog_id, int id, char* name )
+int	Scene::AddParam ( int prog_id, int id, const char* name )
 {
 	int prog = mProgram[prog_id];
 	int active = 0;
@@ -365,7 +365,7 @@ int	Scene::AddParam ( int prog_id, int id, char* name )
 	return ndx;
 }
 
-int	Scene::AddAttrib ( int prog_id, int id, char* name )
+int	Scene::AddAttrib ( int prog_id, int id, const char* name )
 {
 	int prog = mProgram[prog_id];
 	//int ndx = glGetProgramResourceIndex ( prog, GL_BUFFER_VARIABLE, name );		

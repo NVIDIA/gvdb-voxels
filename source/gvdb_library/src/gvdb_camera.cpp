@@ -67,6 +67,7 @@ Camera3D::Camera3D ()
 //	mOps[1] = true;
 
 	setOrbit ( 0, 45, 0, Vector3DF(0,0,0), 120.0, 1.0 );
+	orbit_set_ = true;
 	updateMatricies ();
 }
 
@@ -351,6 +352,7 @@ void Camera3D::setOrbit ( float ax, float ay, float az, Vector3DF tp, float dist
 	from_pos.y = tp.y + (float) dy * mOrbitDist;
 	from_pos.z = tp.z + (float) dz * mOrbitDist;
 	to_pos = tp;
+	orbit_set_ = true;
 	updateMatricies ();
 }
 
@@ -424,36 +426,39 @@ void Camera3D::setProjection (eProjection proj_type)
 
 void Camera3D::updateMatricies ()
 {
+	// THIS NEEDS TO HANDLE THE CASE WHEN THE OBJECT HAS ONLY BEEN CALLED BY setMatricies
 	Matrix4F basis;
 	Vector3DF temp;	
 	
-	// compute camera direction vectors	--- MATCHES OpenGL's gluLookAt function (DO NOT MODIFY)
-	dir_vec = to_pos;					// f vector in gluLookAt docs						
-	dir_vec -= from_pos;				// eye = from_pos in gluLookAt docs
-	dir_vec.Normalize ();
-	side_vec = dir_vec;
-	side_vec.Cross ( up_dir );
-	side_vec.Normalize ();
-	up_vec = side_vec;
-	up_vec.Cross ( dir_vec );
-	up_vec.Normalize();
-	dir_vec *= -1;
+	if(orbit_set_){
+		// compute camera direction vectors	--- MATCHES OpenGL's gluLookAt function (DO NOT MODIFY)
+		dir_vec = to_pos;					// f vector in gluLookAt docs
+		dir_vec -= from_pos;				// eye = from_pos in gluLookAt docs
+		dir_vec.Normalize ();
+		side_vec = dir_vec;
+		side_vec.Cross ( up_dir );
+		side_vec.Normalize ();
+		up_vec = side_vec;
+		up_vec.Cross ( dir_vec );
+		up_vec.Normalize();
+		dir_vec *= -1;
+
+		// construct view matrix
+		rotate_matrix.Basis (side_vec, up_vec, dir_vec );
+		view_matrix = rotate_matrix;
+		view_matrix.PreTranslate ( Vector3DF(-from_pos.x, -from_pos.y, -from_pos.z ) );
 	
-	// construct view matrix
-	rotate_matrix.Basis (side_vec, up_vec, dir_vec );
-	view_matrix = rotate_matrix;
-	view_matrix.PreTranslate ( Vector3DF(-from_pos.x, -from_pos.y, -from_pos.z ) );
 
-	// construct projection matrix  --- MATCHES OpenGL's gluPerspective function (DO NOT MODIFY)
-	float sx = (float) tan ( mFov * DEGtoRAD/2.0f ) * mNear;
-	float sy = sx / mAspect;
-	proj_matrix = 0.0f;
-	proj_matrix(0,0) = 2.0f*mNear / sx;				// matches OpenGL definition
-	proj_matrix(1,1) = 2.0f*mNear / sy;
-	proj_matrix(2,2) = -(mFar + mNear)/(mFar - mNear);			// C
-	proj_matrix(2,3) = -(2.0f*mFar * mNear)/(mFar - mNear);		// D
-	proj_matrix(3,2) = -1.0f;
-
+		// construct projection matrix  --- MATCHES OpenGL's gluPerspective function (DO NOT MODIFY)
+		float sx = (float) tan ( mFov * DEGtoRAD/2.0f ) * mNear;
+		float sy = sx / mAspect;
+		proj_matrix = 0.0f;
+		proj_matrix(0,0) = 2.0f*mNear / sx;				// matches OpenGL definition
+		proj_matrix(1,1) = 2.0f*mNear / sy;
+		proj_matrix(2,2) = -(mFar + mNear)/(mFar - mNear);			// C
+		proj_matrix(2,3) = -(2.0f*mFar * mNear)/(mFar - mNear);		// D
+		proj_matrix(3,2) = -1.0f;
+	}
 	// construct tile projection matrix --- MATCHES OpenGL's glFrustum function (DO NOT MODIFY) 
 	/*float l, r, t, b;
 	l = -sx + 2.0f*sx*mTile.x;						// Tile is in range 0 <= x,y <= 1
@@ -505,6 +510,7 @@ void Camera3D::setMatrices(const float* view_mtx, const float* proj_mtx, Vector3
 	Matrix4F tmp( view_mtx );
 	tmp.InvertTRS ();
 	Vector3DF from ( tmp(0,3), tmp(1,3), tmp(2,3) );
+	from_pos = from;
 
 	// Construct inverse matrices
     Vector3DF zero(0, 0, 0);
@@ -536,6 +542,11 @@ void Camera3D::setViewMatrix ( float* mtx, float* invmtx )
 {
 	memcpy ( view_matrix.GetDataF(), mtx, sizeof(float)*16 );
 	memcpy ( invrot_matrix.GetDataF(), invmtx, sizeof(float)*16 );
+	Matrix4F tmp( mtx );
+	tmp.InvertTRS ();
+	Vector3DF from ( tmp(0,3), tmp(1,3), tmp(2,3) );
+	from_pos = from;
+	origRayWorld = from_pos;	// Used by GVDB render
 }
 void Camera3D::setProjMatrix ( float* mtx, float* invmtx )
 {
