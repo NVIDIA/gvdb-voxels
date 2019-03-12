@@ -341,7 +341,7 @@ void Allocator::CommitMem ( DataPtr& p)
 }
 
 
-void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve )
+void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve, Vector4DF init_val )
 {	
 	// GPU allocate	
 	if ( bGL ) {
@@ -364,7 +364,8 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
 			glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);		
 			gchkGL ( "glBindTexture (AtlasCreate)" );
-	
+
+			//TODO: Unclear how to initialize this with init_val, skipping since not relevant for now
 			switch ( dtype ) {
 			case T_UCHAR:	glTexImage3D ( GL_TEXTURE_3D, 0, GL_R8,		res.x, res.y, res.z, 0, GL_RED, GL_UNSIGNED_BYTE, 0);	break;
 			case T_UCHAR4:	glTexImage3D ( GL_TEXTURE_3D, 0, GL_RGBA8,	res.x, res.y, res.z, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);	break;
@@ -409,15 +410,15 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
 		CUarray old_array = p.garray;
 
 		if ( res.x > 0 && res.y > 0 && res.z > 0 ) {
+			// printf("Allocating tex memory of size %u bytes\n", p.size);
 			cudaCheck ( cuArray3DCreate( &p.garray, &desc), "Allocator", "AllocateTextureGPU", "cuArray3DCreate", "", mbDebug);
 			if ( preserve > 0 && old_array != 0 ) {
-				
-				// Clear channel to 0
+				// Clear channel to init_val.x
 				Vector3DI block ( 8, 8, 8 );
 				Vector3DI grid ( int(res.x/block.x)+1, int(res.y/block.y)+1, int(res.z/block.z)+1 );	
 				cudaCheck ( cuSurfRefSetArray( cuSurfWrite, reinterpret_cast<CUarray>( p.garray ), 0 ), "Allocator", "AllocateTextureGPU", "cuSurfRefSetArray", "cuSurfWrite", mbDebug);
 				int dsize = getSize( p.type );
-				void* args[2] = { &res, &dsize };
+				void* args[3] = { &res, &dsize, &init_val.x };
 				cudaCheck ( cuLaunchKernel ( cuFillTex, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, mStream, args, NULL ), "Allocator", "AllocateTextureGPU", "cuLaunch", "cuFillTex", mbDebug);
 
 				// Copy over preserved data
@@ -441,16 +442,45 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
 }
 
 
-void Allocator::AllocateTextureCPU ( DataPtr& p, uint64 sz, bool bCPU, uint64 preserve )
+void Allocator::AllocateTextureCPU ( DataPtr& p, uint64 sz, bool bCPU, uint64 preserve, Vector4DF init_val )
 {
 	if ( bCPU ) {
 		char* old_cpu = p.cpu;
 		p.cpu = (char*) malloc ( p.size );		
+		// Assign init_val TODO: Deal with other data types other than floats
+		for(size_t i=0; i<p.size/sizeof(float); ++i){
+			((float *) p.cpu)[i] = init_val.x;
+		}
 		if ( preserve > 0 && old_cpu != 0x0 ) {
 			memcpy ( p.cpu, old_cpu, preserve );
 		}
 		if ( old_cpu != 0x0 ) free ( old_cpu );	
 	}
+}
+
+void Allocator::AllocateAtlasMemGPU(DataPtr& p, uchar dtype, Vector3DI res, bool bGL, uint64 preserve, Vector4DF init_val) {
+  if (!bGL) {
+    // Cache old address
+    CUdeviceptr old_array = p.gpu;
+
+    if (res.x > 0 && res.y > 0 && res.z > 0) {
+      // Allocate new linear memory according to the size required
+	  // printf("Allocating device memory of size %u bytes\n", p.size);
+      cudaCheck(cuMemAlloc(&p.gpu, p.size), "Allocator", "AllocateAtlasMemGPU", "cuMemAlloc", "", mbDebug);
+      if (preserve > 0 && old_array != 0) {
+        // Set channel to init_val
+				// TODO: Deal with other data types other than floats
+				cudaCheck(cuMemsetD32(p.gpu, init_val.x, p.size/sizeof(float)), "Allocator", "AllocateAtlasMemGPU", "cuMemset", "", mbDebug);
+
+        // Copy over preserved data
+        if (preserve>0 && preserve < res.x * res.y * res.z)
+          cudaCheck(cuMemcpyDtoD(p.gpu, old_array, preserve), "Allocator", "AllocateAtlasMemGPU", "cuMemcpyDtoD", "preserve", mbDebug);
+      }
+    } else {
+      p.gpu = 0;
+    }
+    if (old_array != 0) cudaCheck(cuMemFree(old_array), "Allocator", "AllocateAtlasMemGPU", "cuMemFree", "", mbDebug);
+  }
 }
 
 void Allocator::AllocateAtlasMap ( int stride, Vector3DI axiscnt )
@@ -502,6 +532,8 @@ bool Allocator::TextureCreate ( uchar chan, uchar dtype, Vector3DI res, bool bCP
 	AllocateTextureGPU ( p, dtype, res, bGL, 0 );		// GPU allocate	
 	AllocateTextureCPU ( p, p.size, bCPU, 0 );			// CPU allocate	
 	mAtlas.push_back ( p );
+	mAtlasTexMem.push_back ( true );
+	mAtlasInitVal.push_back ( Vector4DF{.0f, .0f, .0f, .0f});
 
 	cudaCheck ( cuCtxSynchronize(), "Allocator", "TextureCreate", "cuCtxSynchronize", "", mbDebug);
 
@@ -510,7 +542,7 @@ bool Allocator::TextureCreate ( uchar chan, uchar dtype, Vector3DI res, bool bCP
 
 
 
-bool Allocator::AtlasCreate ( uchar chan, uchar dtype, Vector3DI leafdim, Vector3DI axiscnt, char apr, uint64 map_wid, bool bCPU, bool bGL )
+bool Allocator::AtlasCreate ( uchar chan, uchar dtype, Vector3DI leafdim, Vector3DI axiscnt, char apr, uint64 map_wid, bool bCPU, bool bGL , bool use_tex_mem, Vector4DF init_val)
 {
 	Vector3DI axisres;
 	uint64 atlas_sz; 
@@ -535,9 +567,16 @@ bool Allocator::AtlasCreate ( uchar chan, uchar dtype, Vector3DI leafdim, Vector
 	p.garray = 0x0;
 
 	// Atlas
-	AllocateTextureGPU ( p, dtype, axisres, bGL, 0 );		// GPU allocate	
+	if(use_tex_mem){
+		AllocateTextureGPU ( p, dtype, axisres, bGL, 0, init_val );		// GPU allocate	
+	}
+	else{
+		AllocateAtlasMemGPU( p, dtype, axisres, bGL, 0, init_val );
+	}
 	AllocateTextureCPU ( p, p.size, bCPU, 0 );				// CPU allocate
 	mAtlas.push_back ( p );
+	mAtlasTexMem.push_back ( use_tex_mem );
+	mAtlasInitVal.push_back( init_val );
 
 	cudaCheck ( cuCtxSynchronize(), "Allocator", "AtlasCreate", "cuCtxSynchronize", "", mbDebug);
 
@@ -558,7 +597,7 @@ void Allocator::AtlasSetNum ( uchar chan, int n )
 	mAtlas[chan].lastEle = n;
 }
 
-bool Allocator::AtlasResize ( uchar chan, int cx, int cy, int cz )
+bool Allocator::AtlasResize ( uchar chan, int cx, int cy, int cz)
 {
 	DataPtr p = mAtlas[chan];
 	int leafdim = p.stride;
@@ -573,7 +612,12 @@ bool Allocator::AtlasResize ( uchar chan, int cx, int cy, int cz )
 	p.subdim = axiscnt;
 
 	// Atlas		
-	AllocateTextureGPU ( p, p.type, axisres, (p.glid!=-1), 0 );
+	if(mAtlasTexMem[chan]){
+		AllocateTextureGPU ( p, p.type, axisres, (p.glid!=-1), 0 );
+	}
+	else{
+		AllocateAtlasMemGPU( p, p.type, axisres, (p.glid!=-1), 0 );
+	}
 	AllocateTextureCPU ( p, p.size, (p.cpu!=0x0), 0 );
 	mAtlas[chan] = p;
 
@@ -584,24 +628,32 @@ void Allocator::CopyChannel(int chanDst, int chanSrc)
 {
 	DataPtr pDst = mAtlas[chanDst];
 	DataPtr pSrc = mAtlas[chanSrc];
+	if(mAtlasTexMem[chanDst] != mAtlasTexMem[chanSrc]){
+		gprintf("Invalid channels attempted to be copied!");
+	}
+	if(mAtlasTexMem[chanDst]){
+		int leafdim = pSrc.stride;	
+		Vector3DI axisres;
+		Vector3DI axiscnt = pSrc.subdim;	// number of bricks on each axis	
+		uint64 preserve = pSrc.size;		// previous size of atlas (# bytes to preserve)
 
-	int leafdim = pSrc.stride;	
-	Vector3DI axisres;
-	Vector3DI axiscnt = pSrc.subdim;	// number of bricks on each axis	
-	uint64 preserve = pSrc.size;		// previous size of atlas (# bytes to preserve)
+		axisres = axiscnt * int(leafdim + pSrc.apron * 2);		
 
-	axisres = axiscnt * int(leafdim + pSrc.apron * 2);		
-
-	CUDA_MEMCPY3D cp = {0};
-	cp.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-	cp.dstArray = pDst.garray;
-	cp.srcMemoryType = CU_MEMORYTYPE_ARRAY;
-	cp.srcArray = pSrc.garray;
-	cp.WidthInBytes = axisres.x * getSize(pSrc.type);
-	cp.Height = axisres.y;
-	cp.Depth = preserve / (axisres.x*axisres.y*getSize(pSrc.type));	  // amount to copy (preserve)
-	
-	cudaCheck ( cuMemcpy3D ( &cp ), "Allocator", "CopyChannel", "cuMemcpy3D", "", mbDebug);
+		CUDA_MEMCPY3D cp = {0};
+		cp.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+		cp.dstArray = pDst.garray;
+		cp.srcMemoryType = CU_MEMORYTYPE_ARRAY;
+		cp.srcArray = pSrc.garray;
+		cp.WidthInBytes = axisres.x * getSize(pSrc.type);
+		cp.Height = axisres.y;
+		cp.Depth = preserve / (axisres.x*axisres.y*getSize(pSrc.type));	  // amount to copy (preserve)
+		
+		cudaCheck ( cuMemcpy3D ( &cp ), "Allocator", "CopyChannel", "cuMemcpy3D", "", mbDebug);
+	}
+	else{
+		uint64 preserve = pSrc.size;
+		cudaCheck( cuMemcpyDtoD( pDst.gpu, pSrc.gpu, preserve), "Allocator", "CopyChannel", "cuMemcpyDtoD", "preserve", mbDebug);
+	}
 }
 
 bool Allocator::AtlasResize ( uchar chan, uint64 max_leaf )
@@ -626,8 +678,13 @@ bool Allocator::AtlasResize ( uchar chan, uint64 max_leaf )
 	p.size = atlas_sz;				// new total # bytes
 	p.subdim = axiscnt;				// new number of bricks on each axis
 
-	// Atlas		
-	AllocateTextureGPU ( p, p.type, axisres, (p.glid!=-1), preserve );
+	// Atlas	
+	if(mAtlasTexMem[chan]){
+		AllocateTextureGPU ( p, p.type, axisres, (p.glid!=-1), preserve, mAtlasInitVal[chan] );
+	}
+	else{
+		AllocateAtlasMemGPU( p, p.type, axisres, (p.glid!=-1), preserve, mAtlasInitVal[chan] );
+	}
 	AllocateTextureCPU ( p, p.size, (p.cpu!=0x0), preserve );
 	mAtlas[chan] = p;
 
@@ -803,60 +860,77 @@ void Allocator::AtlasCommitFromCPU ( uchar chan, uchar* src )
 	cp.Depth = res.z;
 	
 	cudaCheck ( cuMemcpy3D ( &cp ), "Allocator", "AtlasCommitFromCPU", "cuMemcpy3D", "", mbDebug);
+
+	//TODO: add HtoD copy here for device pointer
 }
 
 void Allocator::AtlasFill ( uchar chan )
 {
-	Vector3DI atlasres = getAtlasRes(chan);	
-	Vector3DI block ( 8, 8, 8 );
-	Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, int(atlasres.z/block.z)+1 );	
-	
-	cudaCheck ( cuSurfRefSetArray( cuSurfWrite, reinterpret_cast<CUarray>(mAtlas[chan].garray), 0 ), "Allocator", "AtlasCommitFromCPU", "cuSurfRefSetArray", "cuSurfWrite", mbDebug);
-	int dsize = getSize( mAtlas[chan].type );
-	void* args[2] = { &atlasres, &dsize };
-	cudaCheck ( cuLaunchKernel ( cuFillTex, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, mStream, args, NULL ), "Allocator", "AtlasCommitFromCPU", "cuLaunch", "cuFillTex", mbDebug);
+	if(mAtlasTexMem[chan]){
+		Vector3DI atlasres = getAtlasRes(chan);	
+		Vector3DI block ( 8, 8, 8 );
+		Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, int(atlasres.z/block.z)+1 );	
+		
+		cudaCheck ( cuSurfRefSetArray( cuSurfWrite, reinterpret_cast<CUarray>(mAtlas[chan].garray), 0 ), "Allocator", "AtlasCommitFromCPU", "cuSurfRefSetArray", "cuSurfWrite", mbDebug);
+		int dsize = getSize( mAtlas[chan].type );
+		void* args[3] = { &atlasres, &dsize, &mAtlasInitVal[chan] };
+		cudaCheck ( cuLaunchKernel ( cuFillTex, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, mStream, args, NULL ), "Allocator", "AtlasCommitFromCPU", "cuLaunch", "cuFillTex", mbDebug);
+	}
+	else{
+		// TODO: Deal with non float init vals.
+		cudaCheck( cuMemsetD32(mAtlas[chan].gpu, mAtlasInitVal[chan].x, mAtlas[chan].size/sizeof(float)), "Allocator", "AtlasCommitFromCPU", "cuMemset", "", mbDebug);
+	}
 }
 
 void Allocator::AtlasRetrieveSlice ( uchar chan, int slice, int sz, CUdeviceptr gpu_buf, uchar* cpu_dest )
 {
-	// transfer a 3D texture slice into gpu buffer
-	Vector3DI atlasres = getAtlasRes(chan);
-	Vector3DI block ( 8, 8, 1 );
-	Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, 1 );	
-	void* args[3] = { &slice, &atlasres, &gpu_buf };
+	if(mAtlasTexMem[chan]){
+		// transfer a 3D texture slice into gpu buffer
+		Vector3DI atlasres = getAtlasRes(chan);
+		Vector3DI block ( 8, 8, 1 );
+		Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, 1 );	
+		void* args[3] = { &slice, &atlasres, &gpu_buf };
 
-	CUDA_MEMCPY3D cp = {0};	
-	cp.srcMemoryType = CU_MEMORYTYPE_ARRAY;
-	cp.srcArray = mAtlas[chan].garray;	
-	cp.srcZ = slice;
-	cp.dstMemoryType = CU_MEMORYTYPE_HOST;
-	cp.dstHost = cpu_dest;
-	cp.WidthInBytes = atlasres.x * getSize( mAtlas[chan].type );
-	cp.Height = atlasres.y;
-	cp.Depth = 1;
-	cudaCheck ( cuMemcpy3D ( &cp ), "Allocator", "AtlasRetrieveSlice", "cuMemcpy3D", "", mbDebug);
+		CUDA_MEMCPY3D cp = {0};	
+		cp.srcMemoryType = CU_MEMORYTYPE_ARRAY;
+		cp.srcArray = mAtlas[chan].garray;	
+		cp.srcZ = slice;
+		cp.dstMemoryType = CU_MEMORYTYPE_HOST;
+		cp.dstHost = cpu_dest;
+		cp.WidthInBytes = atlasres.x * getSize( mAtlas[chan].type );
+		cp.Height = atlasres.y;
+		cp.Depth = 1;
+		cudaCheck ( cuMemcpy3D ( &cp ), "Allocator", "AtlasRetrieveSlice", "cuMemcpy3D", "", mbDebug);
+	}
+	else{
+		cudaCheck( cuMemcpyDtoH( (void *) cpu_dest, mAtlas[chan].gpu + slice * sz, sz), "Allocator", "AtlasRetrieveSlice", "cuMemcpyDtoH", "", mbDebug);
+	}
 }
 
 void Allocator::AtlasWriteSlice ( uchar chan, int slice, int sz, CUdeviceptr gpu_buf, uchar* cpu_src )
 {
-	// transfer from gpu buffer into 3D texture slice 
-	Vector3DI atlasres = getAtlasRes(chan);
-	Vector3DI block ( 8, 8, 1 );
-	Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, 1 );		
-	void* args[3] = { &slice, &atlasres, &gpu_buf };
+	if(mAtlasTexMem[chan]){
+		// transfer from gpu buffer into 3D texture slice 
+		Vector3DI atlasres = getAtlasRes(chan);
+		Vector3DI block ( 8, 8, 1 );
+		Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, 1 );		
+		void* args[3] = { &slice, &atlasres, &gpu_buf };
 
 
-	CUDA_MEMCPY3D cp = {0};	
-	cp.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-	cp.dstArray = mAtlas[chan].garray;	
-	cp.dstZ = slice;
-	cp.srcMemoryType = CU_MEMORYTYPE_HOST;
-	cp.srcHost = cpu_src;
-	cp.WidthInBytes = atlasres.x * getSize( mAtlas[chan].type );
-	cp.Height = atlasres.y;
-	cp.Depth = 1;
-	cudaCheck ( cuMemcpy3D ( &cp ), "Allocator", "AtlasWriteSlice", "cuMemcpy3D", "", mbDebug);
-
+		CUDA_MEMCPY3D cp = {0};	
+		cp.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+		cp.dstArray = mAtlas[chan].garray;	
+		cp.dstZ = slice;
+		cp.srcMemoryType = CU_MEMORYTYPE_HOST;
+		cp.srcHost = cpu_src;
+		cp.WidthInBytes = atlasres.x * getSize( mAtlas[chan].type );
+		cp.Height = atlasres.y;
+		cp.Depth = 1;
+		cudaCheck ( cuMemcpy3D ( &cp ), "Allocator", "AtlasWriteSlice", "cuMemcpy3D", "", mbDebug);
+	}
+	else{
+		cudaCheck( cuMemcpyHtoD( mAtlas[chan].gpu + slice * sz, (void *)cpu_src,  sz), "Allocator", "AtlasWriteSlice", "cuMemcpyHtoD", "", mbDebug);
+	}
 }
 
 void Allocator::AtlasRetrieveGL ( uchar chan, char* dest )
@@ -906,9 +980,17 @@ void Allocator::AtlasReleaseAll ()
 			mAtlas[n].grsc = 0x0;
 		}
 		// Free cuda memory
-		if ( mAtlas[n].garray != 0x0 && mAtlas[n].glid == -1) {
-			cudaCheck ( cuArrayDestroy ( mAtlas[n].garray ), "Allocator", "AtlasReleaseAll", "cuArrayDestroy", "", mbDebug);
-			mAtlas[n].garray = 0x0;
+		if(mAtlasTexMem[n]){
+			if ( mAtlas[n].garray != 0x0 && mAtlas[n].glid == -1) {
+				cudaCheck ( cuArrayDestroy ( mAtlas[n].garray ), "Allocator", "AtlasReleaseAll", "cuArrayDestroy", "", mbDebug);
+				mAtlas[n].garray = 0x0;
+			}
+		}
+		else{
+			if ( mAtlas[n].gpu != 0x0 && mAtlas[n].glid == -1) {
+				cudaCheck ( cuMemFree ( mAtlas[n].gpu ), "Allocator", "AtlasReleaseAll", "cuMemFree", "", mbDebug);
+				mAtlas[n].gpu = 0x0;
+			}
 		}
 		// Free opengl memory	
 		#ifdef BUILD_OPENGL
@@ -920,6 +1002,8 @@ void Allocator::AtlasReleaseAll ()
 	}
 
 	mAtlas.clear ();
+	mAtlasTexMem.clear ();
+	mAtlasInitVal.clear ();
 
 	for (int n=0; n < mAtlasMap.size(); n++ )  {
 		// Free cpu memory
