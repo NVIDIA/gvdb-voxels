@@ -78,6 +78,8 @@ struct ALIGN(16) VDBInfo {
 	float3		bmax;	
 	cudaTextureObject_t		volIn[MAX_CHANNEL];
 	cudaSurfaceObject_t		volOut[MAX_CHANNEL];	
+	char*		atlas_dev_mem[MAX_CHANNEL];
+	bool		use_tex_mem[MAX_CHANNEL];
 };
 
 __device__ float								cdebug[256]; 

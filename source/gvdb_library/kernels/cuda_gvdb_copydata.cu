@@ -35,12 +35,12 @@ texture<float, cudaTextureType3D, cudaReadModeElementType>		volTexInF;
 surface<void, cudaTextureType3D>								volTexOut;
 
 // Zero memory of 3D volume
-extern "C" __global__ void kernelFillTex ( int3 res, int dsize )
+extern "C" __global__ void kernelFillTex ( int3 res, int dsize, float init_val )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;
 
-	surf3Dwrite ( 0, volTexOut, t.x*dsize, t.y, t.z );
+	surf3Dwrite ( init_val, volTexOut, t.x*dsize, t.y, t.z );
 }
 
 // Copy 3D texture into sub-volume of another 3D texture (char)
