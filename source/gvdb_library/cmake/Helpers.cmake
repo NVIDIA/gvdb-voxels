@@ -82,7 +82,7 @@ FUNCTION( _COMPILEPTX )
         set( compile_target_ptx "${input_without_ext}_PTX")
         set( custom_command_var "${input_without_ext}_OUTPUT")
         # compile ptx
-        cuda_compile_ptx(custom_command_var ${input})
+        cuda_compile_ptx(custom_command_var ${input} OPTIONS "${DEBUG_FLAGS}")
         # This will only configure file generation, we need to add a target to
         # generate a file cuda_generated_<counter>_${input_without_ext}.ptx
         # Add custom command to rename to simply ${input_without_ext}.ptx
