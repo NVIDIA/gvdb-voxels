@@ -141,12 +141,6 @@ void FluidSystem::Initialize ()
 
 	// Allocate the sim parameters
 	AllocateBuffer ( FPARAMS,		sizeof(FParams),	0,	1,					 GPU_SINGLE, CPU_OFF );
-
-	// Allocate auxiliary buffers (prefix sums)
-	AllocateBuffer ( FAUXARRAY1,	sizeof(uint),		0,	SCAN_BLOCKSIZE << 1, GPU_SINGLE, CPU_OFF );
-	AllocateBuffer ( FAUXSCAN1,		sizeof(uint),		0,	SCAN_BLOCKSIZE << 1, GPU_SINGLE, CPU_OFF );	
-	AllocateBuffer ( FAUXARRAY2,	sizeof(uint),		0,	SCAN_BLOCKSIZE << 1, GPU_SINGLE, CPU_OFF );
-	AllocateBuffer ( FAUXSCAN2,		sizeof(uint),		0,	SCAN_BLOCKSIZE << 1, GPU_SINGLE, CPU_OFF );
 }
 
 void FluidSystem::Start ( int num )
@@ -273,6 +267,17 @@ void FluidSystem::AllocateParticles ( int cnt )
 	cuCheck(cuCtxSynchronize(), "AllocateParticles", "cuCtxSynchronize", "", mbDebug );
 
 	m_Param[PSTAT_PMEM] = 68.0f * 2 * cnt;
+
+	// Allocate auxiliary buffers (prefix sums)
+	int blockSize = SCAN_BLOCKSIZE << 1;
+	int numElem1 = m_GridTotal;
+	int numElem2 = int ( numElem1 / blockSize ) + 1;
+	int numElem3 = int ( numElem2 / blockSize ) + 1;
+
+	AllocateBuffer ( FAUXARRAY1,	sizeof(uint),		0,	numElem2, GPU_SINGLE, CPU_OFF );
+	AllocateBuffer ( FAUXSCAN1,	sizeof(uint),		0,	numElem2, GPU_SINGLE, CPU_OFF );
+	AllocateBuffer ( FAUXARRAY2,	sizeof(uint),		0,	numElem3, GPU_SINGLE, CPU_OFF );
+	AllocateBuffer ( FAUXSCAN2,	sizeof(uint),		0,	numElem3, GPU_SINGLE, CPU_OFF );
 }
 
 void FluidSystem::AllocateGrid()
@@ -443,7 +448,7 @@ void FluidSystem::ValidateCUDA ()
 		if ( cpu_gridcnt[n]!=0 ) 
 			{ nvprintf ( "cell: %d, offsets CPU: %d (+%d), GPU: %d\n", n, (int) cpu_gridoff[n], (int) cpu_gridcnt[n], (int) gpu_gridoff[n] ); c++; }
 
-	for (n=0, valid=0, bad=0; n < 512; n++)								// validate all
+	for (n=0, valid=0, bad=0; n < m_GridTotal; n++)								// validate all
 		if ( cpu_gridoff[n]==gpu_gridoff[n] ) {
 			valid++; 
 		} else {
@@ -2735,10 +2740,10 @@ void FluidSystem::PrefixSumCellsCUDA ( uint* goff, int zero_offsets )
 	#else
 
 		// Prefix Sum - determine grid offsets
-		int naux = SCAN_BLOCKSIZE << 1;
+		int blockSize = SCAN_BLOCKSIZE << 1;
 		int numElem1 = m_GridTotal;		
-		int numElem2 = int ( numElem1 / naux ) + 1;
-		int numElem3 = int ( numElem2 / naux ) + 1;
+		int numElem2 = int ( numElem1 / blockSize ) + 1;
+		int numElem3 = int ( numElem2 / blockSize ) + 1;
 		int threads = SCAN_BLOCKSIZE;
 		int zon=1;
 
