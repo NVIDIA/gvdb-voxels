@@ -116,6 +116,7 @@ inline __device__ int getChild ( VDBNode* node, int b )
 {	
 	int n = countOn ( node, b );
 	uint64 listid = node->mChildList;
+	if (listid == ID_UNDEFL) return ID_UNDEF64;
 	uchar clev = uchar( (listid >> 8) & 0xFF );
 	int cndx = listid >> 16;
 	uint64* clist = (uint64*) (gvdb.childlist[clev] + cndx*gvdb.childwid[clev]);
@@ -128,6 +129,7 @@ inline __device__ int getChild ( VDBNode* node, int b )
 inline __device__ int getChild ( VDBInfo* gvdb, VDBNode* node, int b )
 {	
 	uint64 listid = node->mChildList;
+	if (listid == ID_UNDEFL) return ID_UNDEF64;
 	uchar clev = uchar( (listid >> 8) & 0xFF );
 	int cndx = listid >> 16;
 	uint64* clist = (uint64*) (gvdb->childlist[clev] + cndx*gvdb->childwid[clev]);
@@ -188,7 +190,7 @@ inline __device__ int3 getAtlasPos ( VDBInfo* gvdb, uint64 id )
 }
 inline __device__ int getBitPos ( VDBInfo* gvdb, int lev, int3 pos )
 {
-	int res = gvdb->res[ lev ];
+	int res = gvdb->res[ lev ]; 
 	return (pos.z*res + pos.y)*res+ pos.x;
 }
 
