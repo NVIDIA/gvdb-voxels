@@ -352,7 +352,7 @@
 			void SetVoxelSize ( float vx, float vy, float vz );
 			void SetProfile ( bool bCPU, bool bGPU ) ;
 			void SetDebug(bool dbg);
-			void LoadFunction ( int fid, std::string func, int mid, std::string ptx );
+			void LoadFunction ( int fid, std::string func, int mid );
 			void StartRasterGL ();
 			void SetModule ();
 			void SetModule ( CUmodule module );			

@@ -45,7 +45,10 @@ Allocator::Allocator ()
 {
 	mVFBO[0] = -1;
 
-	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, CUDA_GVDB_COPYDATA_PTX), "Allocator", "Allocator", "cuModuleLoad", CUDA_GVDB_COPYDATA_PTX, mbDebug);
+	char ptxfile[512];
+	strcpy(ptxfile, CUDA_GVDB_MODULE_PATH "/cuda_gvdb_copydata.ptx");
+
+	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, ptxfile), "Allocator", "Allocator", "cuModuleLoad", ptxfile, mbDebug);
 		
 	cudaCheck ( cuModuleGetFunction ( &cuFillTex,		cuAllocatorModule, "kernelFillTex" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuFillTex",  mbDebug);
 	cudaCheck ( cuModuleGetFunction ( &cuCopyTexC,		cuAllocatorModule, "kernelCopyTexC" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuCopyTexC", mbDebug);

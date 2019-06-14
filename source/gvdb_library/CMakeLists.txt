@@ -122,8 +122,8 @@ list( APPEND ALL_SOURCE_FILES ${PACKAGE_SOURCE_FILES} )
 # Definitions
 add_definitions(-DGVDB_EXPORTS)					# Export dll symbols
 
-add_definitions(-DCUDA_GVDB_MODULE_PTX="${LIB_INSTALL_PATH}/cuda_gvdb_module.ptx")
-message ( STATUS "CUDA_GVDB_MODULE_PTX: ${LIB_INSTALL_PATH}/cuda_gvdb_module.ptx" )
+add_definitions(-DCUDA_GVDB_MODULE_PATH="${LIB_INSTALL_PATH}")
+message ( STATUS "CUDA_GVDB_MODULE_PATH: ${LIB_INSTALL_PATH}" )
 
 
 # Set the library type
