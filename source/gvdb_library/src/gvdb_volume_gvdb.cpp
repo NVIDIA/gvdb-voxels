@@ -2572,6 +2572,27 @@ void VolumeGVDB::Initialize ()
 	POP_CTX
 }
 
+VolumeGVDB::~VolumeGVDB(){
+	// Clear out all allocated channels and pools
+	DestroyChannels();
+	DataPtr temp;
+	SetPoints(temp, temp, temp);
+	CleanAux();
+	mPool->PoolReleaseAll();
+	// Deallocate cuVDBInfo object
+	if(cuVDBInfo != 0x0){
+		cudaCheck(cuMemFree(cuVDBInfo), "VolumeGVDB", "Destructor", "cuMemFree", "cuVDBInfo", mbDebug);
+	}
+	if(mTransferPtr.gpu!= 0x0){
+		cudaCheck(cuMemFree(mTransferPtr.gpu), "VolumeGVDB", "Destructor", "cuMemFree", "cuVDBInfo", mbDebug);
+	}
+	CUDPPResult result = CUDPP_SUCCESS;
+	result = cudppDestroyPlan(mPlan_max);
+	result = cudppDestroyPlan(mPlan_min);
+	result = cudppDestroyPlan(mPlan_sort);
+	if(result != CUDPP_SUCCESS) printf("Error in plan destruction!");
+}
+
 // Configure VDB tree (5-level)
 void VolumeGVDB::Configure ( int q4, int q3, int q2, int q1, int q0 )
 {
