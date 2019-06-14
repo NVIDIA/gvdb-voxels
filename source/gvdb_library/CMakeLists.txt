@@ -72,13 +72,14 @@ SET(COMMON_SOURCE_FILES ${GLEW_SOURCE} )
 #
 # CMAKE_INSTALL_PREFIX -- path where library will be installed to
 
-if ( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
+if (NOT DEFINED CMAKE_INSTALL_SUGGEST )
    if ( WIN32 )
       get_filename_component ( _instpath "${CMAKE_CURRENT_SOURCE_DIR}/../../_output" REALPATH )
    else()
       get_filename_component ( _instpath "/usr/local/gvdb" REALPATH )
    endif()
-   set ( CMAKE_INSTALL_PREFIX ${_instpath} CACHE PATH "default install path" FORCE)   
+   set ( CMAKE_INSTALL_SUGGEST ${_instpath} CACHE PATH "Suggested install path" FORCE)
+   set ( CMAKE_INSTALL_PREFIX ${_instpath} CACHE PATH "Actual install path" FORCE)   
 endif()
 
 get_filename_component( LIB_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR} REALPATH)
@@ -97,12 +98,13 @@ message ( STATUS "Located CUDA kernels: ${CUDA_FILES}" )
 # Autodetect Target Architecture
 unset(CUDA_ARCH_BIN CACHE)
 unset(CUDA_ARCH_PTX CACHE)
-detect_installed_gpus(CUDA_ARCH_BIN)
+
+#-------------- THIS IS NOT WORKING!
+# detect_installed_gpus(CUDA_ARCH_BIN)
 # Take the detected version, and append the bin and ptx flags assuming ptx ver==bin ver
-APPEND_TARGET_ARCH_FLAGS()
+# APPEND_TARGET_ARCH_FLAGS()
 
 if ( NOT DEFINED CUDA_ARCH_BIN )
-   message( "Did not detect CUDA_ARCH - should not be here, but falling back to default")
    SET( CUDA_ARCH_BIN "compute_30" CACHE STRING "CUDA Architecture target")
    SET( CUDA_ARCH_PTX "sm_30" CACHE STRING "CUDA Code target")
 endif ()

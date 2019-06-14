@@ -45,11 +45,13 @@ if ( GVDB_ROOT_DIR )
 	   message ( "  NOT FOUND. GVDB Library. (so/dll or lib missing)" )	   
 	endif()
 
-	if ( NOT DEFINED WIN32 )
-           set ( OK_CUDPP 0 )
-     	   _FIND_FILE ( LIST_CUDPP GVDB_LIB_DIR "" "libcudpp.so" OK_CUDPP )	        
-    	   _FIND_FILE ( LIST_CUDPP GVDB_LIB_DIR "" "libcudpp_hash.so" OK_CUDPP )	     
-        endif()
+	set ( OK_CUDPP 0 )
+	if ( WIN32 )
+		# _FIND_MULTIPLE ( LIST_CUDPP GVDB_LIB_DIR "lib" "so" OK_CUDPP )    
+	else ()    
+		_FIND_FILE ( LIST_CUDPP GVDB_LIB_DIR "" "libcudpp.so" OK_CUDPP )	        
+    	_FIND_FILE ( LIST_CUDPP GVDB_LIB_DIR "" "libcudpp_hash.so" OK_CUDPP )	     
+    endif()
 
 	#-------- Locate PTX/GLSL
         set ( OK_PTX 0 )	
@@ -84,6 +86,7 @@ set ( GVDB_LIB ${LIST_LIB} CACHE INTERNAL "" FORCE)
 set ( GVDB_PTX ${LIST_PTX} CACHE INTERNAL "" FORCE)
 set ( GVDB_GLSL ${LIST_GLSL} CACHE INTERNAL "" FORCE)
 set ( GVDB_EXTRA ${LIST_EXTRA} CACHE INTERNAL "" FORCE)
+# set ( GVDB_CUDPP ${LIST_CUDPP} CACHE INTERNAL "" FORCE)
 
 #-- Create a list of all binary files needed for exes
 unset ( LIST_FULL )	
@@ -101,6 +104,7 @@ message ( STATUS "  GVDB_LIB:  ${GVDB_LIB}" )
 message ( STATUS "  GVDB_PTX:  ${GVDB_PTX}" )
 message ( STATUS "  GVDB_GLSL: ${GVDB_GLSL}" )
 message ( STATUS "  GVDB_EXTRA:${GVDB_EXTRA}" )
+# message ( STATUS "  GVDB_CUDPP:${GVDB_CUDPP}" )
 
 mark_as_advanced(GVDB_FOUND)
 

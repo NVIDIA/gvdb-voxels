@@ -391,7 +391,7 @@
 	void nvprintSetLogging(bool b);
 	void nverror();
 	
-	bool getFileLocation ( char* filename, char* outpath );
-	bool getFileLocation ( char* filename, char* outpath, std::vector<std::string> paths );
+	bool getFileLocation ( const char* filename, char* outpath );
+	bool getFileLocation ( const char* filename, char* outpath, std::vector<std::string> paths );
 
 #endif

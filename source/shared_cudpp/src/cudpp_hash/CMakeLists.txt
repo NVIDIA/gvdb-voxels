@@ -77,6 +77,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   # https://github.com/cudpp/cudpp/wiki/BuildingCUDPPWithMavericks
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
+set ( CUDPP_BUILD_SHARED_LIBS OFF CACHE BOOL "Use only static cuddp libs for GVDB" FORCE )
 
 if (CUDPP_BUILD_SHARED_LIBS)
   message ( STATUS "Set export shared library.")
@@ -88,6 +89,10 @@ endif()
 unset(CUDA_ARCH_BIN CACHE)
 unset(CUDA_ARCH_PTX CACHE)
 detect_installed_gpus(CUDA_ARCH_BIN)
+set (CUDA_ARCH_BIN "30")
+set (CUDA_ARCH_PTX "30")
+message ( "CUDA_ARCH_BIN: ${CUDA_ARCH_BIN}")
+message ( "CUDA_ARCH_PTX: ${CUDA_ARCH_PTX}")
 # Take the detected version, and append the bin and ptx flags assuming ptx ver==bin ver
 APPEND_TARGET_ARCH_FLAGS()
 
