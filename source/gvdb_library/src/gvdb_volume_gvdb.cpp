@@ -3545,8 +3545,16 @@ void VolumeGVDB::StartRasterGL ()
 	#ifdef BUILD_OPENGL
 		ValidateOpenGL ();
 
-		makeSimpleShaderGL (mScene, SIMPLE_VERT_GLSL, SIMPLE_FRAG_GLSL);
-		makeVoxelizeShader  ( mScene, VOXELIZE_VERT_GLSL, VOXELIZE_FRAG_GLSL, VOXELIZE_GEOM_GLSL );
+		char vertfile[1024], fragfile[1024], geomfile[1024];
+
+		strcpy(vertfile, CUDA_GVDB_MODULE_PATH "/simple.vert.glsl");
+		strcpy(fragfile, CUDA_GVDB_MODULE_PATH "/simple.frag.glsl");
+		makeSimpleShaderGL(mScene, vertfile, fragfile);
+
+		strcpy(vertfile, CUDA_GVDB_MODULE_PATH "/voxelize.vert.glsl");
+		strcpy(fragfile, CUDA_GVDB_MODULE_PATH "/voxelize.frag.glsl");
+		strcpy(geomfile, CUDA_GVDB_MODULE_PATH "/voxelize.geom.glsl");
+		makeVoxelizeShader(mScene, vertfile, fragfile, geomfile);
 	#endif
 }
 
