@@ -38,7 +38,7 @@ endif()
 
 option(CUDPP_BUILD_SHARED_LIBS
   "On to build shared libraries, off for static libraries."
-  ON
+  OFF
   )
 
 option(CUDPP_BUILD_APPLICATIONS
