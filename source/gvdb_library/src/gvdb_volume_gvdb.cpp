@@ -115,7 +115,6 @@ VolumeGVDB::VolumeGVDB ()
 	mAtlasResize.Set ( 0, 20, 0 );
 	mEpsilon = 0.001f;				// default epsilon
 	mMaxIter = 256;					// default max iter
-	mVoxsize.Set ( 1, 1, 1 );		// default voxel size
 	mApron = 1;						// default apron
 	mbDebug = false;
 
@@ -825,8 +824,8 @@ int VolumeGVDB::DetermineDepth( Vector3DI& pos)
 	Vector3DI range, posMin, posMax;
 	for (int lev = 0; lev < MAXLEV; lev++)
 	{
-		posMin = GetCoveringNode ( lev, mPosMin/mVoxsize, range );
-		posMax = GetCoveringNode ( lev, mPosMax/mVoxsize, range );
+		posMin = GetCoveringNode ( lev, mPosMin, range );
+		posMax = GetCoveringNode ( lev, mPosMax, range );
 
 		if (posMin.x == posMax.x && posMin.y == posMax.y && posMin.z == posMax.z) {
 			pos = posMin;
@@ -1576,7 +1575,7 @@ void VolumeGVDB::FindActivBricks(int pLev,  int pRootlev,  int pNumPnts, Vector3
 	int threads = 512;		
 	int pblks = int(pNumPnts / threads)+1;
 	Vector3DI brickRange = getRange(nxtLev);
-	Vector3DI orig_shift = GetCoveringNode ( nxtLev, pOrig/mVoxsize, brickRange );
+	Vector3DI orig_shift = GetCoveringNode ( nxtLev, pOrig, brickRange );
 
 	void* args[11] = { &pNumPnts, &nxtLev, &brickRange, &dim,
 		&mAux[AUX_PNTPOS].gpu, &mAux[AUX_PNTPOS].subdim.x, &mAux[AUX_PNTPOS].stride,
@@ -1820,6 +1819,8 @@ void VolumeGVDB::SaveVBX ( std::string fname )
 	}
 	int num_chan = mPool->getNumAtlas();
 
+	Vector3DF voxelsize_deprecated(1, 1, 1);
+
 	for (int n=0; n < num_grids; n++ ) {
 		grid_offs[n] = ftell ( fp );						// record grid offset
 
@@ -1828,7 +1829,7 @@ void VolumeGVDB::SaveVBX ( std::string fname )
 		fwrite ( &grid_dtype, sizeof(uchar), 1, fp );		// grid data type
 		fwrite ( &grid_components, sizeof(uchar), 1, fp );	// grid components
 		fwrite ( &grid_compress, sizeof(uchar), 1, fp );	// grid compression (0=none, 1=blosc, 2=..)
-		fwrite ( &mVoxsize.x, sizeof(float), 3, fp );		// voxel size
+		fwrite ( &voxelsize_deprecated.x, sizeof(float), 3, fp );		// voxel size (deprecated)
 		fwrite ( &leafcnt, sizeof(int), 1, fp );			// total brick count
 		fwrite ( &leafdim.x, sizeof(int), 3, fp );			// brick dimensions
 		fwrite ( &apron, sizeof(int), 1, fp );				// brick apron
@@ -1909,8 +1910,8 @@ void VolumeGVDB::SetBounds(Vector3DF pMin, Vector3DF pMax)
 	mVoxMax.y = int(pMax.y / range.y) * range.y + 2 * range.y;
 	mVoxMax.z = int(pMax.z / range.z) * range.z + 2 * range.z;
 
-	mObjMin = mVoxMin;	mObjMin *= mVoxsize;
-	mObjMax = mVoxMax;  mObjMax *= mVoxsize;
+	mObjMin = mVoxMin;	
+	mObjMax = mVoxMax; 
 	mVoxRes = mVoxMax;  mVoxRes -= mVoxMin;
 
 	if ( mVoxRes.x > mVoxResMax.x ) mVoxResMax.x = mVoxRes.x;
@@ -1937,8 +1938,8 @@ void VolumeGVDB::ComputeBounds ()
 		if ( curr->mPos.y + range.y > mVoxMax.y ) mVoxMax.y = curr->mPos.y + range.y;
 		if ( curr->mPos.z + range.z > mVoxMax.z ) mVoxMax.z = curr->mPos.z + range.z;		
 	}
-	mObjMin = mVoxMin;	mObjMin *= mVoxsize;
-	mObjMax = mVoxMax;  mObjMax *= mVoxsize;
+	mObjMin = mVoxMin;	
+	mObjMax = mVoxMax; 
 	mVoxRes = mVoxMax;  mVoxRes -= mVoxMin;
 
 	if ( mVoxRes.x > mVoxResMax.x ) mVoxResMax.x = mVoxRes.x;
@@ -3008,9 +3009,7 @@ slong VolumeGVDB::Reparent(int lev, slong prevroot_id, Vector3DI pos, bool& bNew
 
 // Activate region of space at 3D position
 slong VolumeGVDB::ActivateSpace ( Vector3DF pos )
-{
-	pos /= mVoxsize;
-	
+{	
 	Vector3DI brickpos;
 	bool bnew = false;
 	slong node_id = ActivateSpace ( mRoot, pos, bnew, ID_UNDEFL, 0 );
@@ -3022,7 +3021,6 @@ slong VolumeGVDB::ActivateSpace ( Vector3DF pos )
 // Activate region of space at 3D position down to a given level
 slong VolumeGVDB::ActivateSpaceAtLevel ( int lev, Vector3DF pos )
 {
-	pos /= mVoxsize;	
 	Vector3DI brickpos;
 	bool bnew = false;
 	slong node_id = ActivateSpace ( mRoot, pos, bnew, ID_UNDEFL, lev );		// specify level to stop
@@ -3848,8 +3846,8 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	// Identify model bounding box
 	model->ComputeBounds ( *xform, 0.1 );
 	mObjMin = model->objMin; mObjMax = model->objMax;
-	mVoxMin = mObjMin;	mVoxMin /= mVoxsize;
-	mVoxMax = mObjMax;  mVoxMax /= mVoxsize;
+	mVoxMin = mObjMin;	
+	mVoxMax = mObjMax; 
 	mVoxRes = mVoxMax; mVoxRes -= mVoxMin;
 
 	// VDB Hierarchical Rasterization	
@@ -3971,8 +3969,8 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 	// Configure model
 	model->ComputeBounds ( *xform, 0.1 );
 	mObjMin = model->objMin; mObjMax = model->objMax;
-	mVoxMin = mObjMin;	mVoxMin /= mVoxsize;
-	mVoxMax = mObjMax;  mVoxMax /= mVoxsize;
+	mVoxMin = mObjMin;	
+	mVoxMax = mObjMax;  
 	mVoxRes = mVoxMax; mVoxRes -= mVoxMin;
 	
 	// Determine which leaf voxels to activate
@@ -4005,7 +4003,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 				// Rasterize at level 1 (green) 
 				vmin1 = Vector3DI(x1+0, y1+0, z1+0); vmin1 *= vrange1;
 				vmax1 = Vector3DI(x1+1, y1+1, z1+1); vmax1 *= vrange1;				
-				vtemp.SurfaceVoxelizeFastGL ( vmin1*mVoxsize, vmax1*mVoxsize, xform );				
+				vtemp.SurfaceVoxelizeFastGL ( vmin1, vmax1, xform );				
 
 				// Readback the voxels
 				vtemp.RetrieveGL ( (char*) vdat );
@@ -4021,7 +4019,6 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 								vmin0.z = vmin1.z + z0 * vrange1.z / res1;										
 								leaf = ActivateSpace ( mRoot, vmin0, bnew );	
 								if ( leaf != ID_UNDEFL ) {
-									vmin0 *= mVoxsize;
 									leaf_pos.push_back ( vmin0 );
 									leaf_ptr.push_back ( leaf );
 								}
@@ -4041,8 +4038,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 									vmin0.y = vmin1.y + y0 * vrange1.y / res1;
 									vmin0.z = vmin1.z + z0 * vrange1.z / res1;									
 									leaf = ActivateSpace ( mRoot, vmin0, bnew );
-									if ( leaf != ID_UNDEFL ) {
-										vmin0 *= mVoxsize;
+									if ( leaf != ID_UNDEFL ) {										
 										leaf_pos.push_back ( vmin0 );
 										leaf_ptr.push_back ( leaf );
 									}
@@ -4061,8 +4057,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 									vmin0.y = vmin1.y + y0 * vrange1.y / res1;
 									vmin0.z = vmin1.z + z0 * vrange1.z / res1;									
 									leaf = ActivateSpace ( mRoot, vmin0, bnew );
-									if ( leaf != ID_UNDEFL ) {
-										vmin0 *= mVoxsize;
+									if ( leaf != ID_UNDEFL ) {									
 										leaf_pos.push_back ( vmin0 );
 										leaf_ptr.push_back ( leaf );
 									}
@@ -4111,7 +4106,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 		for (int n=0; n < leaf_ptr.size(); n++ ) {
 
 			// Rasterize into temporary 3D texture						
-			vtemp.SurfaceVoxelizeFastGL ( leaf_pos[n], leaf_pos[n] + vrange0*mVoxsize, xform );			
+			vtemp.SurfaceVoxelizeFastGL ( leaf_pos[n], leaf_pos[n] + vrange0, xform );			
 
 			// Copy 3D texture in VDB atlas
 			Node* node = getNode ( leaf_ptr[n] );
@@ -4323,7 +4318,7 @@ void VolumeGVDB::PrepareVDB ()
 		for (int n = levs-1; n >= 0; n-- ) {				
 			mVDBInfo.dim[n]			= mLogDim[n];
 			mVDBInfo.res[n]			= getRes(n);
-			mVDBInfo.vdel[n]		= Vector3DF(getRange(n)) * mVoxsize;	mVDBInfo.vdel[n] /= Vector3DF( getRes3DI(n) );
+			mVDBInfo.vdel[n]		= Vector3DF(getRange(n));	mVDBInfo.vdel[n] /= Vector3DF( getRes3DI(n) );
 			mVDBInfo.noderange[n]	= getRange(n);		// integer (cannot send cover)
 			mVDBInfo.nodecnt[n]		= mPool->getPoolTotalCnt(0, n);
 			mVDBInfo.nodewid[n]		= mPool->getPoolWidth(0, n);
@@ -4367,7 +4362,7 @@ void VolumeGVDB::PrepareVDBPartially ()
 	for (int n = levs-1; n >= 0; n-- ) {				
 		mVDBInfo.dim[n]			= mLogDim[n];
 		mVDBInfo.res[n]			= getRes(n);
-		mVDBInfo.vdel[n]		= Vector3DF(getRange(n)) * mVoxsize;	mVDBInfo.vdel[n] /= Vector3DF( getRes3DI(n) );
+		mVDBInfo.vdel[n]		= Vector3DF(getRange(n));	mVDBInfo.vdel[n] /= Vector3DF( getRes3DI(n) );
 		mVDBInfo.noderange[n]	= getRange(n);		// integer (cannot send cover)
 		mVDBInfo.nodecnt[n]		= mPool->getPoolTotalCnt(0, n);
 		mVDBInfo.nodewid[n]		= mPool->getPoolWidth(0, n);
@@ -5061,7 +5056,6 @@ bool  VolumeGVDB::isActive( Vector3DF pos, slong nodeid)
 {
 	// Recurse to leaf	
 	unsigned int b;
-	pos /= mVoxsize;
 
 	if (getPosInNode(nodeid, pos, b)) {
 	
@@ -6227,10 +6221,8 @@ void VolumeGVDB::SetTransform(Vector3DF pretrans, Vector3DF scal, Vector3DF angs
 int	VolumeGVDB::getNumUsedNodes ( int lev )			{ return mPool->getPoolUsedCnt(0, lev); }
 int	VolumeGVDB::getNumTotalNodes ( int lev )		{ return mPool->getPoolTotalCnt(0, lev); }
 Node* VolumeGVDB::getNodeAtLevel ( int n, int lev )	{ return (Node*) (mPool->PoolData( 0, lev, n )); }
-
-//--- must be updated to use mXform instead of mVoxsize
-Vector3DF VolumeGVDB::getWorldMin ( Node* node )	{ return Vector3DF(node->mPos) * mVoxsize; }
-Vector3DF VolumeGVDB::getWorldMax ( Node* node )	{ return Vector3DF(node->mPos) * mVoxsize + getCover(node->mLev); }
+Vector3DF VolumeGVDB::getWorldMin ( Node* node )	{ return Vector3DF(node->mPos) ; }
+Vector3DF VolumeGVDB::getWorldMax ( Node* node )	{ return Vector3DF(node->mPos) + getCover(node->mLev); }
 
 Vector3DF VolumeGVDB::getWorldMin() {
 	Vector3DF wmin = mObjMin; wmin *= mXform;

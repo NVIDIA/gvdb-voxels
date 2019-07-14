@@ -27,13 +27,12 @@
 
 using namespace nvdb;
 
-void VolumeBase::getDimensions ( Vector3DF& objmin, Vector3DF& objmax, Vector3DF& voxmin, Vector3DF& voxmax, Vector3DF& voxsize, Vector3DF& voxres )
+void VolumeBase::getDimensions ( Vector3DF& objmin, Vector3DF& objmax, Vector3DF& voxmin, Vector3DF& voxmax, Vector3DF& voxres )
 {
 	objmin = mObjMin;
 	objmax = mObjMax;
 	voxmin = mVoxMin;
 	voxmax = mVoxMax;
-	voxsize = mVoxsize * 1000;
 	voxres = mVoxRes;
 }
 

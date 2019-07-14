@@ -93,15 +93,18 @@ void Sample::start_guis (int w, int h)
 		addItem ( "Surface" );
 		addItem ( "Section" );
 		addItem ( "Volume" );
-	addGui( 300, h - 30, 160, 20, "Voxel Size", GUI_COMBO, GUI_INT, &m_voxelsize_select, 0.f, 5.f);
-		addItem ( "0.5 mm");
-		addItem ( "0.4 mm");
-		addItem ( "0.3 mm");
-		addItem ( "0.2 mm");
+	addGui( 300, h - 30, 200, 20, "Voxel Size", GUI_COMBO, GUI_INT, &m_voxelsize_select, 0.f, 5.f);
+		addItem ( "0.5 mm, 10 MB");
+		addItem ( "0.4 mm, 10 MB");
+		addItem ( "0.3 mm, 20 MB");
+		addItem ( "0.2 mm, 40 MB");
 }
 
 void Sample::revoxelize()
 {
+	gvdb1.DestroyChannels();
+	gvdb1.AddChannel(0, T_FLOAT, 1);
+
 	// Setup part dimensions
 	m_part_size = 100.0;					// Part size = 100 mm (default)
 
@@ -144,11 +147,14 @@ void Sample::revoxelize()
 
 	gvdb1.SolidVoxelize(0, model, &xform, 1.0, 0.5);
 
+	gvdb1.Measure(true);
+
 	#ifdef USE_GVDB2
 		printf("SurfaceVoxelizeGL 2.\n");
 		gvdb2.SetVoxelSize(voxelsize.x, voxelsize.y, voxelsize.z);
 		gvdb2.SurfaceVoxelizeGL(0, m, &xform);
 	#endif
+		
 
 }
 
@@ -160,7 +166,7 @@ bool Sample::init ()
 	m_show_topo = false;
 	m_shade_style = 0;
 	m_chan = 0;
-	m_voxelsize_select = 2;
+	m_voxelsize_select = 0;
 	srand ( 6572 );
 
 	init2D ( "arial" );
@@ -204,8 +210,7 @@ bool Sample::init ()
 	// An apron of 1 is used for correct smoothing and trilinear surface rendering.
 	printf("Configure.\n");
 	gvdb1.Configure(3, 3, 3, 3, 5);
-	gvdb1.SetChannelDefault(16, 16, 1);
-	gvdb1.AddChannel(0, T_FLOAT, 1);
+	gvdb1.SetChannelDefault(8, 8, 1);
 
 #ifdef USE_GVDB2
 	gvdb2.Configure ( 3, 3, 3, 3, 4);

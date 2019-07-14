@@ -56,7 +56,7 @@
 		void ClearGeometry ( Model* m );
 		
 		// Query functions
-		void			getDimensions ( Vector3DF& objmin, Vector3DF& objmax, Vector3DF& voxmin, Vector3DF& voxmax, Vector3DF& voxsize, Vector3DF& voxres );
+		void			getDimensions ( Vector3DF& objmin, Vector3DF& objmax, Vector3DF& voxmin, Vector3DF& voxmax, Vector3DF& voxres );
 		void			getTiming ( float& render_time );
 		DataPtr			getTransferPtr ()		{ return mTransferPtr; }
 		CUdeviceptr		getTransferFuncGPU ()	{ return mTransferPtr.gpu; }
@@ -68,7 +68,6 @@
 		void			SetVerbose ( bool tf )			{ mbVerbose = tf; }
 
 	public:
-		Vector3DF		mVoxsize;					// size of voxels (in microns)
 		Vector3DF		mObjMin, mObjMax;			// world space
 		Vector3DF		mVoxMin, mVoxMax, mVoxRes;	// coordinate space
 		Vector3DF		mVoxResMax;

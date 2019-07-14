@@ -172,8 +172,8 @@ void Volume3D::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 		// Configure model
 		model->ComputeBounds ( *xform, 0.05 );
 		mObjMin = model->objMin; mObjMax = model->objMax;
-		mVoxMin = mObjMin;	mVoxMin /= mVoxsize;
-		mVoxMax = mObjMax;  mVoxMax /= mVoxsize;
+		mVoxMin = mObjMin;	
+		mVoxMax = mObjMax;  
 		mVoxRes = mVoxMax;	mVoxRes -= mVoxMin;
 
 		// Create atlas if none exists

@@ -577,7 +577,7 @@
 					int x = (b & mask);
 					return Vector3DI(x,y,z);
 			}
-			Vector3DF getCover(int lv)	{ return mVoxsize * Vector3DF(getRange(lv)); }
+			Vector3DF getCover(int lv)	{ return  Vector3DF(getRange(lv)); }
 			Vector3DI getRange(int lv)	{ 
 					if ( lv==-1 ) return Vector3DI(1,1,1);
 					Vector3DI r = getRes3DI(0);		// brick res
