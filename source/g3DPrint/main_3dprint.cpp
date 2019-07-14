@@ -52,6 +52,7 @@ public:
 	virtual void keyboardchar(unsigned char key, int mods, int x, int y);
 	virtual void mouse (NVPWindow::MouseButton button, NVPWindow::ButtonAction state, int mods, int x, int y);
 	
+	void		revoxelize();
 	void		draw_topology (VolumeGVDB* gvdb);	// draw gvdb topology		
 	void		render_section ();
 	void		start_guis ( int w, int h );
@@ -59,23 +60,96 @@ public:
 	int			gl_screen_tex;
 	int			gl_section_tex;
 	int			mouse_down;
+
+	Vector3DF	m_pivot;
+	float		m_part_size;
+	float		m_voxel_size;
+	int			m_voxelsize_select;
+
 	bool		m_show_topo;	
 	int			m_shade_style;
 	int			m_chan;
 };
 
+Sample sample_obj;
+
+void handle_gui(int gui, float val)
+{
+	switch (gui) {
+	case 2: {				// Voxel size gui changed
+		sample_obj.revoxelize();
+	} break;
+	}
+}
 
 void Sample::start_guis (int w, int h)
 {
 	clearGuis();
 	setview2D ( w, h );
-	guiSetCallback ( 0x0 );		
+	guiSetCallback ( handle_gui );		
 	addGui ( 10, h-30, 130, 20, "Topology", GUI_CHECK, GUI_BOOL, &m_show_topo, 0.f, 1.f );	
 	addGui ( 150, h-30, 130, 20, "Shading",  GUI_COMBO, GUI_INT, &m_shade_style, 0.f, 5.f );		
 		addItem ( "Voxel" );
 		addItem ( "Surface" );
 		addItem ( "Section" );
 		addItem ( "Volume" );
+	addGui( 300, h - 30, 160, 20, "Voxel Size", GUI_COMBO, GUI_INT, &m_voxelsize_select, 0.f, 5.f);
+		addItem ( "0.5 mm");
+		addItem ( "0.4 mm");
+		addItem ( "0.3 mm");
+		addItem ( "0.2 mm");
+}
+
+void Sample::revoxelize()
+{
+	// Setup part dimensions
+	m_part_size = 100.0;					// Part size = 100 mm (default)
+
+	// Voxel size
+	// *NOTE*: Voxelsize has been deprecated inside GVDB 1.1 (7/14/2019)
+	// so we bring it out into the sample itself. For flexibility, applications now handle arbitrary
+	// transforms to/from world coordinates and the voxel grid. The new function SetTransform 
+	// allows the application to setup rendering to convert from unit voxel grid to world coordinates.
+	// To apply voxel size for 3D printing, we include it in the xform matrix for SolidVoxelize.
+	switch (m_voxelsize_select) {
+	case 0:	m_voxel_size = 0.5;		break;
+	case 1:	m_voxel_size = 0.4;		break;
+	case 2:	m_voxel_size = 0.3;		break;
+	case 3:	m_voxel_size = 0.2;		break;
+	};
+	
+	// Create a transform	
+	Matrix4F xform, m;
+	xform.Identity();
+
+	// Complete poly-to-voxel transform: 
+	//    X = S(partsize) S(1/voxelsize) Torigin R
+	//  (remember, matrices are multiplied left-to-right but applied conceptually right-to-left)
+	m.Scale(m_part_size, m_part_size, m_part_size);
+	xform *= m;									// 4th) Apply part size 
+	m.Scale(1 / m_voxel_size, 1 / m_voxel_size, 1 / m_voxel_size);
+	xform *= m;									// 3rd) Apply voxel size (scale by inverse of this)
+	m.Translate( m_pivot.x, m_pivot.y, m_pivot.z);	// 2nd) Move part so origin is at bottom corner 
+	xform *= m;
+	m.RotateZYX(Vector3DF(0, -10, 0));			// 1st) Rotate part about the geometric center
+	xform *= m;
+
+	// Set transform for rendering
+	// Scale the GVDB grid by voxelsize to render the model in our desired world coordinates
+	gvdb1.SetTransform(Vector3DF(0, 0, 0), Vector3DF(m_voxel_size, m_voxel_size, m_voxel_size), Vector3DF(0, 0, 0), Vector3DF(0, 0, 0));
+
+	// Poly-to-Voxels
+	// Converts polygons-to-voxels using the GPU	
+	Model* model = gvdb1.getScene()->getModel(0);
+
+	gvdb1.SolidVoxelize(0, model, &xform, 1.0, 0.5);
+
+	#ifdef USE_GVDB2
+		printf("SurfaceVoxelizeGL 2.\n");
+		gvdb2.SetVoxelSize(voxelsize.x, voxelsize.y, voxelsize.z);
+		gvdb2.SurfaceVoxelizeGL(0, m, &xform);
+	#endif
+
 }
 
 bool Sample::init ()
@@ -86,6 +160,7 @@ bool Sample::init ()
 	m_show_topo = false;
 	m_shade_style = 0;
 	m_chan = 0;
+	m_voxelsize_select = 2;
 	srand ( 6572 );
 
 	init2D ( "arial" );
@@ -110,13 +185,14 @@ bool Sample::init ()
 	gvdb2.AddPath("../source/shared_assets/");
 	gvdb2.AddPath(ASSET_PATH);
 #endif
-
 	
 	// Load polygons
 	// This loads an obj file into scene memory on cpu.
 	printf ( "Loading polygon model.\n" );
 	gvdb1.getScene()->AddModel ( "lucy.obj", 1.0, 0, 0, 0 );
-	gvdb1.CommitGeometry( 0 );					// Send the polygons to GPU as OpenGL VBO
+	gvdb1.CommitGeometry( 0 );				// Send the polygons to GPU as OpenGL VBO
+
+	m_pivot.Set(0.3, 0.45, 0.3);			// this is the center of the polygon model
 
 #ifdef USE_GVDB2
 	gvdb2.getScene()->AddModel("lucy.obj", 1.1, 0, 0, 0);
@@ -126,10 +202,10 @@ bool Sample::init ()
 	// Configure the GVDB tree to the desired topology. We choose a 
 	// topology with small upper nodes (3=8^3) and large bricks (5=32^3) for performance.
 	// An apron of 1 is used for correct smoothing and trilinear surface rendering.
-	printf ( "Configure.\n" );
-	gvdb1.Configure ( 3, 3, 3, 3, 5 );	
-	gvdb1.SetChannelDefault ( 16, 16, 1 );
-	gvdb1.AddChannel ( 0, T_FLOAT, 1 );
+	printf("Configure.\n");
+	gvdb1.Configure(3, 3, 3, 3, 5);
+	gvdb1.SetChannelDefault(16, 16, 1);
+	gvdb1.AddChannel(0, T_FLOAT, 1);
 
 #ifdef USE_GVDB2
 	gvdb2.Configure ( 3, 3, 3, 3, 4);
@@ -137,40 +213,8 @@ bool Sample::init ()
 	gvdb2.AddChannel ( 0, T_FLOAT, 1 );
 #endif
 
-	// Create a transform	
-	// The input polygonal model has been normalized with 1 unit height, so we 
-	// set the desired part size by scaling in millimeters (mm). 
-	// Translation has been added to position the part at (50,55,50).
-	Matrix4F xform;	
-	float part_size = 100.0;					// Part size is set to 100 mm height.
-	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(50,55,50), part_size );
-	
-	// The part can be oriented arbitrarily inside the target GVDB volume
-	// by applying a rotation, translation, or scale to the transform.
-	Matrix4F rot;
-	rot.RotateZYX( Vector3DF( 0, -10, 0 ) );
-	xform *= rot;									// Post-multiply to rotate part
-
-	// Set the voxel size
-	// We can specify the voxel size directly to GVDB. This is the size of a single voxel in world units.
-	// The voxel resolution of a rasterized part is the maximum number of voxels along each axis, 
-	// and is found by dividing the part size by the voxel size.
-	// To limit the resolution, one can invert the equation and find the voxel size for a given resolution.	
-	Vector3DF voxelsize ( 0.2f, 0.2f, 0.2f );	// Voxel size (mm)
-
-	// Poly-to-Voxels
-	// Converts polygons-to-voxels using the GPU graphics pipeline.		
-	Model* m = gvdb1.getScene()->getModel(0);
-	
-	gvdb1.SetVoxelSize ( voxelsize.x, voxelsize.y, voxelsize.z );	
-
-	gvdb1.SolidVoxelize ( 0, m, &xform, 1.0, 0.5 );
-
-#ifdef USE_GVDB2
-	printf ( "SurfaceVoxelizeGL 2.\n" );
-	gvdb2.SetVoxelSize(voxelsize.x, voxelsize.y, voxelsize.z);	
-	gvdb2.SurfaceVoxelizeGL ( 0, m, &xform );
-#endif
+	// Revoxelize the model into GVDB
+	revoxelize();
 
 	// Set volume params
 	printf ( "Volume params.\n" );
@@ -194,16 +238,16 @@ bool Sample::init ()
 	gvdb2.CommitTransferFunc();
 	gvdb2.getScene()->SetBackgroundClr(0.1f, 0.2f, 0.4f, 1.0f);
 #endif
-	
+
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
-	cam->setOrbit ( Vector3DF(-45.f, 30.f, 0.f ), Vector3DF(50,55,50), 300.f, 1.0f );	
+	cam->setOrbit ( Vector3DF(-45.f, 30.f, 0.f ), m_pivot*m_part_size, 300.f, 1.0f );	
 	gvdb1.getScene()->SetCamera( cam );		
 
 	// Create Light
 	Light* lgt = new Light;								
-	lgt->setOrbit ( Vector3DF(299.0f, 57.3f, 0.f), Vector3DF(132.0f, -20.0f, 50.f), 200.f, 1.0f );
+	lgt->setOrbit ( Vector3DF(299.0f, 57.3f, 0.f), m_pivot*m_part_size*Vector3DF(1.3f, 1.8f, 1.1f), 200.f, 1.0f );
 	gvdb1.getScene()->SetLight ( 0, lgt );	
 
 	// Add render buffer 
@@ -233,7 +277,10 @@ void Sample::render_section ()
 {
 	// Render cross-section
 	float h = (float) getHeight();
-	gvdb1.getScene()->SetCrossSection ( Vector3DF(50.0f, 100.0f-(getCurY()*100.0f/h), 50.0f), Vector3DF(30.0f, 1.f, 30.0f) );
+	Vector3DF world;
+	world = m_pivot * m_part_size / m_voxel_size;	// gvdb voxel grid to world coordinates
+	world.y *= 1.0 - getCurY() / h;					// select cross section on world y-axis
+	gvdb1.getScene()->SetCrossSection ( world, Vector3DF(world.x, 1.f, world.z) );
 
 	gvdb1.Render ( SHADE_SECTION2D, 0, 1 );		
 
@@ -302,14 +349,15 @@ void Sample::draw_topology ( VolumeGVDB* gvdb )
 	
 	start3D ( gvdb->getScene()->getCamera() );		// start 3D drawing
 	
+	Vector3DF vs(m_voxel_size, m_voxel_size, m_voxel_size);	// scaling by voxel size 
 	Vector3DF bmin, bmax;
 	Node* node;
 	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
 		int node_cnt = gvdb->getNumNodes(lev);
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb->getNodeAtLevel ( n, lev );
-			bmin = gvdb->getWorldMin ( node );		// get node bounding box
-			bmax = gvdb->getWorldMax ( node );		// draw node as a box
+			bmin = gvdb->getWorldMin ( node ) * vs;		// get node bounding box
+			bmax = gvdb->getWorldMax ( node ) * vs;		// draw node as a box
 			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, clrs[lev].x, clrs[lev].y, clrs[lev].z, 1 );			
 		}		
 	}
@@ -386,7 +434,6 @@ void Sample::reshape (int w, int h)
 
 int sample_main ( int argc, const char** argv ) 
 {
-	Sample sample_obj;
 	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - g3DPrint", "3dprint", argc, argv, 1024, 768, 4, 4 );
 }
 

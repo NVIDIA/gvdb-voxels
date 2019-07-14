@@ -541,7 +541,7 @@ bool VolumeGVDB::LoadVBX(std::string fname, int force_maj, int force_min)
 	Vector3DI range[MAXLEV];
 	int cnt0[MAXLEV], cnt1[MAXLEV];
 	int width0[MAXLEV], width1[MAXLEV];
-	Vector3DF voxelsize;
+	Vector3DF voxelsize_deprecated;
 	uint64 atlas_sz, root;
 
 	std::vector<uint64> grid_offs;
@@ -595,7 +595,7 @@ bool VolumeGVDB::LoadVBX(std::string fname, int force_maj, int force_min)
 		fread(&grid_dtype, sizeof(uchar), 1, fp);		// grid data type
 		fread(&grid_components, sizeof(uchar), 1, fp);	// grid components
 		fread(&grid_compress, sizeof(uchar), 1, fp);		// grid compression (0=none, 1=blosc, 2=..)
-		fread(&voxelsize, sizeof(float), 3, fp);			// voxel size
+		fread(&voxelsize_deprecated, sizeof(float), 3, fp);			// voxel size
 		fread(&leafcnt, sizeof(int), 1, fp);				// total brick count
 		fread(&leafdim.x, sizeof(int), 3, fp);			// brick dimensions
 		fread(&apron, sizeof(int), 1, fp);				// brick apron
@@ -631,7 +631,6 @@ bool VolumeGVDB::LoadVBX(std::string fname, int force_maj, int force_min)
 		// Initialize GVDB
 		Configure ( levels, ld, cnt0, (read_masks==1) );
 
-		SetVoxelSize ( voxelsize.x, voxelsize.y, voxelsize.z );
 		mRoot = root;		// must be set after initialize
 
 		// Read topology
@@ -2069,9 +2068,7 @@ bool VolumeGVDB::LoadBRK ( std::string fname )
 	verbosef ( "    Leaf res: %d (leaf log2=%d)\n", bres.x, mVCFG[4] );
 
 	// Initialize VDB
-	Vector3DF voxelsize ( 1, 1, 1 );
 	Configure ( mVCFG[0], mVCFG[1], mVCFG[2], mVCFG[3], mVCFG[4] );
-	SetVoxelSize ( voxelsize.x, voxelsize.y, voxelsize.z );
 	SetApron ( 1 );
 	
 	// Create atlas
@@ -2137,7 +2134,6 @@ bool VolumeGVDB::LoadBRK ( std::string fname )
 	verbosef( "    Activate: %f ms\n", t.y );
 	verbosef( "    To Atlas: %f ms\n", t.z );
 
-	mVoxsize = voxelsize;
 	ComputeBounds ();
 
 	// Commit all node pools to gpu
@@ -2204,7 +2200,6 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	PERF_POP ();
 
 	// Initialize GVDB config
-	Vector3DF voxelsize;
 	int gridtype = 0;
 
 	bool isFloat = false;
@@ -2214,31 +2209,30 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 		gridtype = 0;
 		isFloat = true;
 		mOVDB->grid543F = openvdb::gridPtrCast< FloatGrid543 >(baseGrid);	
-		voxelsize.Set ( mOVDB->grid543F->voxelSize().x(), mOVDB->grid543F->voxelSize().y(), mOVDB->grid543F->voxelSize().z() );			
+		//voxelsize.Set ( mOVDB->grid543F->voxelSize().x(), mOVDB->grid543F->voxelSize().y(), mOVDB->grid543F->voxelSize().z() );			
 		Configure ( 5, 5, 5, 4, 3 );
 	}
 	if ( baseGrid->isType< Vec3fGrid543 >() ) {
 		gridtype = 0;
 		isFloat = false;
 		mOVDB->grid543VF = openvdb::gridPtrCast< Vec3fGrid543 >(baseGrid);	
-		voxelsize.Set ( mOVDB->grid543VF->voxelSize().x(), mOVDB->grid543VF->voxelSize().y(), mOVDB->grid543VF->voxelSize().z() );	
+		//voxelsize.Set ( mOVDB->grid543VF->voxelSize().x(), mOVDB->grid543VF->voxelSize().y(), mOVDB->grid543VF->voxelSize().z() );	
 		Configure ( 5, 5, 5, 4, 3 );
 	}	 
 	if ( baseGrid->isType< FloatGrid34 >() ) {
 		gridtype = 1;
 		isFloat = true;
 		mOVDB->grid34F = openvdb::gridPtrCast< FloatGrid34 >(baseGrid);	
-		voxelsize.Set ( mOVDB->grid34F->voxelSize().x(), mOVDB->grid34F->voxelSize().y(), mOVDB->grid34F->voxelSize().z() );	
+		//voxelsize.Set ( mOVDB->grid34F->voxelSize().x(), mOVDB->grid34F->voxelSize().y(), mOVDB->grid34F->voxelSize().z() );	
 		Configure ( 3, 3, 3, 3, 4 );
 	}
 	if ( baseGrid->isType< Vec3fGrid34 >() ) {
 		gridtype = 1;
 		isFloat = false;
 		mOVDB->grid34VF = openvdb::gridPtrCast< Vec3fGrid34 >(baseGrid);	
-		voxelsize.Set ( mOVDB->grid34VF->voxelSize().x(), mOVDB->grid34VF->voxelSize().y(), mOVDB->grid34VF->voxelSize().z() );	
+		//voxelsize.Set ( mOVDB->grid34VF->voxelSize().x(), mOVDB->grid34VF->voxelSize().y(), mOVDB->grid34VF->voxelSize().z() );	
 		Configure ( 3, 3, 3, 3, 4 );
 	}
-	SetVoxelSize ( voxelsize.x, voxelsize.y, voxelsize.z );
 	SetApron ( 1 );
 
 	float pused = MeasurePools ();
@@ -3347,12 +3341,6 @@ uint32 VolumeGVDB::getChildOffset ( slong nodeid, slong childid, Vector3DI& pos 
 	return getBitPos ( curr->mLev, pos );
 }
 
-// Set voxel size
-void VolumeGVDB::SetVoxelSize ( float vx, float vy, float vz )
-{
-	mVoxsize.Set ( vx, vy, vz );
-}
-
 
 void VolumeGVDB::writeCube (  FILE* fp, unsigned char vpix[], slong& numfaces, int gv[], int*& vgToVert, slong vbase )
 {
@@ -4265,7 +4253,6 @@ void VolumeGVDB::Measure ( bool bPrint )
 		gprintf("   Volume Max: %.0f x %.0f x %.0f\n", mVoxResMax.x, mVoxResMax.y, mVoxResMax.z);
 		gprintf("   Bound Min:  %f x %f x %f\n", mObjMin.x, mObjMin.y, mObjMin.z);
 		gprintf("   Bound Max:  %f x %f x %f\n", mObjMax.x, mObjMax.y, mObjMax.z);
-		gprintf("   Voxelsize:  %f x %f x %f\n", mVoxsize.x, mVoxsize.y, mVoxsize.z);
 		gprintf("  VDB CONFIG: <%d, %d, %d, %d, %d>:\n", getLD(4), getLD(3), getLD(2), getLD(1), getLD(0));
 		gprintf("             # Nodes / # Pool   Pool Size\n");
 	
@@ -4345,7 +4332,6 @@ void VolumeGVDB::PrepareVDB ()
 			mVDBInfo.childlist[n]	= mPool->getPoolGPU(1, n);								
 			if ( mVDBInfo.nodecnt[n] == 1 ) tlev = n;		// get top level for rendering
 		}
-		mVDBInfo.voxelsize			= mVoxsize;		
 		mVDBInfo.atlas_map			= mPool->getAtlasMapGPU(0);		
 		mVDBInfo.atlas_apron		= mPool->getAtlas(0).apron;	
 		mVDBInfo.atlas_cnt			= mPool->getAtlas(0).subdim;		// number of bricks on each axis of atlas

@@ -50,7 +50,6 @@ struct ALIGN(16) VDBInfo {
 	int			dim[10];
 	int			res[10];	
 	float3		vdel[10];
-	float3		voxelsize;	
 	int3		noderange[10];
 	int			nodecnt[10];
 	int			nodewid[10];

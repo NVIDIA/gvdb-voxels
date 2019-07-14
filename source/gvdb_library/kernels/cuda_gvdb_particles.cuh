@@ -795,7 +795,7 @@ extern "C" __global__ void gvdbGatherDensity (VDBInfo* gvdb, int num_pnts, int n
 	wpos.x = sc_pos[sc_id].x + int(threadIdx.x);	wpos.y = sc_pos[sc_id].y + int(threadIdx.y);	wpos.z = sc_pos[sc_id].z + int(threadIdx.z);
 	
 	VDBNode* node = getNode(gvdb, 0, sc_nid[sc_id]);
-	float3 vmin = node->mPos * gvdb->voxelsize;
+	float3 vmin = make_float3(node->mPos);
 	float3 vdel = gvdb->vdel[0];
 	int3 vox = node->mValue + make_int3((wpos.x - vmin.x) / vdel.x, (wpos.y - vmin.y) / vdel.y, (wpos.z - vmin.z) / vdel.z);
 
@@ -834,7 +834,7 @@ extern "C" __global__ void gvdbGatherLevelSet (VDBInfo* gvdb, int num_pnts, int 
 	wpos.x = sc_pos[sc_id].x + int(threadIdx.x);	wpos.y = sc_pos[sc_id].y + int(threadIdx.y);	wpos.z = sc_pos[sc_id].z + int(threadIdx.z);
 	
 	VDBNode* node = getNode(gvdb, 0, sc_nid[sc_id]);
-	float3 vmin = node->mPos * gvdb->voxelsize;
+	float3 vmin = make_float3(node->mPos);
 	float3 vdel = gvdb->vdel[0];
 	int3 vox = node->mValue + make_int3((wpos.x - vmin.x) / vdel.x, (wpos.y - vmin.y) / vdel.y, (wpos.z - vmin.z) / vdel.z);
 
@@ -872,7 +872,7 @@ extern "C" __global__ void gvdbGatherLevelSet_fp16(VDBInfo* gvdb, int num_pnts, 
 	int3 wpos; wpos.x = sc_pos[sc_id].x + int(threadIdx.x);	wpos.y = sc_pos[sc_id].y + int(threadIdx.y);	wpos.z = sc_pos[sc_id].z + int(threadIdx.z);
 	
 	VDBNode* node = getNode(gvdb, 0, sc_nid[sc_id]);
-	float3 vmin = node->mPos * gvdb->voxelsize;
+	float3 vmin = make_float3(node->mPos);
 	float3 vdel = gvdb->vdel[node->mLev];
 	int3 vox = node->mValue + make_int3((wpos.x - vmin.x) / vdel.x, (wpos.y - vmin.y) / vdel.y, (wpos.z - vmin.z) / vdel.z);
 

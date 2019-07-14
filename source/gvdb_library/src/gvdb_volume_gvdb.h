@@ -82,7 +82,6 @@
 		int				dim[MAXLEV];
 		int				res[MAXLEV];
 		Vector3DF		vdel[MAXLEV];
-		Vector3DF		voxelsize;
 		Vector3DI		noderange[MAXLEV];
 		int				nodecnt[MAXLEV];
 		int				nodewid[MAXLEV];
@@ -349,7 +348,6 @@
 			void SetCudaDevice ( int devid, CUcontext ctx=NULL );
 			void Initialize ();			
 			void Clear ();	
-			void SetVoxelSize ( float vx, float vy, float vz );
 			void SetProfile ( bool bCPU, bool bGPU ) ;
 			void SetDebug(bool dbg);
 			void LoadFunction ( int fid, std::string func, int mid );
@@ -608,10 +606,9 @@
 			//-- Voxsize - this should be made obsolete by SetTransform in the future
 			Vector3DF getWorldMin ( Node* node );
 			Vector3DF getWorldMax ( Node* node );
-			Vector3DF getVoxelSize() { return mVoxsize; }
 			
 			//-- Grid Transform - arbitrary transforms on volume (replaces Voxsize)
-			void SetTransform(Vector3DF pretrans, Vector3DF angs, Vector3DF trans, Vector3DF scal);
+			void SetTransform(Vector3DF pretrans, Vector3DF scal, Vector3DF angs, Vector3DF trans);
 			Vector3DF getWorldMin();
 			Vector3DF getWorldMax();
 			Matrix4F& getTransform() { return mXform; }	

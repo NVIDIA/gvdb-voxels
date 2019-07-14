@@ -147,13 +147,6 @@ inline __device__ float3 getGradientLevelSet ( VDBInfo* gvdb, uchar chan, float3
 	g.x = 1.0* (tex3D<float>( gvdb->volIn[chan], p.x+.5, p.y,   p.z  ) - tex3D<float>( gvdb->volIn[chan], p.x-.5, p.y, p.z ));
 	g.y = 1.0* (tex3D<float>( gvdb->volIn[chan], p.x,   p.y+.5, p.z  ) - tex3D<float>( gvdb->volIn[chan], p.x, p.y-.5, p.z ));
 	g.z = 1.0* (tex3D<float>( gvdb->volIn[chan], p.x,   p.y,   p.z+.5) - tex3D<float>( gvdb->volIn[chan], p.x, p.y, p.z-.5 ));
-
-	/*
-	float3 vs = gvdb->voxelsize * 0.5 / vdel;
-	, p = offs + (pos-vmin)/vdel;	
-	g.x = 0.5* (tex3D<float>( gvdb->volIn[chan], p.x+vs.x, p.y,   p.z  ) - tex3D<float>( gvdb->volIn[chan], p.x-vs.x, p.y, p.z ));
-	g.y = 0.5* (tex3D<float>( gvdb->volIn[chan], p.x,   p.y+vs.y, p.z  ) - tex3D<float>( gvdb->volIn[chan], p.x, p.y-vs.y, p.z ));
-	g.z = 0.5* (tex3D<float>( gvdb->volIn[chan], p.x,   p.y,   p.z+vs.z) - tex3D<float>( gvdb->volIn[chan], p.x, p.y, p.z-vs.z ));*/
 	g = normalize ( g );
 	return g;
 }
@@ -172,7 +165,7 @@ inline __device__ float3 getGradientTricubic ( VDBInfo* gvdb, uchar chan, float3
 
 __device__ float3 rayTricubic ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin, float3 vdel )
 {
-	float3 pt = SCN_FSTEP * gvdb->voxelsize * rdir;
+	float3 pt = SCN_FSTEP * rdir;
 
 	for ( int i=0; i < 512; i++ ) {					
 		if (  getTricubic ( gvdb, chan, p, o, vmin, vdel ) >= SCN_THRESH )			// tricubic test
@@ -184,7 +177,7 @@ __device__ float3 rayTricubic ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, 
 
 __device__ float3 rayTrilinear (VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin, float3 vdel )
 {
-	float dt = SCN_FSTEP * gvdb->voxelsize.x;		
+	float dt = SCN_FSTEP ;
 	float3 pt = dt*rdir/vdel;
 
 	for ( int i=0; i < 512; i++ ) {
@@ -197,7 +190,7 @@ __device__ float3 rayTrilinear (VDBInfo* gvdb, uchar chan, float3& p, float3 o, 
 
 __device__ float3 rayLevelSet ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin, float3 vdel )
 {
-	float dt = SCN_FSTEP * gvdb->voxelsize.x;		
+	float dt = SCN_FSTEP;		
 	float3 pt = dt*rdir/vdel;
 	
 	for ( int i=0; i < 512; i++ ) {
@@ -236,15 +229,15 @@ __device__ void raySurfaceVoxelBrick ( VDBInfo* gvdb, uchar chan, int nodeid, fl
 	{
 		if ( tex3D<float> ( gvdb->volIn[chan], p.x+o.x+.5, p.y+o.y+.5, p.z+o.z+.5 ) > SCN_THRESH) {		// test texture atlas
 			vmin += p * gvdb->vdel[0];		// voxel location in world
-			t = rayBoxIntersect ( pos, dir, vmin, vmin + gvdb->voxelsize );		
+			t = rayBoxIntersect ( pos, dir, vmin, vmin + 1 );		
 			if (t.z == NOHIT) {
 				hit.z = NOHIT;
 				continue;
 			}
 			hit = getRayPoint ( pos, dir, t.x );				
-			norm.x = EPSTEST(hit.x, vmin.x + gvdb->voxelsize.x, VOXEL_EPS) ? 1 : (EPSTEST(hit.x, vmin.x, VOXEL_EPS) ? -1 : 0);
-			norm.y = EPSTEST(hit.y, vmin.y + gvdb->voxelsize.y, VOXEL_EPS) ? 1 : (EPSTEST(hit.y, vmin.y, VOXEL_EPS) ? -1 : 0);
-			norm.z = EPSTEST(hit.z, vmin.z + gvdb->voxelsize.z, VOXEL_EPS) ? 1 : (EPSTEST(hit.z, vmin.z, VOXEL_EPS) ? -1 : 0);
+			norm.x = EPSTEST(hit.x, vmin.x + 1, VOXEL_EPS) ? 1 : (EPSTEST(hit.x, vmin.x, VOXEL_EPS) ? -1 : 0);
+			norm.y = EPSTEST(hit.y, vmin.y + 1, VOXEL_EPS) ? 1 : (EPSTEST(hit.y, vmin.y, VOXEL_EPS) ? -1 : 0);
+			norm.z = EPSTEST(hit.z, vmin.z + 1, VOXEL_EPS) ? 1 : (EPSTEST(hit.z, vmin.z, VOXEL_EPS) ? -1 : 0);
 			if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, p+o );
 			return;	
 		}
@@ -351,22 +344,22 @@ inline __device__ float getLinearDepth(float* depthBufFloat)
 				if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, p+o );
 				} return;			
 			case SHADE_TRILINEAR: {				// tri-linear surface with central diff normals
-				t.x = length( (p* gvdb->vdel[0] +vmin) + (gvdb->voxelsize*0.5) - pos);		// find t value at center of voxel								
+				t.x = length( (p* gvdb->vdel[0] +vmin) + 0.5 - pos);		// find t value at center of voxel								
 				//t.x = SCN_PSTEP * ceil ( t.x / SCN_PSTEP );
 				hit = rayTrilinear ( gvdb, chan, p, o, pos, dir, vmin, gvdb->vdel[0] );		// p updated here
 				if ( hit.z != NOHIT ) {					
 					norm = getGradient ( gvdb, chan, p );
-					//norm = getGradient ( o, hit, vmin,  make_float3(gvdb->noderange[0])*gvdb->voxelsize/(gvdb->res[0]-1) );
+					//norm = getGradient ( o, hit, vmin,  make_float3(gvdb->noderange[0]) / (gvdb->res[0]-1) );
 					if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, p+o );
 					return;
 				}
 				} break;
 			case SHADE_TRICUBIC: {				// tri-cubic surface with tricubic normals
-				t.x = length( (p* gvdb->vdel[0] +vmin) +(gvdb->voxelsize*0.5) - pos);		// find t value at center of voxel											
+				t.x = length( (p* gvdb->vdel[0] +vmin) + 0.5 - pos);		// find t value at center of voxel											
 				//t.x = PSTEP * ceil ( t.x/PSTEP );
 				hit = rayTricubic ( gvdb, chan, p, o, pos, dir, vmin, gvdb->vdel[0] );
 				if ( hit.z != NOHIT ) {					
-					norm = getGradientTricubic (gvdb, chan, p, o, vmin, make_float3(gvdb->noderange[0])*gvdb->voxelsize/(gvdb->res[0]-1)  );
+					norm = getGradientTricubic (gvdb, chan, p, o, vmin, make_float3(gvdb->noderange[0]) / (gvdb->res[0]-1)  );
 					if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, p+o );
 					return;
 				}

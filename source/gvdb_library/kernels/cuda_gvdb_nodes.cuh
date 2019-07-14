@@ -56,7 +56,6 @@ struct ALIGN(16) VDBInfo {
 	int			dim[10];
 	int			res[10];	
 	float3		vdel[10];
-	float3		voxelsize;	
 	int3		noderange[10];
 	int			nodecnt[10];
 	int			nodewid[10];
@@ -162,7 +161,7 @@ inline __device__ bool getAtlasToWorld ( VDBInfo* gvdb, uint3 vox, float3& wpos 
 	int brickid = (bndx.z*gvdb->atlas_cnt.y + bndx.y )*gvdb->atlas_cnt.x + bndx.x;		// brick id			
 	if ((gvdb->atlas_map + brickid)->mLeafID == ID_UNDEFL) return false;
 	int3 poffset = make_int3(vox.x % gvdb->brick_res, vox.y % gvdb->brick_res, vox.z % gvdb->brick_res ) - make_int3(gvdb->atlas_apron);
-	wpos = ( make_float3((gvdb->atlas_map + brickid)->mPos) + make_float3(poffset) + make_float3(0.5,0.5,0.5) ) * gvdb->voxelsize;
+	wpos = ( make_float3((gvdb->atlas_map + brickid)->mPos) + make_float3(poffset) + make_float3(0.5,0.5,0.5) );
 	return true;
 }
 inline __device__ bool getAtlasToWorldID ( VDBInfo* gvdb, uint3 vox, float3& wpos, int& leafid )
@@ -172,7 +171,7 @@ inline __device__ bool getAtlasToWorldID ( VDBInfo* gvdb, uint3 vox, float3& wpo
 	leafid = (gvdb->atlas_map + brickid)->mLeafID;
 	if ( leafid == ID_UNDEFL) return false;
 	int3 poffset = make_int3(vox.x % gvdb->brick_res, vox.y % gvdb->brick_res, vox.z % gvdb->brick_res ) - make_int3(gvdb->atlas_apron);
-	wpos = ( make_float3((gvdb->atlas_map + brickid)->mPos) + make_float3(poffset) + make_float3(0.5,0.5,0.5) ) * gvdb->voxelsize;
+	wpos = ( make_float3((gvdb->atlas_map + brickid)->mPos) + make_float3(poffset) + make_float3(0.5,0.5,0.5) );
 	return true;
 }
 
@@ -205,7 +204,7 @@ inline __device__ VDBNode* getNode ( VDBInfo* gvdb, int lev, int n )
 inline __device__ VDBNode* getNode ( VDBInfo* gvdb, int lev, int n, float3* vmin )
 {
 	VDBNode* node = (VDBNode*) (gvdb->nodelist[lev] + n*gvdb->nodewid[lev]);
-	*vmin = node->mPos * gvdb->voxelsize;	
+	*vmin = make_float3(node->mPos);
 	return node;
 }
 
@@ -220,7 +219,7 @@ inline __device__ VDBNode* getNode ( VDBInfo* gvdb, int lev, int start_id, float
 	VDBNode* node = getNode ( gvdb, lev, start_id, &vmin );		// get starting node
 	while ( lev > 0 && node != 0x0 ) {			
 		// is point inside node? if no, exit
-		vmax = vmin + make_float3(gvdb->noderange[lev]) * gvdb->voxelsize; 
+		vmax = vmin + make_float3(gvdb->noderange[lev]);
 		if ( pos.x < vmin.x || pos.y < vmin.y || pos.z < vmin.z || pos.x >= vmax.x || pos.y >= vmax.y || pos.z >= vmax.z ) {
 			*node_id = ID_UNDEFL; 
 			return 0x0;		
@@ -255,8 +254,8 @@ inline __device__ VDBNode* getNodeAtPoint ( VDBInfo* gvdb, float3 pos, float3* o
 	if ( node == 0x0 ) return 0x0;
 	
 	// compute node bounding box
-	*vmin = node->mPos * gvdb->voxelsize;	
-	*vdel = gvdb->vdel[ node->mLev ];  //make_float3(gvdb->noderange[0]) * gvdb->voxelsize / gvdb->res[0];
+	*vmin = make_float3(node->mPos);
+	*vdel = gvdb->vdel[ node->mLev ]; 
 	*offs = make_float3( node->mValue );
 	return node;
 }
@@ -304,7 +303,7 @@ inline __device__ VDBNode* getleafNodeAtPoint ( VDBInfo* gvdb, float3 pos, float
 	VDBNode* node = (VDBNode*) (gvdb->nodelist[0] + pnodeId*gvdb->nodewid[0]);
 	
 	// compute node bounding box
-	*vmin = node->mPos * gvdb->voxelsize;	
+	*vmin = make_float3(node->mPos);
 	*vdel = gvdb->vdel[ node->mLev ];  
 	return node;
 }
