@@ -1293,16 +1293,18 @@ void nverror ()
 	nvprintf ( "Error. Application will exit." );
 	exit(-1);
 }
-bool getFileLocation ( char* filename, char* outpath )
+bool getFileLocation (const char* filename, char* outpath )
 {
 	std::vector<std::string> paths;
 	paths.push_back ( "./");
+#ifdef ASSET_PATH
 	paths.push_back ( ASSET_PATH );
+#endif
 	bool result = getFileLocation ( filename, outpath, paths );
 	return result;
 }
 
-bool getFileLocation ( char* filename, char* outpath, std::vector<std::string> searchPaths )
+bool getFileLocation (const char* filename, char* outpath, std::vector<std::string> searchPaths )
 {
 	bool found = false;
 	FILE* fp = fopen( filename, "rb" );

@@ -72,8 +72,8 @@ RT_PROGRAM void vol_intersect( int primIdx )
 
 		shading_normal = norm;		
 		geometric_normal = norm;
-		front_hit_point = hit + shading_normal * gvdbObj.voxelsize*2;
-		back_hit_point  = hit - shading_normal * gvdbObj.voxelsize*4;
+		front_hit_point = hit + shading_normal * 2; // gvdbObj.voxelsize * // NB voxelsize=(1.0, 1.0, 1.0)
+		back_hit_point  = hit - shading_normal * 4; // gvdbObj.voxelsize *
 		deep_color = hclr;
 		//if ( ray_info.rtype == SHADOW_RAY ) deep_color.w = (hit.x!=NOHIT) ? 0 : 1;
 
@@ -148,7 +148,7 @@ RT_PROGRAM void vol_levelset ( int primIdx )
 		shading_normal = norm;		
 		geometric_normal = norm;
 		front_hit_point = hit;
-		back_hit_point = hit - shading_normal * gvdbObj.voxelsize * .2;
+		back_hit_point = hit - shading_normal * .2; // gvdbObj.voxelsize * // NB voxelsize= (1.0, 1.0, 1.0)
 		deep_color = hclr;
 
 		rtReportIntersection( mat_id );

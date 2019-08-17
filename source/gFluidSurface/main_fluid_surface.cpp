@@ -105,7 +105,7 @@ void Sample::reconfigure ()
 	gvdb.Configure ( 3, 3, 3, 3, 5 );	
 	
 	// VoxelSize. Determines the effective resolution of the voxel grid. 
-	gvdb.SetVoxelSize ( 1.0f, 1.0f, 1.0f );
+	//gvdb.SetVoxelSize ( 1.0f, 1.0f, 1.0f ); // voxelsize is now always (1.0,1.0,1.0)
 	gvdb.DestroyChannels ();	
 
 	// Atlas memory expansion will be supported in the Fall 2016 release, 
