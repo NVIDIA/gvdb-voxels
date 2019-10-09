@@ -112,7 +112,7 @@ OptiX 3.9.0 or later (InteractivOptix sample only, download from NVIDIA)
   2. Install the CUDA Toolkit 7.5 or later
   3. Install the NVIDIA R367 drivers or later
   - These can be downloaded from the NVIDIA website
-  4. Remove the symoblic libGL, which may incorrectly point to the libGL mesa driver.
+  4. Remove the symbolic libGL, which may incorrectly point to the libGL mesa driver.
   - sudo rm -rf /usr/lib/x86_64-linux-gnu/libGL.so
   5. Link the libGL to the NVIDIA driver
   - sudo ln -s /usr/lib/nvidia-367/libGL.so /usr/lib/x86_64-linux-gnu/libGL.so
