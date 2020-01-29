@@ -71,31 +71,8 @@ FUNCTION( _COMPILEPTX )
   else ()
 		# Linux - PTX compile
 		file ( MAKE_DIRECTORY "${_COMPILEPTX_TARGET_PATH}" )
-    FOREACH(input ${_COMPILEPTX_SOURCES})
-      get_filename_component( input_ext ${input} EXT )									# Input extension
-      get_filename_component( input_without_ext ${input} NAME_WE )						# Input base
-      if ( ${input_ext} STREQUAL ".cu" )			
-        # Set output names
-        set( output "${input_without_ext}.ptx" ) # Output name
-        set( output_with_path "${_COMPILEPTX_TARGET_PATH}/${input_without_ext}.ptx" )	# Output with path
-
-        set( compile_target_ptx "${input_without_ext}_PTX")
-        set( custom_command_var "${input_without_ext}_OUTPUT")
-        # compile ptx
-        cuda_compile_ptx(custom_command_var ${input} OPTIONS "${DEBUG_FLAGS}")
-        # This will only configure file generation, we need to add a target to
-        # generate a file cuda_generated_<counter>_${input_without_ext}.ptx
-        # Add custom command to rename to simply ${input_without_ext}.ptx
-        add_custom_command(OUTPUT ${output_with_path}
-                          COMMAND ${CMAKE_COMMAND} -E rename ${custom_command_var} ${output_with_path}
-                          DEPENDS ${custom_command_var})
-        add_custom_target(${compile_target_ptx} ALL DEPENDS ${input} ${output_with_path} SOURCES ${input})
-
-        # Add this output file to list of generated ptx files
-        LIST(APPEND PTX_FILES ${output})
-        LIST(APPEND PTX_FILES_PATH ${output_with_path} )
-      endif()
-    ENDFOREACH()
+		cuda_compile_ptx(PTX_FILES ${_COMPILEPTX_SOURCES} )		
+		SET ( PTX_FILES_PATH ${PTX_FILES} )
   endif()
 
   set( ${_COMPILEPTX_GENERATED} ${PTX_FILES} PARENT_SCOPE)
@@ -170,8 +147,11 @@ function( _INSTALL_PTX )
     foreach ( _file IN ITEMS ${_INSTALL_PTX_FILES} )
       get_filename_component ( _ptxpath ${_file} DIRECTORY )
       get_filename_component ( _ptxbase ${_file} NAME_WE )
-      get_filename_component ( _ptxparent ${_ptxpath} DIRECTORY )    # parent directory
-      set ( _fixed "${_file}" )
+      string ( SUBSTRING ${_ptxbase} 27 -1 _ptxname )
+      set ( _fixed "${_ptxpath}/${_ptxname}.ptx" )
+      add_custom_command ( TARGET ${PROJNAME} PRE_LINK
+        COMMAND ${CMAKE_COMMAND} -E copy  ${_file} ${_fixed}
+        )      
       list ( APPEND PTX_FIXED ${_fixed} )
       list ( APPEND OUT_LIST ${_fixed} )
     endforeach()
@@ -243,7 +223,7 @@ function(_LIST_ALL_SOURCE )
 
   unset ( SOURCE_LIST )
   foreach ( _file IN ITEMS ${_LIST_ALL_SOURCE_FILES} )
-     message ( STATUS "Source: ${_file}")			# uncomment to check source files
+     # message ( STATUS "Source: ${_file}")			# uncomment to check source files
      list ( APPEND SOURCE_LIST ${_file} )
   endforeach()
 

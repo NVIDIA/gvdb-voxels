@@ -45,10 +45,7 @@ Allocator::Allocator ()
 {
 	mVFBO[0] = -1;
 
-	char ptxfile[512];
-	strcpy(ptxfile, CUDA_GVDB_MODULE_PATH "/cuda_gvdb_copydata.ptx");
-
-	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, ptxfile), "Allocator", "Allocator", "cuModuleLoad", ptxfile, mbDebug);
+	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, "cuda_gvdb_copydata.ptx" ), "Allocator", "Allocator", "cuModuleLoad", "cuda_gvdb_copydata.ptx", mbDebug);
 		
 	cudaCheck ( cuModuleGetFunction ( &cuFillTex,		cuAllocatorModule, "kernelFillTex" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuFillTex",  mbDebug);
 	cudaCheck ( cuModuleGetFunction ( &cuCopyTexC,		cuAllocatorModule, "kernelCopyTexC" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuCopyTexC", mbDebug);
@@ -61,10 +58,6 @@ Allocator::Allocator ()
 	cudaCheck ( cuModuleGetFunction ( &cuSliceTexToBufC, cuAllocatorModule, "kernelSliceTexToBufC" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuSliceTexToBufC", mbDebug);
 	cudaCheck ( cuModuleGetFunction ( &cuSliceBufToTexF, cuAllocatorModule, "kernelSliceBufToTexF" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuSliceBufToTexF", mbDebug);
 	cudaCheck ( cuModuleGetFunction ( &cuSliceBufToTexC, cuAllocatorModule, "kernelSliceBufToTexC" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuSliceBufToTexC", mbDebug);
-
-	cudaCheck(cuModuleGetSurfRef(&cuSurfWrite, cuAllocatorModule, "volTexOut"), "Allocator", "Allocator", "cuModuleGetSurfRef", "cuSurfWrite", mbDebug);
-	cudaCheck(cuModuleGetTexRef(&cuSurfReadC, cuAllocatorModule, "volTexInC"), "Allocator", "Allocator", "cuModuleGetTexRef", "cuSurfReadC", mbDebug);
-	cudaCheck(cuModuleGetTexRef(&cuSurfReadF, cuAllocatorModule, "volTexInF"), "Allocator", "Allocator", "cuModuleGetTexRef", "cuSurfReadF", mbDebug);
 }
 
 
@@ -298,28 +291,7 @@ void Allocator::CreateMemLinear ( DataPtr& p, char* dat, int stride, int cnt, bo
 		p.cpu = dat;							// get from user
 	}
 	if ( p.gpu != 0x0 ) cudaCheck ( cuMemFree (p.gpu), "Allocator", "CreateMemLinear", "cuMemFree", "", mbDebug);
-
-	//CUdevice dev;
-	//cuCtxGetDevice(&dev);
-	//gprintf("   Using Device: %d\n", (int) dev);
-
-	//size_t free, total;
-	//size_t tmp =  (size_t) cnt * (size_t) stride;
-	//float MB = 1024.0*1024.0;
-	//cuMemGetInfo( &free, &total );
-
-	//cudaMemGetInfo ( &free, &total );
-	//gprintf( "Before:\n");
-	//gprintf( "   CUDA Total Mem:  %6.2f MB\n", float(total) / MB );
-	//gprintf( "   CUDA  Free Mem:  %6.2f MB\n", float(free) / MB );
-	//std::cout << cnt << " " << stride << std::endl;
-	//gprintf( "   Allocating Mem:  %6.2f MB\n", float(tmp) / MB);
-	//////////////////////////////////////////////////////////////////////////
 	cudaCheck ( cuMemAlloc ( &p.gpu, p.size ), "Allocator", "CreateMemLinear", "cuMemAlloc", "", mbDebug);
-	//////////////////////////////////////////////////////////////////////////
-	//cuMemGetInfo( &free, &total );
-	//gprintf( "After:\n");
-	//gprintf( "   CUDA  Free Mem:  %6.2f MB\n", float(free) / MB );
 
 	if ( dat!=0x0 ) CommitMem ( p );			// transfer from user
 }
@@ -335,7 +307,6 @@ void Allocator::FreeMemLinear ( DataPtr& p )
 void Allocator::RetrieveMem ( DataPtr& p)
 {
 	cudaCheck ( cuMemcpyDtoH ( p.cpu, p.gpu, p.size), "Allocator", "RetrieveMem", "cuMemcpyDtoH", "", mbDebug);
-	//cudaCheck ( cuCtxSynchronize (), "cuCtxSync", "RetrieveMem" );
 }
 
 void Allocator::CommitMem ( DataPtr& p)
@@ -391,8 +362,33 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
 			gchkGL ( "cuGraphicsGLRegisterImage" );
 			cudaCheck ( cuGraphicsMapResources(1, &p.grsc, 0), "Allocator", "AllocateTextureGPU", "cuGraphicsMapResources", "", mbDebug);
 			cudaCheck ( cuGraphicsSubResourceGetMappedArray ( &p.garray, p.grsc, 0, 0 ), "Allocator", "AllocateTextureGPU", "cuGraphicsSubResourceGetMappedArray", "", mbDebug);
+		
+			CUDA_RESOURCE_DESC resDesc = {};
+			resDesc.resType = CU_RESOURCE_TYPE_ARRAY;
+			resDesc.res.array.hArray = p.garray;
+
+		
+			cudaCheck(cuSurfObjectCreate(&p.surf_obj, &resDesc), "Allocator", "AllocateTextureGPU", "cuSurfObjectCreate", "", mbDebug);
+
+
+			CUDA_RESOURCE_DESC surfReadDesc = {};
+			surfReadDesc.resType = CU_RESOURCE_TYPE_ARRAY;
+			surfReadDesc.res.array.hArray = reinterpret_cast<CUarray>(p.garray);
+
+			CUDA_TEXTURE_DESC texReadDesc = {};
+			texReadDesc.addressMode[0] = CU_TR_ADDRESS_MODE_WRAP;
+			texReadDesc.addressMode[1] = CU_TR_ADDRESS_MODE_WRAP;
+			texReadDesc.addressMode[2] = CU_TR_ADDRESS_MODE_WRAP;
+
+			texReadDesc.filterMode = CU_TR_FILTER_MODE_LINEAR;
+
+			cudaCheck(cuTexObjectCreate(&p.tex_obj, &surfReadDesc, &texReadDesc, nullptr), "Allocator", "AllocateTextureGPU", "cuGraphicsUnmapResources", "", mbDebug);
+
+			
 			cudaCheck ( cuGraphicsUnmapResources(1, &p.grsc, 0), "Allocator", "AllocateTextureGPU", "cuGraphicsUnmapResources", "", mbDebug);
-		#endif
+		
+
+#endif
 
 	} else {
 
@@ -413,14 +409,34 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
 
 		if ( res.x > 0 && res.y > 0 && res.z > 0 ) {
 			cudaCheck ( cuArray3DCreate( &p.garray, &desc), "Allocator", "AllocateTextureGPU", "cuArray3DCreate", "", mbDebug);
-			if ( preserve > 0 && old_array != 0 ) {
+            
+            CUDA_RESOURCE_DESC resDesc = {};
+            resDesc.resType = CU_RESOURCE_TYPE_ARRAY;
+            resDesc.res.array.hArray = p.garray;
+
+            cudaCheck(cuSurfObjectCreate(&p.surf_obj, &resDesc), "Allocator", "AllocateTextureGPU", "cuSurfObjectCreate", "", mbDebug);
+
+            CUDA_RESOURCE_DESC surfReadDesc = {};
+            surfReadDesc.resType = CU_RESOURCE_TYPE_ARRAY;
+            surfReadDesc.res.array.hArray = reinterpret_cast<CUarray>(p.garray);
+
+            CUDA_TEXTURE_DESC texReadDesc = {};
+            texReadDesc.addressMode[0] = CU_TR_ADDRESS_MODE_WRAP;
+            texReadDesc.addressMode[1] = CU_TR_ADDRESS_MODE_WRAP;
+            texReadDesc.addressMode[2] = CU_TR_ADDRESS_MODE_WRAP;
+
+            texReadDesc.filterMode = CU_TR_FILTER_MODE_LINEAR;
+
+            cudaCheck(cuTexObjectCreate(&p.tex_obj, &surfReadDesc, &texReadDesc, nullptr), "Allocator", "AllocateTextureGPU", "cuGraphicsUnmapResources", "", mbDebug);
+            
+            if ( preserve > 0 && old_array != 0 ) {
 				
 				// Clear channel to 0
 				Vector3DI block ( 8, 8, 8 );
 				Vector3DI grid ( int(res.x/block.x)+1, int(res.y/block.y)+1, int(res.z/block.z)+1 );	
-				cudaCheck ( cuSurfRefSetArray( cuSurfWrite, reinterpret_cast<CUarray>( p.garray ), 0 ), "Allocator", "AllocateTextureGPU", "cuSurfRefSetArray", "cuSurfWrite", mbDebug);
+
 				int dsize = getSize( p.type );
-				void* args[2] = { &res, &dsize };
+				void* args[3] = { &res, &dsize, &p.surf_obj };
 				cudaCheck ( cuLaunchKernel ( cuFillTex, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, mStream, args, NULL ), "Allocator", "AllocateTextureGPU", "cuLaunch", "cuFillTex", mbDebug);
 
 				// Copy over preserved data
@@ -723,11 +739,7 @@ void Allocator::AtlasCopyTex ( uchar chan, Vector3DI val, const DataPtr& src )
 	Vector3DI block ( 8, 8, 8 );
 	Vector3DI grid ( int(brickres.x/block.x)+1, int(brickres.y/block.y)+1, int(brickres.z/block.z)+1 );	
 
-	cudaCheck ( cuSurfRefSetArray( cuSurfWrite, reinterpret_cast<CUarray>(mAtlas[chan].garray), 0 ), "Allocator", "AtlasCopyTex", "cuSurfRefSetArray", "cuSurfWrite", mbDebug);
-	cudaCheck ( cuTexRefSetArray ( cuSurfReadC,  reinterpret_cast<CUarray>(src.garray), CU_TRSA_OVERRIDE_FORMAT ), "Allocator", "AtlasCopyTex", "cuTexRefSetArray", "cuSurfReadC", mbDebug );	
-	cudaCheck ( cuTexRefSetArray ( cuSurfReadF,  reinterpret_cast<CUarray>(src.garray), CU_TRSA_OVERRIDE_FORMAT ), "Allocator", "AtlasCopyTex", "cuTexRefSetArray", "cuSurfReadF", mbDebug);
-
-	void* args[2] = { &val, &brickres };
+	void* args[4] = { &val, &brickres,(void*)&src.tex_obj, (void*)&src.surf_obj };
 	switch ( mAtlas[chan].type ) {
 	case T_UCHAR:	cudaCheck ( cuLaunchKernel ( cuCopyTexC, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasCopyTex", "cuLaunch", "cuCopyTexC", mbDebug); break;
 	case T_FLOAT:	cudaCheck ( cuLaunchKernel ( cuCopyTexF, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasCopyTex", "cuLaunch", "cuCopyTexF", mbDebug); break;
@@ -741,10 +753,8 @@ void Allocator::AtlasCopyLinear ( uchar chan, Vector3DI offset, CUdeviceptr gpu_
 	Vector3DI brickres = Vector3DI(br,br,br);
 	Vector3DI block ( 8, 8, 8 );
 	Vector3DI grid ( int(brickres.x/block.x)+1, int(brickres.y/block.y)+1, int(brickres.z/block.z)+1 );	
-	
-	cudaCheck ( cuSurfRefSetArray( cuSurfWrite, reinterpret_cast<CUarray>(mAtlas[chan].garray), 0 ), "Allocator", "AtlasCopyLinear", "cuSurfRefSetArray", "cuSurfWrite", mbDebug);
 
-	void* args[3] = { &offset, &brickres, &gpu_buf };
+	void* args[4] = { &offset, &brickres, &gpu_buf, &mAtlas[chan].surf_obj };
 	switch ( mAtlas[chan].type ) {
 	case T_UCHAR:	cudaCheck ( cuLaunchKernel ( cuCopyBufToTexC, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasCopyLinear", "cuLaunch", "cuCopyBufToTexC", mbDebug); break;
 	case T_FLOAT:	cudaCheck ( cuLaunchKernel ( cuCopyBufToTexF, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasCopyLinear", "cuLaunch", "cuCopyBufToTexF", mbDebug); break;
@@ -758,11 +768,9 @@ void Allocator::AtlasRetrieveTexXYZ ( uchar chan, Vector3DI val, DataPtr& dest )
 	int brickres = mAtlas[chan].subdim.x;
 	
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI grid ( int(brickres/block.x)+1, int(brickres/block.y)+1, int(brickres/block.z)+1 );	
+	Vector3DI grid ( int(brickres/block.x)+1, int(brickres/block.y)+1, int(brickres/block.z)+1 );
 
-	cudaCheck ( cuTexRefSetArray ( cuSurfReadF,  reinterpret_cast<CUarray>(mAtlas[chan].garray), CU_TRSA_OVERRIDE_FORMAT  ), "Allocator", "AtlasRetrieveXYZ", "cuTexRefSetArray", "", mbDebug);
-
-	void* args[4] = { &val, &atlasres, &brickres, &dest.gpu };
+	void* args[5] = { &val, &atlasres, &brickres, &dest.gpu, &mAtlas[chan].tex_obj };
 	cudaCheck ( cuLaunchKernel ( cuRetrieveTexXYZ, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasRetrieveXYZ", "cuLaunch", "cuRetrieveTexXYZ", mbDebug);
 
 	RetrieveMem ( dest );
@@ -777,15 +785,12 @@ void Allocator::AtlasCopyTexZYX ( uchar chan, Vector3DI val, const DataPtr& src 
 	Vector3DI brickres = src.subdim;
 
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI grid ( int(brickres.x/block.x), int(brickres.y/block.y), int(brickres.z/block.z) );	
+	Vector3DI grid ( int(brickres.x/block.x), int(brickres.y/block.y), int(brickres.z/block.z) );
 
-	cudaCheck ( cuSurfRefSetArray( cuSurfWrite, reinterpret_cast<CUarray>(mAtlas[chan].garray), 0 ), "Allocator", "AtlasCopyTexZYX", "cuSurfRefSetArray", "cuSurfWrite", mbDebug);
-	cudaCheck ( cuTexRefSetArray ( cuSurfReadF,  reinterpret_cast<CUarray>(src.garray), CU_TRSA_OVERRIDE_FORMAT  ), "Allocator", "AtlasCopyTexZYX", "cuTexRefSetArray", "cuSurfReadF", mbDebug);
+	void* args[4] = { &val, &brickres, (void*)&src.tex_obj, &mAtlas[chan].surf_obj };
+	cudaCheck(cuLaunchKernel(cuCopyTexZYX, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL), "Allocator", "AtlasCopyTexZYX", "cuLaunch", "cuCopyTexZYX", mbDebug);
 
-	void* args[2] = { &val, &brickres };
-	cudaCheck ( cuLaunchKernel ( cuCopyTexZYX, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasCopyTexZYX", "cuLaunch", "cuCopyTexZYX", mbDebug);
-
-	cuCtxSynchronize ();
+	cuCtxSynchronize();
 }
 
 void Allocator::AtlasCommit ( uchar chan )
@@ -813,10 +818,9 @@ void Allocator::AtlasFill ( uchar chan )
 	Vector3DI atlasres = getAtlasRes(chan);	
 	Vector3DI block ( 8, 8, 8 );
 	Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, int(atlasres.z/block.z)+1 );	
-	
-	cudaCheck ( cuSurfRefSetArray( cuSurfWrite, reinterpret_cast<CUarray>(mAtlas[chan].garray), 0 ), "Allocator", "AtlasCommitFromCPU", "cuSurfRefSetArray", "cuSurfWrite", mbDebug);
+
 	int dsize = getSize( mAtlas[chan].type );
-	void* args[2] = { &atlasres, &dsize };
+	void* args[3] = { &atlasres, &dsize , &mAtlas[chan].surf_obj };
 	cudaCheck ( cuLaunchKernel ( cuFillTex, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, mStream, args, NULL ), "Allocator", "AtlasCommitFromCPU", "cuLaunch", "cuFillTex", mbDebug);
 }
 
@@ -826,7 +830,6 @@ void Allocator::AtlasRetrieveSlice ( uchar chan, int slice, int sz, CUdeviceptr 
 	Vector3DI atlasres = getAtlasRes(chan);
 	Vector3DI block ( 8, 8, 1 );
 	Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, 1 );	
-	void* args[3] = { &slice, &atlasres, &gpu_buf };
 
 	CUDA_MEMCPY3D cp = {0};	
 	cp.srcMemoryType = CU_MEMORYTYPE_ARRAY;
@@ -846,8 +849,6 @@ void Allocator::AtlasWriteSlice ( uchar chan, int slice, int sz, CUdeviceptr gpu
 	Vector3DI atlasres = getAtlasRes(chan);
 	Vector3DI block ( 8, 8, 1 );
 	Vector3DI grid ( int(atlasres.x/block.x)+1, int(atlasres.y/block.y)+1, 1 );		
-	void* args[3] = { &slice, &atlasres, &gpu_buf };
-
 
 	CUDA_MEMCPY3D cp = {0};	
 	cp.dstMemoryType = CU_MEMORYTYPE_ARRAY;
@@ -901,6 +902,18 @@ void Allocator::AtlasReleaseAll ()
 		if ( mAtlas[n].cpu != 0x0 ) {
 			free ( mAtlas[n].cpu );
 			mAtlas[n].cpu = 0x0;
+		}
+
+		// Destroy Surf/Tex Objects
+		if (mAtlas[n].surf_obj != 0x0) {
+			cudaCheck(cuSurfObjectDestroy(mAtlas[n].surf_obj), "Allocator", "AtlasReleaseAll", "cuSurfObjectDestroy", "", mbDebug);
+			mAtlas[n].surf_obj = 0x0;
+		}
+
+		// Destroy Surf/Tex Objects
+		if (mAtlas[n].tex_obj != 0x0) {
+			cudaCheck(cuTexObjectDestroy(mAtlas[n].tex_obj), "Allocator", "AtlasReleaseAll", "cuTexObjectDestroy", "", mbDebug);
+			mAtlas[n].tex_obj = 0x0;
 		}
 
 		// Unregister
@@ -964,7 +977,7 @@ int Allocator::getAtlasBrickwid (uchar chan)
 int	Allocator::getAtlasMem ()
 {
 	Vector3DI res = getAtlasRes(0);
-	uint64 mem = getSize(mAtlas[0].type)*res.x*res.y*res.z / uint64(1042*1024); 
+	uint64 mem = getSize(mAtlas[0].type)*res.x*res.y*res.z / uint64(1024*1024); 
 	return mem;	
 }
 
@@ -1053,15 +1066,15 @@ void StartCuda ( int devsel, CUcontext ctxsel, CUdevice& dev, CUcontext& ctx, CU
 		cuDeviceGetName ( name, 128, dev_id);
 
 		int pi;
-		cuDeviceGetAttribute ( &pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_WIDTH, dev_id ) ;
-		if (verbose) gprintf ("Max. texture3D width: %d\n", pi);
-		cuDeviceGetAttribute ( &pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_HEIGHT, dev_id ) ;
-		if (verbose) gprintf ("Max. texture3D height: %d\n", pi);
-		cuDeviceGetAttribute ( &pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_DEPTH, dev_id ) ;
-		if (verbose) gprintf ("Max. texture3D depth: %d\n", pi);
+		cuDeviceGetAttribute(&pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_WIDTH, dev_id);
+		if (verbose) gprintf("Max. texture3D width: %d\n", pi);
+		cuDeviceGetAttribute(&pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_HEIGHT, dev_id);
+		if (verbose) gprintf("Max. texture3D height: %d\n", pi);
+		cuDeviceGetAttribute(&pi, CU_DEVICE_ATTRIBUTE_MAXIMUM_TEXTURE3D_DEPTH, dev_id);
+		if (verbose) gprintf("Max. texture3D depth: %d\n", pi);
 
 		if (verbose) gprintf ( "   %d. %s\n", n, name );
-	}			
+	}
 
 	if (devsel == GVDB_DEV_CURRENT) {
 		//--- Get currently active context 
@@ -1073,9 +1086,24 @@ void StartCuda ( int devsel, CUcontext ctxsel, CUdevice& dev, CUcontext& ctx, CU
 		ctx = ctxsel;	
 		cudaCheck(cuCtxSetCurrent(ctx), "(global)", "StartCuda", "cuCtxSetCurrent", "GVDB_DEV_EXISTING", false );
 		cudaCheck(cuCtxGetDevice(&dev), "(global)", "StartCuda", "cuCtxGetDevice", "GVDB_DEV_EXISTING", false );
-	}	
-	if (devsel == GVDB_DEV_FIRST) devsel = 0;
-	if (devsel >= cnt) devsel = 0;				// Fallback to dev 0 if addition GPUs not found
+	}
+	if (devsel == GVDB_DEV_FIRST
+		|| devsel >= cnt) { // Fallback to OpenGL device if additional GPUs not found
+		// Get the CUDA device being used for OpenGL, so that GL examples work
+		// correctly on multi-GPU systems (e.g. SLI or NVLink)
+		unsigned int cudaGLDeviceCount = 0;
+		int cudaGLDevices[1];
+		cuGLGetDevices(&cudaGLDeviceCount, cudaGLDevices, 1, CU_GL_DEVICE_LIST_NEXT_FRAME);
+
+		if (cudaGLDeviceCount == 0) {
+			// Fall back to device 0 if no CUDA-GL devices were found
+			devsel = 0;
+		}
+		else {
+			// Use the first element in this list (which may not be device 0)
+			devsel = cudaGLDevices[0];
+		}
+	}
 
 	if (devsel >= 0) {		
 		//--- Create new context with Driver API 
@@ -1087,26 +1115,6 @@ void StartCuda ( int devsel, CUcontext ctxsel, CUdevice& dev, CUcontext& ctx, CU
 	
 	cuCtxSetCurrent( NULL );
 	cuCtxSetCurrent( ctx );
-
-	//cuStreamCreate(strm, CU_STREAM_NON_BLOCKING);
-
-
-	/*CUdeviceptr gp;
-	cudaCheck(cuMemAlloc(&gp, 11), "test", "test");
-	exit(-1);*/
-
-	//Increase memory limits
-	//size_t size_heap, size_stack;
-	//cudaDeviceSetLimit( cudaLimitMallocHeapSize, 20000000*sizeof(double));
-	//cudaDeviceSetLimit( cudaLimitStackSize,12928);
-	//cudaDeviceGetLimit( &size_heap, cudaLimitMallocHeapSize);
-	//cudaDeviceGetLimit( &size_stack, cudaLimitStackSize);
-	
-	/*size_t free, total;
-	float MB = 1024.0*1024.0;
-	cudaMemGetInfo ( &free, &total );
-	if (verbose) gprintf( "   CUDA Total Mem:  %6.2f MB\n", float(total) / MB );
-	if (verbose) gprintf( "   CUDA  Free Mem:  %6.2f MB\n", float(free) / MB ); */
 		
 }
 

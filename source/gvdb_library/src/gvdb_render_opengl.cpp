@@ -87,12 +87,6 @@
 		scene->AddShader ( GLS_INSTANCE, vertname, fragname );
 		scene->AddParam ( GLS_INSTANCE, UVIEW, "uView" );
 		scene->AddParam ( GLS_INSTANCE, UPROJ, "uProj" );	
-	
-		/*scene->AddAttrib ( GLS_INSTANCE, UVOLMIN, "instVMin" );		// instance attributes
-		scene->AddAttrib ( GLS_INSTANCE, UVOLMAX, "instVMax" );
-		scene->AddAttrib ( GLS_INSTANCE, UTEXMIN, "instTMin" );
-		scene->AddAttrib ( GLS_INSTANCE, UTEXMAX, "instTMax" );
-		scene->AddAttrib ( GLS_INSTANCE, UCLRAMB, "instClr" );*/
 	}
 	void makeScreenShader ( Scene* scene, const char* vertname, const char* fragname )
 	{
@@ -184,13 +178,6 @@
 		glDisable ( GL_DEPTH_TEST );
 		glDisable ( GL_CULL_FACE );	
 
-		// OpenGL 3.3
-		/* glEnableClientState ( GL_VERTEX_ARRAY );
-		glBindBuffer ( GL_ARRAY_BUFFER, model->vertBufferID );	
-		glVertexPointer ( model->vertComponents, GL_FLOAT, model->vertStride, (char*) model->vertOffset );
-		glNormalPointer ( GL_FLOAT, model->vertStride, (char*) model->normOffset );
-		glBindBuffer ( GL_ELEMENT_ARRAY_BUFFER, model->elemBufferID );	 
-		glDrawElements ( model->elemDataType, model->elemCount*3, GL_UNSIGNED_INT, 0 );	*/
 	}
 
 	void renderScreenspaceGL ( Scene* scene, int prog_id )
@@ -210,8 +197,6 @@
 			glProgramUniform3fv	( prog, scene->getParam(prog_id, UCAMDIMS), 1, &cd.x );	
 		}
 
-		//scene->getScreenquad().SelectVBO ();
-		//scene->getScreenquad().Draw(1);
 	}
 
 #endif

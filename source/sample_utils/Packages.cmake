@@ -155,15 +155,6 @@ macro ( _FIND_LOCALPACKAGE_CUDA )
   endif()
 endmacro()
 
-macro ( _FIND_LOCALPACKAGE_OPENVDB ) 
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../../../LocalPackages/OpenVDB)
-    Message(STATUS "Local OpenVDB detected. Using it")    
-	set(OPENVDB_LOCALPACK_VER "4.0.1" CACHE STRING "OpenVDB Version")
-    set(OPENVDB_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../LocalPackages/OpenVDB/OpenVDB_${OPENVDB_LOCALPACK_VER}_vs2015" )
-	SET(USE_OPENVDB ON CACHE BOOL "Use OpenVDB" FORCE) 
-  endif()
-endmacro()
-
 macro ( _FIND_LOCALPACKAGE_OPTIX )
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../../../../LocalPackages/Optix)
     Message(STATUS "Local Optix detected. Using it")
@@ -224,79 +215,6 @@ macro(_add_package_ZLIB)
   endif()
 endmacro()
 
-#####################################################################################
-# Optional OpenVDB
-#
-macro(_add_package_OpenVDB)
-
-   Message(STATUS "\n<-- Searching for OpenVDB")		
-
-  _FIND_LOCALPACKAGE_OPENVDB ()
-
-  if ( NOT DEFINED USE_OPENVDB )	  
-	SET(USE_OPENVDB OFF CACHE BOOL "Use OpenVDB") 
-  endif ()
-
-  find_package(OpenVDB)  
-  if (OPENVDB_FOUND)
-      if ( NOT DEFINED USE_OPENVDB )	       
-	       SET(USE_OPENVDB ON CACHE BOOL "Use OpenVDB")
-      endif()
-	  if ( USE_OPENVDB ) 
-		  Message(STATUS "--> Using package OpenVDB")
-		  
-		  add_definitions(-DUSEOPENVDB)
-		  add_definitions(-DOPENEXR_DLL)
-		  add_definitions(-DOPENVDB_3_ABI_COMPATIBLE)
-		  add_definitions(-DBUILD_OPENVDB)	 
-		  add_definitions(-DOPENVDB_STATICLIB)
-		  add_definitions(-DOPENVDB_USE_BLOSC)
-
-		  message ( STATUS "Adding OpenVDB includes: ${OPENVDB_INCLUDE_DIR}" )
-		  include_directories(${OPENVDB_INCLUDE_DIR})
-		  include_directories ("${OPENVDB_INCLUDE_DIR}")
-		  include_directories ("${OPENVDB_INCLUDE_DIR}/IlmBase")
-		  include_directories ("${OPENVDB_INCLUDE_DIR}/tbb")     
-		  LIST(APPEND LIBRARIES_OPTIMIZED ${OPENVDB_LIB_RELEASE} )
-		  LIST(APPEND LIBRARIES_DEBUG ${OPENVDB_LIB_DEBUG} )		
-
-		  if ( OPENVDB_LIB_DIR STREQUAL "" ) 
-		     message ( FATAL_ERROR "OpenVDB package found, but OpenVDB library directory not found. OPENVDB_LIB_DIR." )		   
-		  endif ()
-
-		if (MSVC_VERSION EQUAL 1600)
-		   set ( MSVCX "vc10" )
-		endif()
-		if (MSVC_VERSION EQUAL 1700)
-		   set ( MSVCX "vc11" )
-		endif()
-		if (MSVC_VERSION EQUAL 1800)
-		   set ( MSVCX "vc12" )
-		endif()
-		if (MSVC_VERSION EQUAL 1900)
-		   set ( MSVCX "vc14" )
-		endif()
-
-		  LIST(APPEND LIBRARIES_OPTIMIZED "${OPENVDB_LIB_DIR}/Blosc.lib" )	
-		  LIST(APPEND LIBRARIES_DEBUG "${OPENVDB_LIB_DIR}/Blosc.lib" )	
-		  LIST(APPEND LIBRARIES_OPTIMIZED "${OPENVDB_LIB_DIR}/Half.lib" )	
-		  LIST(APPEND LIBRARIES_DEBUG "${OPENVDB_LIB_DIR}/Half.lib" )	
-		  LIST(APPEND LIBRARIES_OPTIMIZED "${OPENVDB_LIB_DIR}/zlib.lib" )	
-		  LIST(APPEND LIBRARIES_DEBUG "${OPENVDB_LIB_DIR}/zlibd.lib" )	
-		  LIST(APPEND LIBRARIES_OPTIMIZED "${OPENVDB_LIB_DIR}/tbb.lib" )
-		  LIST(APPEND LIBRARIES_DEBUG "${OPENVDB_LIB_DIR}/tbb_debug.lib" )		  
-		  LIST(APPEND LIBRARIES_OPTIMIZED "${OPENVDB_LIB_DIR}/boost_system-${MSVCX}0-mt-1_64.lib" )
-		  LIST(APPEND LIBRARIES_DEBUG "${OPENVDB_LIB_DIR}/boost_system-${MSVCX}0-mt-gd-1_64.lib" )
-		  LIST(APPEND LIBRARIES_OPTIMIZED "${OPENVDB_LIB_DIR}/boost_thread-${MSVCX}0-mt-1_64.lib" )
-		  LIST(APPEND LIBRARIES_DEBUG "${OPENVDB_LIB_DIR}/boost_thread-${MSVCX}0-mt-gd-1_64.lib" )
-		  
-		  LIST(APPEND PACKAGE_SOURCE_FILES ${OPENVDB_HEADERS} )
-	  endif ()
- else()
-     SET(USE_OPENVDB OFF CACHE BOOL "Use OpenVDB" FORCE)
- endif()
-endmacro()
-
 
 #####################################################################################
 # Optional Utils package
@@ -329,95 +247,6 @@ macro(_add_package_Utils)
 
 endmacro()
 
-#####################################################################################
-# Optional CUDA package
-#
-
-macro(_set_cuda_suffix)
-	#------ CUDA VERSION
-	if ( CUDA_VERSION ) 	  
-	  if ( ${CUDA_VERSION} EQUAL "8.0" )
-		SET ( CUDA_SUFFIX "cu8" )
-	  endif ()
-	  if ( ${CUDA_VERSION} EQUAL "9.0" )
-		SET ( CUDA_SUFFIX "cu9" )
-	  endif ()
-	  if ( ${CUDA_VERSION} EQUAL "9.1" )
-		SET ( CUDA_SUFFIX "cu9" )
-	  endif ()
-	else()
-	  message ( FATAL_ERROR "\nNVIDIA CUDA not found.\n" )
-	endif()
-endmacro()
-
-macro(_add_package_CUDA)
-
-	Message(STATUS "\n<-- Searching for CUDA")		
-
-	_FIND_LOCALPACKAGE_CUDA ()
-
-	find_package(CUDA)
-
-	if ( CUDA_FOUND )
-		_set_cuda_suffix()
-		message( STATUS "--> Using package CUDA (ver ${CUDA_VERSION})") 
-		add_definitions(-DUSECUDA)    
-		include_directories(${CUDA_TOOLKIT_INCLUDE})
-		if (WIN32)
-			LIST(APPEND LIBRARIES_OPTIMIZED ${CUDA_CUDA_LIBRARY} ${CUDA_CUDART_LIBRARY} )
-			LIST(APPEND LIBRARIES_DEBUG ${CUDA_CUDA_LIBRARY} ${CUDA_CUDART_LIBRARY} )
-		else()
-			find_library(LIBCUDA cuda HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
-			find_library(LIBCUDART cudart HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
-			LIST(APPEND LIBRARIES_OPTIMIZED ${LIBCUDA})
-			LIST(APPEND LIBRARIES_DEBUG ${LIBCUDART})
-		endif()
-		LIST(APPEND PACKAGE_SOURCE_FILES ${CUDA_TOOLKIT_INCLUDE} )    
-		source_group(CUDA FILES ${CUDA_TOOLKIT_INCLUDE} ) 
-	else()
-		message ( FATAL_ERROR "---> Unable to find package CUDA")
-	endif()
-
-endmacro()
-
-#####################################################################################
-# Optional CUDPP package
-#
-macro(_add_package_CUDPP)
-
-  Message(STATUS "\n<-- Searching for CUDPP")		
-
-  find_package(CUDPP)  
-
-  if (CUDPP_FOUND)
-      if ( NOT DEFINED USE_CUDPP )	       
-	       SET(USE_CUDPP ON CACHE BOOL "Use CUDPP")
-      endif()
-	  if ( USE_CUDPP ) 
-		Message(STATUS "--> Using package CUDPP")		
-		add_definitions(-DUSE_CUDPP)			
-		include_directories( ${CUDPP_INCLUDE_DIR} )		
-		link_directories( ${CUDPP_LIB_DIR} )
-		if (WIN32)
-			LIST(APPEND LIBRARIES_OPTIMIZED ${CUDPP_LIB1_REL} )
-			LIST(APPEND LIBRARIES_OPTIMIZED ${CUDPP_LIB2_REL} )
-			LIST(APPEND LIBRARIES_DEBUG ${CUDPP_LIB1_DEBUG} )
-			LIST(APPEND LIBRARIES_DEBUG ${CUDPP_LIB2_DEBUG} )	
-		else()
-			find_library(LIBCUDPP cudpp HINTS ${GVDB_LIB_DIR} )
-			find_library(LIBCUDPP_HASH cudpp_hash HINTS ${GVDB_LIB_DIR} )
-			LIST(APPEND LIBRARIES_OPTIMIZED ${LIBCUDPP} ${LIBCUDPP_HASH} )
-			LIST(APPEND LIBRARIES_DEBUG ${LIBCUDPP} ${LIBCUDPP_HASH} )
-		endif()
-		LIST(APPEND PACKAGE_SOURCE_FILES ${CUDPP_INCLUDE_DIR}/${CUDPP_HEADERS} ) 
-  	  else()
-		Message(FATAL_ERROR "--> NOT USING package CUDPP. Set USE_CUDPP true.")		
-   endif ()
-else ()
-   SET(USE_CUDPP OFF CACHE BOOL "Use CUDPP") 
-endif()
-
-endmacro()
 
 #####################################################################################
 # Optional OptiX package

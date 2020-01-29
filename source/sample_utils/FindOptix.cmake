@@ -2,18 +2,18 @@
 #
 
 # outputs
-unset(OPTIX_DLL CACHE)
-unset(OPTIX_LIB1 CACHE)
-unset(OPTIX_LIB2 CACHE)
+unset(OPTIX_SHARED_LIBS CACHE)
+unset(OPTIX_LIB CACHE)
+unset(OPTIX_LIBU CACHE)
 unset(OPTIX_FOUND CACHE)
 unset(OPTIX_INCLUDE_DIR CACHE)
 
-set ( OPTIX_MAX_VER "5.0.0" CACHE STRING "" )
+message(STATUS "Finding OptiX...")
 
-macro ( folder_list result curdir substring )
-  FILE(GLOB children RELATIVE ${curdir} "${curdir}/*")      
+macro ( folder_list result curdir )
+  FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)
   SET(dirlist "")
-  foreach ( child ${children})  
+  foreach ( child ${children})
     IF(IS_DIRECTORY ${curdir}/${child})
         LIST(APPEND dirlist ${child})
     ENDIF()
@@ -21,69 +21,101 @@ macro ( folder_list result curdir substring )
   SET(${result} ${dirlist})
 ENDMACRO()
 
-macro(_find_version_path targetVersion targetPath rootName avoidName searchList platform )
+macro(_check_version_on_folder checkdir bestver bestpath)
+  string ( REGEX MATCH "OptiX SDK.*([0-9]+).([0-9]+).([0-9]+)" result "${checkdir}" )
+  if ( "${result}" STREQUAL "${checkdir}" )
+    # found a path with versioning 
+    SET ( ver "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}" )
+    if ( ver VERSION_GREATER bestver )
+      SET ( bestver ${ver} )
+      SET ( bestpath "${basedir}/${checkdir}" )
+    endif ()
+  endif()
+endmacro()
+
+macro(_find_version_path targetVersion targetPath searchList )
   unset ( targetVersion )
   unset ( targetPath )
   SET ( bestver "0.0.0" )
   SET ( bestpath "" )
-  foreach ( searchdir ${searchList} )
-    get_filename_component ( basedir ${searchdir} ABSOLUTE )    
-    folder_list ( dirList ${basedir} ${platform} )	
-	foreach ( checkdir ${dirList} )	    	    
-	    string ( TOLOWER ${checkdir} checklower )			 		
-		string ( FIND ${checklower} ${avoidName} result )
-		if ( ${result} EQUAL "-1" )		    
-			string ( REGEX MATCH "${rootName}(.*)([0-9]+).([0-9]+).([0-9]+)(.*)$" result "${checklower}" )
-			if ( "${result}" STREQUAL "${checklower}" )
-			   # found a path with versioning 
-			   SET ( ver "${CMAKE_MATCH_2}.${CMAKE_MATCH_3}.${CMAKE_MATCH_4}" )
-			   if ( ver GREATER bestver AND NOT (ver GREATER ${OPTIX_MAX_VER}) )
-	  			 SET ( bestver ${ver} )
-	  			 SET ( bestpath "${basedir}/${checkdir}" )				 
-	  		 endif ()
-			endif()	  
-		endif()
-	  endforeach ()		
+  
+  Message(STATUS "searchList: ${searchList}" )
+  foreach ( basedir ${searchList} )
+    folder_list ( dirList ${basedir} )  
+    MESSAGE(STATUS "Folder List : ${dirList}")
+    Message(STATUS "dirList: ${dirList}" )
+    foreach ( checkdir ${dirList} )
+      _check_version_on_folder(${checkdir} bestver bestpath)
+    endforeach ()   
   endforeach ()  
   SET ( ${targetVersion} "${bestver}" )
   SET ( ${targetPath} "${bestpath}" )
 endmacro()
 
-macro(_find_files targetVar incDir dllName dllName64 folder)
-  unset ( fileList )
-  if(ARCH STREQUAL "x86")
-      file(GLOB fileList "${${incDir}}/../${folder}${dllName}")
-      list(LENGTH fileList NUMLIST)
-      if(NUMLIST EQUAL 0)
-        file(GLOB fileList "${${incDir}}/${folder}${dllName}")
-      endif()
+# Finds a file named either fileNameWin or fileNameUnix (depending on the system)
+# in searchFolder and appends it to the list in targetVar. If the file was found,
+# adds 1 to numFound.
+macro(_find_file targetList fileNameWin fileNameUnix searchFolder numFound)
+  unset(fileName)
+  unset(fileNameLength)
+  unset(foundFile CACHE)
+  
+  # Choose file name
+  if(WIN32)
+    set(fileName ${fileNameWin})
+  elseif(UNIX)
+    set(fileName ${fileNameUnix})
   else()
-      file(GLOB fileList "${${incDir}}/../${folder}${dllName64}")
-      list(LENGTH fileList NUMLIST)
-      if(NUMLIST EQUAL 0)
-        file(GLOB fileList "${${incDir}}/${folder}${dllName64}")
-      endif()
-  endif()  
-  list(LENGTH fileList NUMLIST)
-  if(NUMLIST EQUAL 0)    
-     set (${targetVar} "NOTFOUND")    
+    message("FindOptix.cmake:_find_files: Neither WIN32 or UNIX was defined!")
+    return()
   endif()
-  list(APPEND ${targetVar} ${fileList} )  
-
-  # message ( "File list: ${${targetVar}}" )		#-- debugging
+  
+  unset(fileNameLength)
+  string(LENGTH ${fileName} fileNameLength)
+  if(fileNameLength EQUAL 0)
+    return()
+  endif()
+  
+  find_file(foundFile ${fileName} ${searchFolder})
+  
+  if(NOT ("${foundFile}" STREQUAL "foundFile-NOTFOUND"))
+    # Add one to numFound
+    math(EXPR ${numFound} "${${numFound}}+1")
+  endif()
+  
+  list(APPEND ${targetList} "${foundFile}")
 endmacro()
 
- # Locate OptiX 
+# Main code for finding OptiX
 
 if ( NOT OPTIX_ROOT_DIR )
+  # -------------------------------------------------------------------
+  # Locate OPTIX by version
+  set(OPTIX_LOCATION "C:/ProgramData/NVIDIA Corporation/") 
+
+  STRING(REGEX REPLACE "\\\\" "/" OPTIX_LOCATION "${OPTIX_LOCATION}") 
+
+  set ( SEARCH_PATHS
+    "${OPTIX_LOCATION}" # this could be set to C:\ProgramData\NVIDIA Corporation; best version will be taken.
+  )
+
+  message(STATUS "  OptiX search paths: : ${SEARCH_PATHS}")
+
   # Default search
   if ( WIN32 )
-     set (OPTIX_ROOT_DIR "c:/ProgramData/NVIDIA Corporation/OptiX SDK 4.0.0/" CACHE PATH "Optix Location" FORCE) 
-     set (OPTIX_VERSION "4.0.0" )
+    set(OPTIX_ROOT_DIR "")
+    set (OPTIX_VERSION "0.0.0" )
   else ()
      set (OPTIX_ROOT_DIR "/usr/local/optix" CACHE PATH "" FORCE)
      set (OPTIX_VERSION "4.0.0" )
   endif()
+endif()
+
+if(WIN32)
+  _find_version_path ( OPTIX_VERSION OPTIX_ROOT_DIR "${SEARCH_PATHS}" )
+  message(STATUS "OptiX version string: : ${OPTIX_VERSION}")
+else()
+  message(STATUS "OptiX root directory (Linux) : ${OPTIX_ROOT_DIR}")
 endif()
 
 #-------- Locate Libs
@@ -96,28 +128,36 @@ message ( STATUS "  OptiX Lib:     ${OPTIX_LIB_DIR}" )
 message ( STATUS "  OptiX Bin:     ${OPTIX_BIN_DIR}" )
 message ( STATUS "  OptiX Include: ${OPTIX_INCLUDE_DIR}" )
 
-set ( OK_DLL "0" )
-_FIND_FILE ( OPTIX_DLL OPTIX_BIN_DIR "optix.1.dll" "" OK_DLL )
-_FIND_FILE ( OPTIX_DLL OPTIX_BIN_DIR "optixu.1.dll" "" OK_DLL )
-if( NOT OK_DLL EQUAL 2 )	
-   message ( INFO "  OptiX NOT FOUND. Could not find OptiX dll/so" )
-   set ( OPTIX_FOUND "NO" )
+# Shared libraries (TODO: Clean this up)
+set(OK_DLL "0")
+if(WIN32)
+  _find_file(OPTIX_SHARED_LIBS "optix.${OPTIX_VERSION}.dll" "" ${OPTIX_BIN_DIR} OK_DLL)
+  _find_file(OPTIX_SHARED_LIBS "optixu.${OPTIX_VERSION}.dll" "" ${OPTIX_BIN_DIR} OK_DLL)
+else()
+  _find_file(OPTIX_SHARED_LIBS "" "liboptix.so" ${OPTIX_LIB_DIR} OK_DLL)
+  _find_file(OPTIX_SHARED_LIBS "" "liboptixu.so" ${OPTIX_LIB_DIR} OK_DLL)
 endif()
 
-set ( OK_LIB "0" )
-_FIND_FILE ( OPTIX_LIB1 OPTIX_LIB_DIR "optix.lib" "liboptix.so" OK_LIB )
-_FIND_FILE ( OPTIX_LIB2 OPTIX_LIB_DIR "optixu.lib" "liboptixu.so" OK_LIB )
-if( NOT OK_LIB EQUAL 2 )	
-   message ( INFO "  OptiX NOT FOUND. Could not find OptiX lib" )
-   set ( OPTIX_FOUND "NO" )
+if(NOT OK_DLL EQUAL 2)
+  message("  OptiX NOT FOUND. Could not find at least one of optix.${OPTIX_VERSION}.dll or optixu.${OPTIX_VERSION}.dll in ${OPTIX_BIN_DIR}.")
+  set(OPTIX_FOUND "NO")
 endif()
 
-set ( OK_H "0" )
-_FIND_FILE ( OPTIX_HEADERS OPTIX_INCLUDE_DIR "optix.h" "optix.h" OK_H )
-if( NOT OK_H EQUAL 1 )	
-   message ( INFO "  OptiX NOT FOUND. Could not find OptiX headers" )
-   set ( OPTIX_FOUND "NO" )
+#Libraries
+set(OK_LIB "0")
+_find_file(OPTIX_LIB "optix.${OPTIX_VERSION}.lib" "liboptix.so" ${OPTIX_LIB_DIR} OK_LIB)
+_find_file(OPTIX_LIBU "optixu.${OPTIX_VERSION}.lib" "liboptixu.so" ${OPTIX_LIB_DIR} OK_LIB)
+if( NOT OK_LIB EQUAL 2 )
+   message("  OptiX NOT FOUND. Could not find at least one of optix.${OPTIX_VERSION}.lib or optixu.${OPTIX_VERSION}.lib in ${OPTIX_LIB_DIR}.")
+   set(OPTIX_FOUND "NO")
 endif()
+
+# set(OK_HEADERS "0")
+# _find_file(OPTIX_HEADERS "optix.h" "optix.h" ${OPTIX_INCLUDE_DIR} OK_HEADERS )
+# if( NOT OK_HEADERS EQUAL 1 )	
+#    message("  OptiX NOT FOUND. Could not find the OptiX header file, optix.h, in ${OPTIX_INCLUDE_DIR}.")
+#    set(OPTIX_FOUND "NO")
+# endif()
 
 if ( OPTIX_FOUND STREQUAL "NO" )
   message(FATAL_ERROR "
@@ -129,12 +169,12 @@ else()
   message ( STATUS "  OptiX Location: ${OPTIX_ROOT_DIR}" )
 endif()
 
-message ( STATUS "  OptiX Libs:    ${OPTIX_LIB1}, ${OPTIX_LIB2}" )
-message ( STATUS "  OptiX Bins:    ${OPTIX_DLL}" )
+message(STATUS "  OptiX Libs: ${OPTIX_LIB}, ${OPTIX_LIBU}")
+message(STATUS "  OptiX Shared Libraries: ${OPTIX_SHARED_LIBS}")
+# message(STATUS "  OptiX Headers: ${OPTIX_HEADERS}")
 
-SET(OPTIX_DLL ${OPTIX_DLL} CACHE STRING "" FORCE)
-SET(OPTIX_LIB1 ${OPTIX_LIB1} CACHE STRING "" FORCE)
-SET(OPTIX_LIB2 ${OPTIX_LIB2} CACHE STRING "" FORCE)
+SET(OPTIX_SHARED_LIBS ${OPTIX_SHARED_LIBS} CACHE STRING "" FORCE)
+SET(OPTIX_LIB ${OPTIX_LIB} CACHE STRING "" FORCE)
+SET(OPTIX_LIBU ${OPTIX_LIBU} CACHE STRING "" FORCE)
 
 mark_as_advanced( OPTIX_FOUND )
-

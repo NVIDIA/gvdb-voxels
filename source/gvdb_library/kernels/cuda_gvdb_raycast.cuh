@@ -177,7 +177,7 @@ __device__ float3 rayTricubic ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, 
 
 __device__ float3 rayTrilinear (VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin, float3 vdel )
 {
-	float dt = SCN_FSTEP ;
+	float dt = SCN_FSTEP;		
 	float3 pt = dt*rdir/vdel;
 
 	for ( int i=0; i < 512; i++ ) {
@@ -190,7 +190,7 @@ __device__ float3 rayTrilinear (VDBInfo* gvdb, uchar chan, float3& p, float3 o, 
 
 __device__ float3 rayLevelSet ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin, float3 vdel )
 {
-	float dt = SCN_FSTEP;		
+	float dt = SCN_FSTEP;
 	float3 pt = dt*rdir/vdel;
 	
 	for ( int i=0; i < 512; i++ ) {
@@ -212,9 +212,6 @@ inline __device__ float4 getColorF ( VDBInfo* gvdb, uchar chan, float3 p )
 
 //----------- RAY CASTING
 
-#define EPSTEST(a,b,c)	(a>b-c && a<b+c)
-#define VOXEL_EPS	0.0001
-
 // SurfaceVoxelBrick - Trace brick to render voxels as cubes
 __device__ void raySurfaceVoxelBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& hclr )
 {
@@ -229,15 +226,22 @@ __device__ void raySurfaceVoxelBrick ( VDBInfo* gvdb, uchar chan, int nodeid, fl
 	{
 		if ( tex3D<float> ( gvdb->volIn[chan], p.x+o.x+.5, p.y+o.y+.5, p.z+o.z+.5 ) > SCN_THRESH) {		// test texture atlas
 			vmin += p * gvdb->vdel[0];		// voxel location in world
-			t = rayBoxIntersect ( pos, dir, vmin, vmin + 1 );		
+			t = rayBoxIntersect ( pos, dir, vmin, vmin + 1 );
 			if (t.z == NOHIT) {
 				hit.z = NOHIT;
 				continue;
 			}
-			hit = getRayPoint ( pos, dir, t.x );				
-			norm.x = EPSTEST(hit.x, vmin.x + 1, VOXEL_EPS) ? 1 : (EPSTEST(hit.x, vmin.x, VOXEL_EPS) ? -1 : 0);
-			norm.y = EPSTEST(hit.y, vmin.y + 1, VOXEL_EPS) ? 1 : (EPSTEST(hit.y, vmin.y, VOXEL_EPS) ? -1 : 0);
-			norm.z = EPSTEST(hit.z, vmin.z + 1, VOXEL_EPS) ? 1 : (EPSTEST(hit.z, vmin.z, VOXEL_EPS) ? -1 : 0);
+			hit = getRayPoint ( pos, dir, t.x );
+
+			// Compute the normal of the voxel [vmin, vmin+gvdb->voxelsize] at the hit point
+			// Note: This is not normalized when the ray hits an edge of the voxel exactly
+			float3 fromVoxelCenter = (hit - vmin) - 0.5f; // in [-1/2, 1/2]
+			fromVoxelCenter -= 0.01 * dir; // Bias the sample point slightly towards the camera
+			const float maxCoordinate = fmaxf(fmaxf(fabsf(fromVoxelCenter.x), fabsf(fromVoxelCenter.y)), fabsf(fromVoxelCenter.z));
+			norm.x = (fabsf(fromVoxelCenter.x) == maxCoordinate ? copysignf(1.0f, fromVoxelCenter.x) : 0.0f);
+			norm.y = (fabsf(fromVoxelCenter.y) == maxCoordinate ? copysignf(1.0f, fromVoxelCenter.y) : 0.0f);
+			norm.z = (fabsf(fromVoxelCenter.z) == maxCoordinate ? copysignf(1.0f, fromVoxelCenter.z) : 0.0f);
+
 			if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, p+o );
 			return;	
 		}
@@ -308,6 +312,8 @@ inline __device__ float getLinearDepth(float* depthBufFloat)
 
 
 // SurfaceDepthBrick - Trace into brick to find surface, with early termination based on depth buffer
+#define EPSTEST(a,b,c)	(a>b-c && a<b+c)
+#define VOXEL_EPS 0.0001
 /*__device__ void raySurfaceDepthBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& hclr )
 {
 	dir = normalize(dir);

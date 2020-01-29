@@ -28,7 +28,7 @@
 //----------------------------------------------------------------------------------
 
 
-#include "optix_extra_math.cuh"			
+#include "optix_extra_math.cuh"
 #include "texture_fetch_functions.h"			// from OptiX SDK
 
 struct PerRayData_radiance
@@ -85,7 +85,7 @@ RT_PROGRAM void trace_primary ()
   prd.rtype = 0;	// ANY_RAY
 
   int initial_samples = 1;
-  
+
   if ( sample <= initial_samples ) {
 	  result = make_float3(0,0,0);	  
 	  for (int n=0; n < initial_samples; n++ ) {

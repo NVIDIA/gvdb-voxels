@@ -237,7 +237,7 @@ int strExtract ( std::string& str, std::vector<std::string>& list )
 	return -1;
 }
 
-unsigned long getFileSize ( char* fname )
+unsigned long getFileSize ( const char* fname )
 {
 	FILE* fp = fopen ( fname, "rb" );
 	fseek ( fp, 0, SEEK_END );

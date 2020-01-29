@@ -24,8 +24,6 @@
 #ifndef DEF_GVDB_NODE
 	#define DEF_GVDB_NODE
 
-	#pragma message ( "gvdb_node" )
-
 	#include "gvdb_types.h"
 	#include "gvdb_vec.h"
 	#include <assert.h>

@@ -37,7 +37,8 @@
 			#if defined(_WIN32) || defined(__CYGWIN__)
 				#define GVDB_API		__declspec(dllimport)
 			#else
-				#define GVDB_API		//https://stackoverflow.com/questions/2164827/explicitly-exporting-shared-library-functions-in-linux
+				// No equivalent of _declspec(dllimport) - see https://stackoverflow.com/questions/2164827/explicitly-exporting-shared-library-functions-in-linux
+				#define GVDB_API
 			#endif
 		#endif          
 	#else

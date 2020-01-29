@@ -186,7 +186,6 @@ bool Sample::init()
 	Matrix4F xform;	
 	float part_size = 200.0;							// Part size is set to 100 mm height.
 	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(200,200,200), part_size );
-	gvdb.SetVoxelSize ( 1, 1, 1 );
 	Model* m = gvdb.getScene()->getModel(0);
 
 	gvdb.SolidVoxelize ( 0, m, &xform, 1, 1 );		// polygons to voxels
@@ -300,7 +299,7 @@ void Sample::simulate()
 	gvdb.SetDataGPU ( pntpos, m_numrays, m_rays.gpu, 0, sizeof(ScnRay) );
 	gvdb.SetDataGPU ( pntclr, m_numrays, m_rays.gpu, 48, sizeof(ScnRay) );
 	DataPtr data;
-	gvdb.SetPoints ( pntpos, data, pntclr );
+	gvdb.SetPoints ( pntpos, data, pntclr );  
 
 	int scPntLen = 0;
 	int subcell_size = 4;
@@ -353,7 +352,8 @@ void Sample::draw_topology ()
 			node = gvdb.getNodeAtLevel ( n, lev );
 			bmin = gvdb.getWorldMin ( node );		// get node bounding box
 			bmax = gvdb.getWorldMax ( node );		// draw node as a box
-			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, gvdb.getClrDim(lev).x, gvdb.getClrDim(lev).y, gvdb.getClrDim(lev).z, 1 );
+			Vector3DF clr = gvdb.getClrDim(lev);
+			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, clr.x, clr.y, clr.z, 1 );			
 		}		
 	}
 	end3D();										// end 3D drawing

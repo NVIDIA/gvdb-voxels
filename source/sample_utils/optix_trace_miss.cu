@@ -63,9 +63,13 @@ float3 __device__ __inline__ jitter_sample ()
 
 float3 __device__ __inline__ sampleEnv(float3 dir)
 {
+	// envmap is a texture containing the top half of the skydome, in
+	// warped spherical coordinates:
+	// (x, y, z) = (cos(pi*u)*v, 1-v, sin(pi*u)*v)
 	float u = atan2f(dir.x, dir.z) * M_1_PIf;
 	float v = 1.0 - dir.y;
-	return (v < 0) ? make_float3(.1, .1, .1) : make_float3( tex2D(envmap, u, v) );
+	// Use a single color for the sea
+	return (v > 1.0f) ? make_float3(.1f, .1f, .1f) : make_float3( tex2D(envmap, u, v) );
 }
 
 RT_PROGRAM void miss()

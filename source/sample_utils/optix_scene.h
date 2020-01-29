@@ -29,12 +29,11 @@
 #ifndef DEF_OPTIX_SCENE
 	#define DEF_OPTIX_SCENE
 
+	#include "gvdb.h"
+
 	#include <optix.h>
 	#include <optixu/optixu.h>
 	#include <optixu/optixpp_namespace.h>
-	using namespace optix;
-
-	#include "gvdb.h"
 
 	struct MaterialParams {
 		char		name[64];
@@ -69,15 +68,14 @@
 		int			m_numtri;
 		int			m_numnorm;
 		
-		optix::Geometry	m_geom;			// Optix geometry
-		Transform	m_tform;			// Optix transform		
-		Buffer		m_vbuf;				// Optix buffers
-		Buffer		m_nbuf;
-		Buffer		m_tbuf;
-		Buffer		m_vibuf;
-		Buffer		m_nibuf;
-		Buffer		m_mibuf;
-		
+		optix::Geometry	 m_geom;		// Optix geometry
+		optix::Transform m_tform;		// Optix transform		
+		optix::Buffer	 m_vbuf;		// Optix buffers
+		optix::Buffer    m_nbuf;
+		optix::Buffer    m_tbuf;
+		optix::Buffer    m_vibuf;
+		optix::Buffer    m_nibuf;
+		optix::Buffer    m_mibuf;
 	};
 
 
@@ -96,8 +94,8 @@
 		};
 
 		void	InitializeOptix ( int w, int h );
-		Buffer	CreateOutputOptix ( RTformat format, unsigned int width, unsigned int height );
-		Program CreateProgramOptix ( std::string name, std::string prog_func );
+		optix::Buffer	CreateOutputOptix ( RTformat format, unsigned int width, unsigned int height );
+		optix::Program	CreateProgramOptix ( std::string name, std::string prog_func );
 		void	ClearGraph ();
 		int		AddMaterial ( std::string fname, std::string cast_prog, std::string shadow_prog );
 		OptixModel* AddPolygons ( Model* model, int mat_id, Matrix4F& xform );		
@@ -142,20 +140,20 @@
 
 	private:
 
-		optix::Context	m_OptixContext;
-		Group			m_OptixMainGroup;
-		TextureSampler	m_OptixVolSampler;
-		TextureSampler	m_OptixEnvmap;
-		Program			m_OptixVolIntersectSurfProg;
-		Program			m_OptixVolIntersectLevelSetProg;
-		Program			m_OptixVolIntersectDeepProg;
-		Program			m_OptixVolBBoxProg;
-		Program			m_OptixMeshIntersectProg;
-		Program			m_OptixMeshBBoxProg;
-		Buffer			m_OptixBuffer;
-		Buffer			m_OptixTransferFunc;
-		Buffer			m_OptixSeeds;
-		std::vector< Transform >		m_OptixVolumes;
+		optix::Context			m_OptixContext;
+		optix::Group			m_OptixMainGroup;
+		optix::TextureSampler	m_OptixVolSampler;
+		optix::TextureSampler	m_OptixEnvmap;
+		optix::Program			m_OptixVolIntersectSurfProg;
+		optix::Program			m_OptixVolIntersectLevelSetProg;
+		optix::Program			m_OptixVolIntersectDeepProg;
+		optix::Program			m_OptixVolBBoxProg;
+		optix::Program			m_OptixMeshIntersectProg;
+		optix::Program			m_OptixMeshBBoxProg;
+		optix::Buffer			m_OptixBuffer;
+		optix::Buffer			m_OptixTransferFunc;
+		optix::Buffer			m_OptixSeeds;
+		std::vector< optix::Transform >	m_OptixVolumes;
 		std::vector< OptixModel* >		m_OptixModels;
 		std::vector< optix::Material >	m_OptixMats;
 		std::vector< MaterialParams >	m_OptixMatParams;

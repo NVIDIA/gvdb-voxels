@@ -1004,8 +1004,15 @@ extern "C" __global__ void gvdbInsertTriangles ( float bdiv, int bmax, int* bcnt
 	// compute bounds on y-axis	
 	float p0, p1;
 	fminmax3( v0.y, v1.y, v2.y, p0, p1 );
-	p0 = int(p0/bdiv);	p1 = int(p1/bdiv);							// y-min and y-max bins
-	
+	p0 = int(p0 / bdiv);	p1 = int(p1 / bdiv);						// y-min and y-max bins
+
+	// If either of these conditions are true, the triangle must be outside of the volume.
+	if (p0 >= bmax) return;
+	if (p1 < 0) return;
+	// Clamp bounds to lie within allocated bins.
+	if (p1 >= bmax) p1 = bmax - 1;
+	if (p0 < 0) p0 = 0;
+
 	// scan bins covered by triangle	
 	for (int y=p0; y <= p1; y++) {
 		atomicAdd ( &bcnt[y], (uint) 1 );							// histogram bin counts
@@ -1129,8 +1136,13 @@ extern "C" __global__ void gvdbSortTriangles ( float bdiv, int bmax, int* bcnt, 
 	float p0, p1;
 	fminmax3( v0.y, v1.y, v2.y, p0, p1 );
 	p0 = int(p0/bdiv);	p1 = int(p1/bdiv);							// y-min and y-max bins
-	if ( p0 >= bmax ) p0 = bmax-1;
-	if ( p1 >= bmax ) p1 = bmax-1;
+
+	// If either of these conditions are true, the triangle must be outside of the volume.
+	if (p0 >= bmax) return;
+	if (p1 < 0) return;
+	// Clamp bounds to lie within allocated bins.
+	if (p1 >= bmax) p1 = bmax - 1;
+	if (p0 < 0) p0 = 0;
 	
 	// scan bins covered by triangle	
 	int bndx;
@@ -1151,8 +1163,8 @@ extern "C" __global__ void gvdbVoxelize ( float3 vmin, float3 vmax, int3 res, uc
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;
 	
 	// solid voxelization
-	float3 tdel = (vmax-vmin)/make_float3(res);						// width of voxel
-	vmin += make_float3(t.x+.5f, t.y+.5f, t.z+.5f)*tdel;		// center of voxel
+	float3 tdel = (vmax-vmin)/make_float3(res);				// width of voxel
+	vmin += make_float3(t.x+.5f, t.y+.5f, t.z+.5f)*tdel;	// center of voxel
 	float3 v0, v1, v2;
 	float3 e0, e1, e2;
 	float3 norm, p;		
@@ -1162,15 +1174,13 @@ extern "C" __global__ void gvdbVoxelize ( float3 vmin, float3 vmax, int3 res, uc
 	if ( b >= bmax ) b = bmax-1;
 	
 	for (n=boff[b]; n < boff[b]+bcnt[b]; n++ ) {
-		
-		v0 = tbuf[n*3];   v0 = (v0 - vmin)/tdel;
-		v1 = tbuf[n*3+1]; v1 = (v1 - vmin)/tdel;
-		v2 = tbuf[n*3+2]; v2 = (v2 - vmin)/tdel;
-		/*f = make_int3( ebuf[n*3], ebuf[n*3+1], ebuf[n*3+2] );
-		v0 = vbuf[f.x << 1];		v0 = mul4x ( v0, cxform );	v0 = (v0 - tcent)/tdel;
-		v1 = vbuf[f.y << 1];		v1 = mul4x ( v1, cxform );	v1 = (v1 - tcent)/tdel;
-		v2 = vbuf[f.z << 1];		v2 = mul4x ( v2, cxform );	v2 = (v2 - tcent)/tdel;*/
-		e0 = v1-v0;	e1 = v2-v0;	
+		// This snapping to grid emulates a fixed-point rasterizer, and avoids
+		// the case where our ray-triangle intersection ray passes exactly
+		// through a triangle vertex.
+		// Get vertex;    Scale voxel to [-0.5,0.5]^3; snap to grid
+		v0 = tbuf[n * 3 + 0]; v0 = (v0 - vmin) / tdel; v0.y += exp2(-6.0f) * float(v0.y == floorf(v0.y));
+		v1 = tbuf[n * 3 + 1]; v1 = (v1 - vmin) / tdel; v1.y += exp2(-6.0f) * float(v1.y == floorf(v1.y));
+		v2 = tbuf[n * 3 + 2]; v2 = (v2 - vmin) / tdel; v2.y += exp2(-6.0f) * float(v2.y == floorf(v2.y));
 
 		//--- bounding box test
 		fminmax3( v0.y, v1.y, v2.y, p.x, p.y );	
@@ -1180,22 +1190,71 @@ extern "C" __global__ void gvdbVoxelize ( float3 vmin, float3 vmax, int3 res, uc
 		fminmax3( v0.x, v1.x, v2.x, p.x, p.y );		
 		if ( p.y < -0.5f ) continue;				// x- half space, keep x+ half space
 
-		//--- ray-triangle intersect
-		norm.x = 0;		
-		e2 = make_float3(0, -e1.z, e1.y);			// P = CROSS(D, e1)		  e2 <=> P,  D={1,0,0}
-		p.z = dot ( e0, e2 );						// det = DOT(e0, P)		  p.z <=> det
-		if ( p.z > -0.001 && p.z < 0.001 ) norm.x=1;		
-		// T=-v0;									// T = SUB(O, v0)         -v0 <=> T  O={0,0,0}
-		p.y = dot ( -v0, e2 ) / p.z;				// u = DOT(T, P)*invdet   p.y <=> u
-		if ( p.y < 0.f || p.y > 1.f ) norm.x=1;
-		e2 = cross ( -v0, e0 );						// Q = CROSS(T, e0)		  e2 <=> Q
-		rad = e2.x / p.z;							// v = DOT(D, Q)*invdet   rad <=> v
-		if ( rad < 0.f || p.y+rad > 1.f ) norm.x=1;
-		rad = dot ( e1, e2 ) / p.z;					// t = DOT(e1, Q)*invdet  rad <=> t
-		if ( rad < 0.001f ) norm.x=1;
-		if ( norm.x==0 ) cnt++;						// count crossing for inside-outside test (solid voxelize)
+		//--- ray-triangle intersection
+		//--- intersect all triangles with ray O + Dt = (0,0,0) + (1,0,0)t, t > 0
+		// Based on the watertight intersection test from Woop, Benthin, and
+		// Wald: http://jcgt.org/published/0002/01/05/
+		// Used space: norm (norm.x = U, norm.y = V, norm.z = W), rad (= T)
+		
+		// Don't have to do any preconversion:
+		// v0 = v0' = M(v0-O)
+		// v1 = v1' = M(v1-O)
+		// v2 = v2' = M(v2-O)
 
+		// Prevent the compiler from fusing these into MAD operations
+		norm.x = __fadd_rz(__fmul_rz(v2.y, v1.z), -__fmul_rz(v2.z, v1.y)); // U = DOT(CROSS(v2, v1), D)  norm.x <=> U
+		norm.y = __fadd_rz(__fmul_rz(v0.y, v2.z), -__fmul_rz(v0.z, v2.y)); // V = DOT(CROSS(v0, v2), D)  norm.y <=> V
+		norm.z = __fadd_rz(__fmul_rz(v1.y, v0.z), -__fmul_rz(v1.z, v0.y)); // W = DOT(CROSS(v1, v0), D)  norm.z <=> W
+
+		// Now, test to see whether our point is inside or on the edges of the triangle.
+		if ((norm.x >= 0.0f && norm.y >= 0.0f && norm.z >= 0.0f) || (norm.x <= 0.0f && norm.y <= 0.0f && norm.z <= 0.0f)) {
+
+			rad = __fmul_rz(norm.x, v0.x) + __fmul_rz(norm.y, v1.x) + __fmul_rz(norm.z, v2.x); // rad <=> T
+			p.y = norm.x + norm.y + norm.z; // p.y <=> det
+
+			// Check hit distance (T/det) - ignore coplanar triangles and
+			// triangles behind where the ray starts:
+			if (rad*p.y > 0.0f) {
+				if ((norm.x != 0.0f) && (norm.y != 0.0f) && (norm.z != 0.0f))
+				{
+					cnt += 1; // Inside the triangle
+				}
+				else {
+					// D3D10-style top-left rule for oriented triangles. Uses
+					// the fact that the ray never passes through a mesh vertex.
+					if (norm.x == 0.0f) {
+						// Edge 1, 2
+						e0.x = v2.z - v1.z;
+						e0.y = v2.y - v1.y;
+					}
+					else if (norm.y == 0.0f) {
+						// Edge 2, 0
+						e0.x = v0.z - v2.z;
+						e0.y = v0.y - v2.y;
+					}
+					else { // norm.z == 0.0f
+						// Edge 0, 1
+						e0.x = v1.z - v0.z;
+						e0.y = v1.y - v0.y;
+					}
+
+					// This will be positive if the edge vi.zy, vj.zy is in
+					// lexicographic order, negative if in reverse lexicographic
+					// order, and 0 if vi.zy == vj.zy.
+					e0.x = 2.0f*((e0.x > 0.0f) - (0.0f > e0.x)) + ((e0.y > 0.0f) - (0.0f > e0.y));
+					if (p.y*e0.x > 0.0f) {
+						cnt += 1;
+					}
+				}
+			}
+		}
+
+		// For conservative triangle tests, only consider triangles with AABBs
+		// containing this voxel:
 		if ( p.x > 0.5f ) continue;					// x+ half space
+
+		// set e0 and e1 to their normal values
+		e0 = v1 - v0;	e1 = v2 - v0;
 
 		//--- fast box-plane test
 		e2 = -e1; e1 = v2-v1;					
@@ -1234,79 +1293,24 @@ extern "C" __global__ void gvdbVoxelize ( float3 vmin, float3 vmax, int3 res, uc
 		if ( -(p.y+p.z)*0.5f - (p.y*v1.y + p.z*v1.z) + fmaxf(0, p.y) + fmaxf(0, p.z) < 0 ) continue; 
 		p = make_float3 ( 0, -e2.z*rad, e2.y*rad );
 		if ( -(p.y+p.z)*0.5f - (p.y*v2.y + p.z*v2.z) + fmaxf(0, p.y) + fmaxf(0, p.z) < 0 ) continue;
-
-		//--- akenine-moller tests
-		/*p.x = e0.z*v0.y - e0.y*v0.z;							// AXISTEST_X01(e0[Z], e0[Y], fez, fey);
-		p.z = e0.z*v2.y - e0.y*v2.z;
-		if (p.x<p.z) {min=p.x; max=p.z;} else {min=p.z; max=p.x;} 
-		rad = fabsf(e0.z) * 0.5f + fabsf(e0.y) * 0.5f;  
-		if (min>rad || max<-rad) continue;
-
-		p.x = -e0.z*v0.x + e0.x*v0.z;		      				// AXISTEST_Y02(e0.z, e0.x, fez, fex);
-		p.z = -e0.z*v2.x + e0.x*v2.z;
-		if (p.x<p.z) {min=p.x; max=p.z;} else {min=p.z; max=p.x;}
-		rad = fabsf(e0.z) * 0.5f + fabsf(e0.x) * 0.5f; 
-		if (min>rad || max<-rad) continue;
-
-		p.y = e0.y*v1.x - e0.x*v1.y;								// AXISTEST_Z12(e0.y, e0.x, fey, fex);
-		p.z = e0.y*v2.x - e0.x*v2.y;
-		if(p.z<p.y) {min=p.z; max=p.y;} else {min=p.y; max=p.z;}
-		rad = fabsf(e0.y) * 0.5f + fabsf(e0.x) * 0.5f;  
-		if(min>rad || max<-rad) continue;
- 
-		p.x = e1.z*v0.y - e1.y*v0.z;							// AXISTEST_X01(e1.z, e1.y, fez, fey);
-		p.z = e1.z*v2.y - e1.y*v2.z;
-		if(p.x<p.z) {min=p.x; max=p.z;} else {min=p.z; max=p.x;} 
-		rad = fabsf(e1.z) * 0.5f + fabsf(e1.y) * 0.5f;
-		if(min>rad || max<-rad) continue;
-
-		p.x = -e1.z*v0.x + e1.x*v0.z;							// AXISTEST_Y02(e1.z, e1.x, fez, fex);
-		p.z = -e1.z*v2.x + e1.x*v2.z;
-		if(p.x<p.z) {min=p.x; max=p.z;} else {min=p.z; max=p.x;}
-		rad = fabsf(e1.z) * 0.5f + fabsf(e1.x) * 0.5f;
-		if(min>rad || max<-rad) continue;
-
-		p.x = e1.y*v0.x - e1.x*v0.y;								// AXISTEST_Z0(e1.y, e1.x, fey, fex);
-		p.y = e1.y*v1.x - e1.x*v1.y;
-		if(p.x<p.y) {min=p.x; max=p.y;} else {min=p.y; max=p.x;} 
-		rad = fabsf(e1.y) * 0.5f + fabsf(e1.x) * 0.5f;
-		if(min>rad || max<-rad) continue;
-  
-		p.x = e2.z*v0.y - e2.y*v0.z;								// AXISTEST_X2(e2.z, e2.y, fez, fey);
-		p.y = e2.z*v1.y - e2.y*v1.z;
-		if(p.x<p.y) {min=p.x; max=p.y;} else {min=p.y; max=p.x;} 
-		rad = fabsf(e2.z) * 0.5f + fabsf(e2.y) * 0.5f; 
-		if(min>rad || max<-rad) continue;
-	
-		p.x = -e2.z*v0.x + e2.x*v0.z;		      				// AXISTEST_Y1(e2.z, e2.x, fez, fex);
-		p.y = -e2.z*v1.x + e2.x*v1.z;
-		if(p.x<p.y) {min=p.x; max=p.y;} else {min=p.y; max=p.x;} 
-		rad = fabsf(e2.z) * 0.5f + fabsf(e2.x) * 0.5f;
-		if(min>rad || max<-rad) continue;
-	
-		p.y = e2.y*v1.x - e2.x*v1.y;								// AXISTEST_Z12(e2.y, e2.x, fey, fex); 
-		p.z = e2.y*v2.x - e2.x*v2.y;
-		if(p.z<p.y) {min=p.z; max=p.y;} else {min=p.y; max=p.z;} 
-		rad = fabsf(e2.y) * 0.5f + fabsf(e2.x) * 0.5f;
-		if(min>rad || max<-rad) continue; */
 		
 		switch ( otype ) {
 		case T_UCHAR:	obuf [ (t.z*res.y + t.y)*res.x + t.x ] = (uchar) val_surf;			break;
 		case T_FLOAT:	((float*) obuf) [ (t.z*res.y + t.y)*res.x + t.x ] = val_surf;		break;
 		case T_INT:		((int*) obuf) [ (t.z*res.y + t.y)*res.x + t.x ] = (int) val_surf;	break;
-		};		
+		};
 		
 		break;
 	}
 
 	if ( n == boff[b]+bcnt[b] ) {
 		// solid voxelization		
-		if ( cnt % 2 == 1) {
+		if ( (cnt % 2) == 1 ) {
 			switch ( otype ) {
 			case T_UCHAR:	obuf [ (t.z*res.y + t.y)*res.x + t.x ] = (uchar) val_inside;		break;
 			case T_FLOAT:	((float*) obuf) [ (t.z*res.y + t.y)*res.x + t.x ] = val_inside;		break;
 			case T_INT:		((int*) obuf) [ (t.z*res.y + t.y)*res.x + t.x ] = (int) val_inside;	break;
-			};		
+			};
 		}
 	}
 }

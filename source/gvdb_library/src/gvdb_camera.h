@@ -123,7 +123,7 @@ using namespace nvdb;
 		float calculateLOD ( Vector3DF pnt, float minlod, float maxlod, float maxdist );
 
 		// Utility functions
-		virtual void updateMatricies ();				// Updates camera axes and projection matricies
+		virtual void updateMatricies ();			// Updates camera axes and projection matricies
 		void updateFrustum ();						// Updates frustum planes
 		Vector3DF inverseRay ( float x, float y, float z );
 		Vector3DF inverseRayProj ( float x, float y, float z );
@@ -185,9 +185,9 @@ using namespace nvdb;
 				
 		Vector3DF		origRayWorld;
 		Vector4DF		tlRayWorld;
-    	Vector4DF		trRayWorld;
-    	Vector4DF		blRayWorld;
-    	Vector4DF		brRayWorld;
+		Vector4DF		trRayWorld;
+		Vector4DF		blRayWorld;
+		Vector4DF		brRayWorld;
 	};
 
 	}

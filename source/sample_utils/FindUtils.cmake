@@ -6,18 +6,16 @@
 unset( UTILS_FOUND CACHE)
 
 message ( STATUS "--> Find Sample Utils") 
+set ( SAMPLE_UTIL_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE PATH "Path to sample_utils" )
 
-set ( SAMPLE_UTIL_DIR "${CMAKE_MODULE_PATH}" CACHE PATH "Path to sample_utils" )
-
-set ( OK_UTIL "0" )
-_FIND_FILE ( UTIL_FILES SAMPLE_UTIL_DIR "nv_gui.h" "nv_gui.h" OK_UTIL )
-
-if ( OK_UTIL EQUAL 1 )
+# Determine if SAMPLE_UTIL_DIR points to a valid sample utils directory.
+if (EXISTS "${SAMPLE_UTIL_DIR}/nv_gui.h" )
     set ( UTILS_FOUND "YES" )    
 	include_directories( ${SAMPLE_UTIL_DIR} )	
 	
-	# OpenGL always required
 	if ( REQUIRE_OPENGL )
+        # Add OpenGL to build
+		cmake_policy(SET CMP0072 NEW) # Prefer GLVND by default when available (CMake 3.11+)
 		find_package(OpenGL)		
 		message ( STATUS " Using OpenGL")
 	endif()
@@ -77,8 +75,8 @@ if ( OK_UTIL EQUAL 1 )
 else()
     set ( UTILS_FOUND "NO" )	
 	message ( FATAL_ERROR "
-Sample Utils not found. Please set the CMAKE_MODULE_PATH  \
-and the SAMPLE_UTIL_DIR to the location of sample_utils path,  \
+Sample Utils not found. Please set SAMPLE_UTIL_DIR \
+to the path to the sample_utils folder,  \
 which contains nv_gui, file_png, file_tga, main_win, main_x11, \
 and cmake helpers. \n
      ") 

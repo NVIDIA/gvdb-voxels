@@ -140,9 +140,6 @@ void Volume3D::SurfaceVoxelizeFastGL ( Vector3DF vmin, Vector3DF vmax, Matrix4F*
 		Empty ();												// using cuda kernel						
 		cudaCheck ( cuCtxSynchronize(), "Volume3D", "SurfaceVoxelizeFastGL", "cuCtxSynchronize", "", false );		// must sync for opengl to use		
 		
-		//glClearColor ( 0, 0, 0, 0);			// using FBO, see PrepareRasterGL setup
-		//glClear(GL_COLOR_BUFFER_BIT);	
-
 		// Setup transform matrix
 		Matrix4F mw;
 		mw.Translate ( -mObjMin.x, -mObjMin.y, -mObjMin.z );
@@ -172,8 +169,8 @@ void Volume3D::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 		// Configure model
 		model->ComputeBounds ( *xform, 0.05 );
 		mObjMin = model->objMin; mObjMax = model->objMax;
-		mVoxMin = mObjMin;	
-		mVoxMax = mObjMax;  
+		mVoxMin = mObjMin;
+		mVoxMax = mObjMax;
 		mVoxRes = mVoxMax;	mVoxRes -= mVoxMin;
 
 		// Create atlas if none exists

@@ -28,6 +28,8 @@
 
 #include "optix_extra_math.cuh"
 
+using namespace optix;
+
 // This is to be plugged into an RTgeometry object to represent
 // a triangle mesh with a vertex buffer of triangle soup (triangle list)
 // with an interleaved position, normal, texturecoordinate layout.

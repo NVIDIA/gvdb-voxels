@@ -39,9 +39,12 @@
 
 extern "C" __global__ void gvdbUpdateApronFacesF ( VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, int* nbrtable )
 {
-	// Compute brick & atlas vox	
-	int side = threadIdx.z;
-	uint3 suv = blockIdx * make_uint3(blockDim.x, blockDim.y, 1) + threadIdx;
+	// Compute brick & atlas vox
+	int brk = blockIdx.x;
+	if (brk > brickcnt) return;
+
+	int side = threadIdx.x;
+	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
 	if (suv.x >= brickwid || suv.y >= brickwid || side >= 3 ) return;
 	int3 vox, vinc;
 	switch (side) {
@@ -50,8 +53,6 @@ extern "C" __global__ void gvdbUpdateApronFacesF ( VDBInfo* gvdb, uchar chan, in
 	case 2:		vox = make_int3(suv.x, suv.y, 0);		vinc = make_int3(0, 0, 1); break;
 	}
 	int3 vnbr = vox + vinc*(brickwid - 1);							// neighbor offset
-	int brk = blockIdx.z;
-	if (brk > brickcnt) return;
 
 	// Get current brick
 	VDBNode* node = getNode(gvdb, 0, brk);	
@@ -75,9 +76,12 @@ extern "C" __global__ void gvdbUpdateApronFacesF ( VDBInfo* gvdb, uchar chan, in
 
 extern "C" __global__ void gvdbUpdateApronF (VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, float boundval)
 {
-	// Compute brick & atlas vox	
-	int side = threadIdx.z;
-	uint3 suv = blockIdx * make_uint3(blockDim.x, blockDim.y, 1) + threadIdx;
+	// Compute brick & atlas vox
+	int brk = blockIdx.x;
+	if (brk > brickcnt) return;
+
+	int side = threadIdx.x;
+	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
 	if (suv.x >= brickres || suv.y >= brickres || side >= 6) return;
 	uint3 vox;
 	switch (side) {
@@ -88,8 +92,6 @@ extern "C" __global__ void gvdbUpdateApronF (VDBInfo* gvdb, uchar chan, int bric
 	case 4:		vox = make_uint3(suv.x, brickres-1, suv.y);	break;
 	case 5:		vox = make_uint3(suv.x, suv.y, brickres-1);	break;	
 	}	
-	int brk = blockIdx.z;
-	if (brk > brickcnt) return;
 
 	// Get current brick
 	VDBNode* node = getNode(gvdb, 0, brk);
@@ -102,37 +104,20 @@ extern "C" __global__ void gvdbUpdateApronF (VDBInfo* gvdb, uchar chan, int bric
 	float3 offs, vmin, vdel; uint64 nid;
 	node = getNodeAtPoint(gvdb, wpos, &offs, &vmin, &vdel, &nid);		// Evaluate at world position
 	offs += (wpos - vmin) / vdel;
-
+	
 	float v = (node == 0x0) ? boundval : tex3D<float>(gvdb->volIn[chan], offs.x, offs.y, offs.z);	// Sample at world point
 	surf3Dwrite(v, gvdb->volOut[chan], vox.x * sizeof(float), vox.y, vox.z);					// Write to apron voxel
 }
 
 
-// Recreate the compressed axis
-/*uint3 vox = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;
-switch ( axis ) {
-case 0:		vox.x = blockIdx.x * blkres + gvdb->apron_table[threadIdx.x];	break;
-case 1:		vox.y = blockIdx.y * blkres + gvdb->apron_table[threadIdx.y];	break;
-case 2:		vox.z = blockIdx.z * blkres + gvdb->apron_table[threadIdx.z];	break;
-};
-if ( vox.x >= res.x || vox.y >= res.y || vox.z >= res.z ) return;
-float3 wpos;
-if ( !getAtlasToWorld ( gvdb, vox, wpos )) return;
-
-float3 offs, vmin, vdel; uint64 nid;
-VDBNode* node = getNodeAtPoint ( gvdb, wpos, &offs, &vmin, &vdel, &nid );		// Evaluate at world position
-offs += (wpos-vmin)/vdel;
-
-float v = (node==0x0) ? 0.0 : tex3D<float> ( gvdb->volIn[chan], offs.x, offs.y, offs.z );		// Sample at world point
-
-surf3Dwrite ( v, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );	// Write to apron voxel*/
-
-
 extern "C" __global__ void gvdbUpdateApronF4 ( VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, float boundval)
 {
 	// Compute brick & atlas vox	
-	int side = threadIdx.z;
-	uint3 suv = blockIdx * make_uint3(blockDim.x, blockDim.y, 1) + threadIdx;
+	int brk = blockIdx.x;
+	if (brk > brickcnt) return;
+
+	int side = threadIdx.x;
+	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
 	if (suv.x >= brickres || suv.y >= brickres || side >= 6) return;
 	uint3 vox;
 	switch (side) {
@@ -143,8 +128,6 @@ extern "C" __global__ void gvdbUpdateApronF4 ( VDBInfo* gvdb, uchar chan, int br
 	case 4:		vox = make_uint3(suv.x, brickres-1, suv.y);	break;
 	case 5:		vox = make_uint3(suv.x, suv.y, brickres-1);	break;	
 	}	
-	int brk = blockIdx.z;
-	if (brk > brickcnt) return;
 
 	// Get current brick
 	VDBNode* node = getNode(gvdb, 0, brk);
@@ -165,8 +148,11 @@ extern "C" __global__ void gvdbUpdateApronF4 ( VDBInfo* gvdb, uchar chan, int br
 extern "C" __global__ void gvdbUpdateApronC ( VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, float boundval)
 {
 	// Compute brick & atlas vox	
-	int side = threadIdx.z;
-	uint3 suv = blockIdx * make_uint3(blockDim.x, blockDim.y, 1) + threadIdx;
+	int brk = blockIdx.x;
+	if (brk > brickcnt) return;
+
+	int side = threadIdx.x;
+	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
 	if (suv.x >= brickres || suv.y >= brickres || side >= 6) return;
 	uint3 vox;
 	switch (side) {
@@ -177,8 +163,6 @@ extern "C" __global__ void gvdbUpdateApronC ( VDBInfo* gvdb, uchar chan, int bri
 	case 4:		vox = make_uint3(suv.x, brickres-1, suv.y);	break;
 	case 5:		vox = make_uint3(suv.x, suv.y, brickres-1);	break;	
 	}	
-	int brk = blockIdx.z;
-	if (brk > brickcnt) return;
 
 	// Get current brick
 	VDBNode* node = getNode(gvdb, 0, brk);
@@ -199,8 +183,11 @@ extern "C" __global__ void gvdbUpdateApronC ( VDBInfo* gvdb, uchar chan, int bri
 extern "C" __global__ void gvdbUpdateApronC4 ( VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, float boundval)
 {
 	// Compute brick & atlas vox	
-	int side = threadIdx.z;
-	uint3 suv = blockIdx * make_uint3(blockDim.x, blockDim.y, 1) + threadIdx;
+	int brk = blockIdx.x;
+	if (brk > brickcnt) return;
+
+	int side = threadIdx.x;
+	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
 	if (suv.x >= brickres || suv.y >= brickres || side >= 6) return;
 	uint3 vox;
 	switch (side) {
@@ -211,8 +198,6 @@ extern "C" __global__ void gvdbUpdateApronC4 ( VDBInfo* gvdb, uchar chan, int br
 	case 4:		vox = make_uint3(suv.x, brickres-1, suv.y);	break;
 	case 5:		vox = make_uint3(suv.x, suv.y, brickres-1);	break;	
 	}	
-	int brk = blockIdx.z;
-	if (brk > brickcnt) return;
 
 	// Get current brick
 	VDBNode* node = getNode(gvdb, 0, brk);

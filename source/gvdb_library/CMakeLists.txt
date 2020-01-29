@@ -1,215 +1,321 @@
-cmake_minimum_required(VERSION 2.8)
-if ( WIN32 )
-   set(PROJNAME libgvdb)
-else()
-   set(PROJNAME gvdb)
-endif()
-Project(${PROJNAME})
-Message(STATUS "-------------------------------")
-Message(STATUS "Processing Project ${PROJNAME}:")
+cmake_minimum_required(VERSION 3.10) # Use Modern CMake
 
-#####################################################################################
-# Included Cmakes
+# Here's what the dependency graph of this project looks like:
+#      .---gvdbCopy--. (copies files)
+#      |             |
+#      V             V
+#     gvdb        gvdbPTX
+# (builds lib)  (builds PTX)
 
-if(NOT BASE_DIRECTORY)
-  SET(BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-endif()
-include ( "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Helpers.cmake" )
-include ( "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Packages.cmake" )
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CudaComputeTargetFlags.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CudaAutodetectCompute.cmake)
+project(gvdb LANGUAGES CUDA CXX C)
 
-include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/src")
-_add_project_definitions(${PROJNAME})
+cmake_policy(SET CMP0072 NEW) # Prefer GLVND by default when available (CMake 3.11+)
+find_package(OpenGL REQUIRED)
+# Finds GLEW
+include("cmake/FindGLEW.cmake")
 
-#####################################################################################
-# GVDB Options
-#
-set ( USE_BITMASKS OFF CACHE BOOL "Use Bitmasks" )
-if ( USE_BITMASKS ) 
-   add_definitions(-DUSE_BITMASKS)
+# Print warning if not a 64-bit build
+if(NOT (CMAKE_SIZEOF_VOID_P EQUAL 8))
+    message(WARNING "gvdb_library: This project requires a 64-bit build. Subsequent configuration steps may fail.")
 endif()
 
-set ( USE_SIMULATION OFF CACHE BOOL "Use GVDB 2.0 Simulation" )
-if ( USE_SIMULATION ) 
-   add_definitions(-DSIM_CODE)
+# Set the global minimum C++ standard for the project (this is C++11, since we use nullptr)
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 11)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
-set ( USE_OPENVDB OFF CACHE BOOL "Use OpenVDB" FORCE)
-
-set ( USE_NVTX OFF CACHE BOOL "Use NSIGHT Markers" )
-if ( USE_NVTX ) 
-   add_definitions(-DUSE_NVTX)
+# Set C++ standard required for CUDA
+if(NOT DEFINED CMAKE_CUDA_STANDARD)
+    set(CMAKE_CUDA_STANDARD 11)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
-#####################################################################################
-# Add CUDA
-#
-_add_package_CUDA()
+# Compile a couple of source files into a PTX object library.
+# Creates an object library target named gvdbPTX.
+add_library(gvdbPTX OBJECT "kernels/cuda_gvdb_copydata.cu" "kernels/cuda_gvdb_module.cu")
+# Make sure it compiles to a PTX file.
+set_target_properties(gvdbPTX PROPERTIES CUDA_PTX_COMPILATION ON)
+# Private and public sources are compiled into the target.
+# Public and interface sources are published into the list of sources for
+# consuming targets
+# Another way of thinking about this is that
+# public = used for target + used from targets.
+target_sources(gvdbPTX
+    PUBLIC  "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_dda.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_geom.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_nodes.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_operators.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_particles.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_raycast.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_scene.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_math.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/radixsort_kernel.cuh")
 
-#####################################################################################
-# Add CUDPP Library
-#
-_add_package_CUDPP()
+# Enable the --use_fast_math CUDA compiler flag.
+target_compile_options(gvdbPTX
+    PRIVATE --use_fast_math)
 
-#####################################################################################
-# Add OPENVDB Library (optional)
-#
-_add_package_OpenVDB()
- 
-#####################################################################################
-# Source files for this project
-#
-file(GLOB SOURCE_FILES src/*.cpp src/*.hpp src/*.inl src/*.h src/*.c)
+# Export our additional target include directories.
+target_include_directories(gvdbPTX
+    INTERFACE   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/kernels>
+                $<INSTALL_INTERFACE:include>) # expands to _output/include - note that these must be un-quoted!
 
-#####################################################################################
-# Additional files for tools/helpers
-#
-SET(COMMON_SOURCE_FILES ${GLEW_SOURCE} )
 
-#####################################################################################
-# Library paths
-#
-# CMAKE_INSTALL_PREFIX -- path where library will be installed to
+# Create our main GVDB shared library (will output to libgvdb.so on Unix and gvdb.dll on Windows)
+# add_library requires at least one file to be listed in CMake 3.10:
+file(WRITE "${CMAKE_CURRENT_LIST_DIR}/dummy.cpp" "")
 
-if (NOT DEFINED CMAKE_INSTALL_SUGGEST )
-   if ( WIN32 )
-      get_filename_component ( _instpath "${CMAKE_CURRENT_SOURCE_DIR}/../../_output" REALPATH )
-   else()
-      get_filename_component ( _instpath "/usr/local/gvdb" REALPATH )
-   endif()
-   set ( CMAKE_INSTALL_SUGGEST ${_instpath} CACHE PATH "Suggested install path" FORCE)
-   set ( CMAKE_INSTALL_PREFIX ${_instpath} CACHE PATH "Actual install path" FORCE)   
+add_library(gvdb SHARED "${CMAKE_CURRENT_LIST_DIR}/dummy.cpp")
+
+# Add sources - this tells our compiler which files to build, as well as which
+# files to show in IDEs.
+target_sources(gvdb
+    PRIVATE src/app_perf.cpp
+            src/gvdb_allocator.cpp
+            src/gvdb_camera.cpp
+            src/gvdb_cutils.cu
+            src/gvdb_model.cpp
+            src/gvdb_node.cpp
+            src/gvdb_render_opengl.cpp
+            src/gvdb_scene.cpp
+            src/gvdb_types.cpp
+            src/gvdb_vec.cpp
+            src/gvdb_volume_3D.cpp
+            src/gvdb_volume_base.cpp
+            src/gvdb_volume_gvdb.cpp
+            src/loader_ObjarReader.cpp
+            src/loader_OBJReader.cpp
+            src/loader_Parser.cpp
+            src/string_helper.cpp
+    PUBLIC  "${CMAKE_CURRENT_LIST_DIR}/src/app_perf.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_allocator.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_camera.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_cutils.cuh"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_model.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_node.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_render.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_scene.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_types.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_vec.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_volume_3D.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_volume_base.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/gvdb_volume_gvdb.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/loader_ObjarReader.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/loader_OBJReader.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/loader_Parser.h"
+            "${CMAKE_CURRENT_LIST_DIR}/src/string_helper.h")
+
+# Export our additional target include directories.
+target_include_directories(gvdb
+    PUBLIC      ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+    INTERFACE   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
+                $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/kernels>
+                $<INSTALL_INTERFACE:include>)
+
+
+# Make sure to link against CUDA and OpenGL
+target_link_libraries(gvdb
+    PUBLIC ${OPENGL_LIBRARIES})
+if(WIN32)
+    target_link_libraries(gvdb PUBLIC cuda.lib)
+elseif(UNIX)
+    find_package(X11 REQUIRED)
+    target_link_libraries(gvdb
+        PUBLIC  cuda
+                ${X11_LIBRARIES})
 endif()
 
-get_filename_component( LIB_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR} REALPATH)
-get_filename_component( LIB_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/lib REALPATH)
-get_filename_component( INCLUDE_PATH ${CMAKE_INSTALL_PREFIX}/include REALPATH)
-get_filename_component( SHARE_PATH ${CMAKE_INSTALL_PREFIX}/lib REALPATH)
+macro(_gvdb_find variable path)
+    if(NOT ${variable})
+        file(GLOB _FOUND_FILES ${path})
+        if(NOT _FOUND_FILES)
+            message(WARNING "_gvdb_find_shared_library: Unable to find any files corresponding to the glob specification ${path}!")
+        else()
+            list(GET _FOUND_FILES 0 ${variable}) # Set variable to the first element of the list
+        endif()
+    endif()
+endmacro()
 
-set ( EXECUTABLE_OUTPUT_PATH ${LIB_INSTALL_PATH} CACHE PATH "" FORCE )
-
-#####################################################################################
-# Custom Build for CUDA files
-#
-file(GLOB CUDA_FILES RELATIVE "${BASE_DIRECTORY}" kernels/*.cu kernels/*.cuh )
-message ( STATUS "Located CUDA kernels: ${CUDA_FILES}" )
-
-# Autodetect Target Architecture
-unset(CUDA_ARCH_BIN CACHE)
-unset(CUDA_ARCH_PTX CACHE)
-
-#-------------- THIS IS NOT WORKING!
-# detect_installed_gpus(CUDA_ARCH_BIN)
-# Take the detected version, and append the bin and ptx flags assuming ptx ver==bin ver
-# APPEND_TARGET_ARCH_FLAGS()
-
-if ( NOT DEFINED CUDA_ARCH_BIN )
-   SET( CUDA_ARCH_BIN "compute_30" CACHE STRING "CUDA Architecture target")
-   SET( CUDA_ARCH_PTX "sm_30" CACHE STRING "CUDA Code target")
-endif ()
-
-_COMPILEPTX ( SOURCES ${CUDA_FILES} TARGET_PATH ${LIB_OUTPUT_PATH} GENERATED CUDA_PTX GENPATHS CUDA_PTX_PATHS INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/kernels" OPTIONS -DSIM_CODE -arch=${CUDA_ARCH_BIN} -code=${CUDA_ARCH_PTX} --ptxas-options=-v -O3 --use_fast_math --maxrregcount=64 )
-
-#####################################################################################
-# Executable
-#
-unset ( ALL_SOURCE_FILES )
-list( APPEND ALL_SOURCE_FILES ${SOURCE_FILES} )
-list( APPEND ALL_SOURCE_FILES ${COMMON_SOURCE_FILES} )
-list( APPEND ALL_SOURCE_FILES ${PACKAGE_SOURCE_FILES} )
-
-# Definitions
-add_definitions(-DGVDB_EXPORTS)					# Export dll symbols
-
-add_definitions(-DCUDA_GVDB_MODULE_PATH="${LIB_INSTALL_PATH}")
-message ( STATUS "CUDA_GVDB_MODULE_PATH: ${LIB_INSTALL_PATH}" )
-
-
-# Set the library type
-OPTION (BUILD_SHARED_LIBS "Build Shared Libraries" ON)
-set (LIB_TYPE STATIC)
-if (BUILD_SHARED_LIBS)
-  set (LIB_TYPE SHARED)
+# Allow the developer to build with or without OpenVDB
+set(GVDB_BUILD_OPENVDB OFF CACHE BOOL "If ON, builds GVDB with OpenVDB and #defines BUILD_OPENVDB.")
+set(GVDB_OPENVDB_LIBRARIES_TO_COPY "")
+if(GVDB_BUILD_OPENVDB)
+    target_compile_definitions(gvdb PUBLIC BUILD_OPENVDB)
+    if(WIN32)
+        # Windows version - we assume you use vcpkg here or have set the
+        # GVDB_OPENVDB_INCLUDE_DIR, GVDB_OPENVDB_LIB_RELEASE_DIR, GVDB_OPENVDB_LIB_DEBUG_DIR, and
+        # GVDB_OPENVDB_DLL_RELEASE_DIR variables:
+        # Helpful (hopefully!) warning message if someone's building this on Windows with OpenVDB but without using vcpkg
+        if(NOT CMAKE_TOOLCHAIN_FILE)
+            message(WARNING "GVDB_BUILD_OPENVDB was specified, but CMAKE_TOOLCHAIN_FILE wasn't specified. This is only an issue if you're using something like vcpkg. If you're using the CMake GUI, you'll want to specify the vcpkg toolchain in the configuration settings (delete the cache, press the Configure button, then choose 'Specify toolchain file for cross-compiling' and enter the path to vcpkg.cmake, then make sure to re-enable GVDB_BUILD_OPENVDB). If you're using the CMake command-line interface, you might need to specify -DCMAKE_TOOLCHAIN_FILE=<path to toolchain file>.")
+        endif()
+        
+        # Linking OpenVDB with vcpkg is a bit odd, so this section is a bit more complex than the rest
+        # of the CMakeFile. If you're not building with OpenVDB, this never gets included.
+        #
+        # As of this writing, vcpkg seems to assume you're running its CMake toolchain with a single 
+        # configuration (e.g. Debug or Release), so find_package calls search first in the respective
+        # debug or release directory in vcpkg's installed directory. Vcpkg also runs a useful PowerShell
+        # script in the post-build process step that searches for referenced DLLs and automatically copies
+        # them to the output directory. Here, it looks at your built executable's path, determines whether
+        # you built in debug or release mode from that, and then searches in the relevant vcpkg directories.
+        #
+        # Unfortunately, it doesn't search in the release directory if it can't find the relevant file in
+        # the debug directory, and silently fails if this is the case. At the same time, openvdb in vcpkg
+        # has some quirks - for example, the debug version always uses the release version of Half and tbb.
+        #
+        # Here's how we handle this:
+        # - Finding openvdb.h works normally.
+        # - We find paths to separate debug and release libraries using the fact that (as of this writing!)
+        # tbb's debug and release libraries and DLLs are named different things (tbb_debug and tbb). This
+        # allows us to find vcpkg's install directories; these can also be overriden by the user.
+        # - Finally, we make sure to always copy over the release versions of Half and tbb. When we're building
+        # in debug mode, this allows us to include the DLLs vcpkg won't find, while this saves some work for
+        # vcpkg in release mode.
+        
+        # Compile definitions: We're using the DLL of OpenVDB, instead of building it statically.
+        # TBB has a #pragma comment(lib, tbb...) line in it, but this isn't set up to work properly,
+        # so we explicitly link it instead:
+        target_compile_definitions(gvdb PUBLIC __TBB_NO_IMPLICIT_LINKAGE)
+        
+        # Find the path to the include directory:
+        if(NOT GVDB_OPENVDB_INCLUDE_DIR)
+            find_path(GVDB_OPENVDB_INCLUDE_DIR openvdb/openvdb.h)
+        endif()
+        message(STATUS "Using this path for GVDB_OPENVDB_INCLUDE_DIR: ${GVDB_OPENVDB_INCLUDE_DIR}")
+        target_include_directories(gvdb PUBLIC ${GVDB_OPENVDB_INCLUDE_DIR})
+        
+        # Find the debug and release directories containing vcpkg's .lib files:
+        if(NOT GVDB_OPENVDB_LIB_RELEASE_DIR)
+            find_path(GVDB_OPENVDB_LIB_RELEASE_DIR tbb.lib PATH_SUFFIXES lib)
+        endif()
+        if(NOT GVDB_OPENVDB_LIB_DEBUG_DIR)
+            find_path(GVDB_OPENVDB_LIB_DEBUG_DIR tbb_debug.lib PATH_SUFFIXES debug/lib)
+        endif()
+        
+        # Find the paths to our .lib files manually:
+        _gvdb_find(GVDB_OPENVDB_LIB_DEBUG ${GVDB_OPENVDB_LIB_DEBUG_DIR}/openvdb.lib)
+        _gvdb_find(GVDB_TBB_LIB_DEBUG     ${GVDB_OPENVDB_LIB_DEBUG_DIR}/tbb_debug.lib)
+        _gvdb_find(GVDB_BLOSC_LIB_DEBUG   ${GVDB_OPENVDB_LIB_DEBUG_DIR}/blosc.lib)
+        _gvdb_find(GVDB_ZLIB_LIB_DEBUG    ${GVDB_OPENVDB_LIB_DEBUG_DIR}/zlib*.lib)
+        _gvdb_find(GVDB_HALF_LIB_DEBUG    ${GVDB_OPENVDB_LIB_DEBUG_DIR}/Half-*.lib)
+        
+        _gvdb_find(GVDB_OPENVDB_LIB_RELEASE ${GVDB_OPENVDB_LIB_RELEASE_DIR}/openvdb.lib)
+        _gvdb_find(GVDB_TBB_LIB_RELEASE     ${GVDB_OPENVDB_LIB_RELEASE_DIR}/tbb.lib)
+        _gvdb_find(GVDB_BLOSC_LIB_RELEASE   ${GVDB_OPENVDB_LIB_RELEASE_DIR}/blosc.lib)
+        _gvdb_find(GVDB_ZLIB_LIB_RELEASE    ${GVDB_OPENVDB_LIB_RELEASE_DIR}/zlib*.lib)
+        _gvdb_find(GVDB_HALF_LIB_RELEASE    ${GVDB_OPENVDB_LIB_RELEASE_DIR}/Half-*.lib)
+        
+        target_link_libraries(gvdb PRIVATE
+            debug ${GVDB_OPENVDB_LIB_DEBUG}
+            debug ${GVDB_TBB_LIB_DEBUG}
+            debug ${GVDB_BLOSC_LIB_DEBUG}
+            debug ${GVDB_ZLIB_LIB_DEBUG}
+            debug ${GVDB_HALF_LIB_DEBUG}
+            optimized ${GVDB_OPENVDB_LIB_RELEASE}
+            optimized ${GVDB_TBB_LIB_RELEASE}
+            optimized ${GVDB_BLOSC_LIB_RELEASE}
+            optimized ${GVDB_ZLIB_LIB_RELEASE}
+            optimized ${GVDB_HALF_LIB_RELEASE}
+        )
+        
+        # Find the path to the directory containing release versions of DLLs.
+        if(NOT GVDB_OPENVDB_DLL_RELEASE_DIR)
+            find_path(GVDB_OPENVDB_DLL_RELEASE_DIR tbb.dll PATH_SUFFIXES bin)
+        endif()
+        
+        # Include the release versions of Half and tbb.
+        _gvdb_find(GVDB_TBB_DLL_RELEASE ${GVDB_OPENVDB_DLL_RELEASE_DIR}/tbb.dll)
+        _gvdb_find(GVDB_HALF_DLL_RELEASE ${GVDB_OPENVDB_DLL_RELEASE_DIR}/Half-*.dll)
+        list(APPEND GVDB_OPENVDB_LIBRARIES_TO_COPY ${GVDB_TBB_DLL_RELEASE} ${GVDB_HALF_DLL_RELEASE})
+    else()
+        # On Linux systems, find_package(openvdb) should work, assuming OpenVDB has
+        # been installed from source. By default, OpenVDB will be installed in /usr/local/lib,
+        # but we allow the user to modify the search path for this.
+        if(NOT GVDB_OPENVDB_INSTALL_PATH)
+            # Try to find where libopenvdb.so has been installed.
+            find_library(GVDB_OPENVDB_LIB libopenvdb.so)
+            if(GVDB_OPENVDB_LIB)
+                get_filename_component(GVDB_OPENVDB_INSTALL_PATH "${GVDB_OPENVDB_LIB}" DIRECTORY)
+            else()
+                set(GVDB_OPENVDB_INSTALL_PATH "/usr/local/lib")
+            endif()
+            message(STATUS "Note: GVDB_OPENVDB_INSTALL_PATH not specified; assuming OpenVDB has been installed in ${GVDB_OPENVDB_INSTALL_PATH} (which should contain cmake/OpenVDB).")
+        endif()
+        list(APPEND CMAKE_MODULE_PATH "${GVDB_OPENVDB_INSTALL_PATH}/cmake/OpenVDB")
+        find_package(OpenVDB REQUIRED) # GVDB_BUILD_OPENVDB was specified!
+        target_link_libraries(gvdb PUBLIC OpenVDB::openvdb)
+    endif()
 endif()
 
-# Build with OpenGL
-OPTION (BUILD_OPENGL "Build with OpenGL" ON)
-if (BUILD_OPENGL)
-	add_definitions(-DBUILD_OPENGL)  				# Build OpenGL
+# Enable definitions: build with OpenGL (required),
+# write DLL definitions as exports (instead of imports)
+target_compile_definitions(gvdb
+    PRIVATE BUILD_OPENGL
+            GVDB_EXPORTS)
+
+# GVDB currently compiles with GLEW using the static version -
+# that is, by directly including glew.c and its header files.
+# We also need to define GLEW_STATIC.
+target_compile_definitions(gvdb PUBLIC GLEW_STATIC)
+target_sources(gvdb PRIVATE ${GLEW_SOURCE})
+target_include_directories(gvdb PRIVATE ${GLEW_INCLUDE_DIR})
+
+# Finally, make our targets importable from the build directory.
+export(TARGETS gvdb gvdbPTX FILE GVDBConfig.cmake)
+
+# As one further improvement, we can copy all of the files we need into the library
+# directory - essentially packaging this for applications that use gvdb without
+# requiring an additional install step.
+# To track dependencies correctly, we'll add another target that handles the file copies,
+# and depends on gvdbPTX!
+set(_GVDB_COPY_STAMP_FILES copiedPTX.stamp copiedShaders.stamp)
+if(GVDB_BUILD_OPENVDB AND GVDB_OPENVDB_LIBRARIES_TO_COPY)
+    # Copy OpenVDB and the libraries it depends upon
+    add_custom_command(OUTPUT copiedSharedLibraries.stamp
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GVDB_OPENVDB_LIBRARIES_TO_COPY} $<TARGET_FILE_DIR:gvdb>
+    COMMAND ${CMAKE_COMMAND} -E touch copiedSharedLibraries.stamp
+    COMMAND_EXPAND_LISTS)
+    list(APPEND _GVDB_COPY_STAMP_FILES copiedSharedLibraries.stamp)
 endif()
 
-if( WIN32 AND NOT GLUT_FOUND)
-  add_definitions(/wd4267) #remove size_t to int warning
-  add_definitions(/wd4996) #remove printf warning
-  add_definitions(/wd4244) #remove double to float conversion warning
-  add_definitions(/wd4305) #remove double to float truncation warning
-  add_library (${PROJNAME} ${LIB_TYPE} ${ALL_SOURCE_FILES} ${CUDA_FILES} )
-else()
-  add_library (${PROJNAME} ${LIB_TYPE} ${ALL_SOURCE_FILES} ${CUDA_FILES} ${PTX_FILES} )
+add_custom_target(gvdbCopy DEPENDS ${_GVDB_COPY_STAMP_FILES})
+
+# Copy the PTX files to the library directory (this is where the dependency on gvdbPTX is introduced)
+add_custom_command(OUTPUT copiedPTX.stamp
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:gvdbPTX> $<TARGET_FILE_DIR:gvdb>
+    COMMAND ${CMAKE_COMMAND} -E touch copiedPTX.stamp
+    DEPENDS gvdbPTX COMMAND_EXPAND_LISTS)
+# Finally, copy the shaders to the library directory
+add_custom_command(OUTPUT copiedShaders.stamp
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_LIST_DIR}/shaders" $<TARGET_FILE_DIR:gvdb>
+    COMMAND ${CMAKE_COMMAND} -E touch copiedShaders.stamp)
+# We can then tell CMake that our libraries were built in this folder, so that
+# subsequent find_package calls on the same system can find the libraries
+# right away.
+# export(PACKAGE gvdb)
+# export(PACKAGE gvdbPTX)
+
+# Install target
+# Install near source tree - not in the default directory unless CMAKE_INSTALL_PREFIX
+# has been set by the user!
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    get_filename_component(_INSTALLPATH "${CMAKE_CURRENT_SOURCE_DIR}/../../_output" REALPATH)
+    # Forcing is only OK here because we've checked for CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT.
+    set(CMAKE_INSTALL_PREFIX ${_INSTALLPATH} CACHE PATH "Default install path for GVDB" FORCE)
 endif()
 
-set_target_properties( ${PROJNAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${LIB_OUTPUT_PATH} )
-set_target_properties( ${PROJNAME} PROPERTIES VS_INTERMEDIATE_DIRECTORY_DEBUG ${LIB_OUTPUT_PATH}/Debug )
-set_target_properties( ${PROJNAME} PROPERTIES VS_INTERMEDIATE_DIRECTORY_RELEASE ${LIB_OUTPUT_PATH}/Release )
-set_target_properties( ${PROJNAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${LIB_OUTPUT_PATH} )
-set_target_properties( ${PROJNAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+# Compute binary, include, and library install paths.
+get_filename_component(BIN_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/bin REALPATH)
+get_filename_component(INCLUDE_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/include REALPATH)
+get_filename_component(LIB_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/lib REALPATH)
 
-message ( STATUS "Build:   ${LIB_OUTPUT_PATH}" )
-message ( STATUS "Lib:     ${LIB_INSTALL_PATH}" )
-message ( STATUS "Inc:     ${INCLUDE_PATH}" )
-message ( STATUS "Share:   ${SHARE_PATH}" )
-
-#####################################################################################
-# Linkage
-#
-_LINK ( PROJECT ${PROJNAME} OPT ${LIBRARIES_OPTIMIZED} DEBUG ${LIBRARIES_DEBUG} PLATFORM ${PLATFORM_LIBRARIES} )
-
-################################################################
-# Windows specific
-#
-if ( WIN32 )    
-	# instruct CMake to automatically build INSTALL project in Visual Studio 
-	set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
-	# generate an import library
-	set ( GVDB_LINK_FLAGS "/implib:${LIB_OUTPUT_PATH}/$(Configuration)/libgvdb.lib" )
-	set_target_properties ( ${PROJNAME} PROPERTIES LINK_FLAGS "${GVDB_LINK_FLAGS}" )
-	message ( STATUS "Import Library: ${GVDB_LINK_FLAGS}" )  
-	# visual studio source groups
-	source_group(common FILES 
-		${COMMON_SOURCE_FILES}  
-	)
-	source_group(CUDA FILES 
-		${CUDA_FILES}
-	)
-	source_group(PTX FILES 
-		${PTX_FILES}
-	)
-endif()
-
-################################################################
-# Install Binaries, Shaders and PTX
-#
-if ( USE_OPENVDB ) 
-    package_openvdb_binaries()
-   _INSTALL ( FILES ${OPENVDB_BINARIES} SOURCE ${OPENVDB_LIB_DIR} DESTINATION ${EXECUTABLE_OUTPUT_PATH} OUTPUT INSTALL_LIST  )
-endif()
-file( GLOB SHADERS shaders/*.glsl)
-file( GLOB HEADER_FILES src/*.h )
-file( GLOB CUH_FILES kernels/*.cuh )
-
-_INSTALL ( FILES ${SHADERS} SOURCE "" DESTINATION ${EXECUTABLE_OUTPUT_PATH} OUTPUT INSTALL_LIST )
-_INSTALL ( FILES ${CUDPP_LIBRARIES} SOURCE "" DESTINATION ${EXECUTABLE_OUTPUT_PATH} OUTPUT INSTALL_LIST )
-_INSTALL_PTX ( FILES ${CUDA_PTX_PATHS} DESTINATION ${EXECUTABLE_OUTPUT_PATH} OUTPUT INSTALL_LIST )
-
-install ( FILES ${HEADER_FILES} DESTINATION ${INCLUDE_PATH} )
-install ( FILES ${CUH_FILES} DESTINATION ${INCLUDE_PATH} )
-install ( FILES ${INSTALL_LIST} DESTINATION ${LIB_INSTALL_PATH} )
-install ( TARGETS ${PROJNAME} DESTINATION ${LIB_INSTALL_PATH} )
-
-#################################
-# Done
-message ( STATUS "\nGVDB INSTALL PATH: ${CMAKE_INSTALL_PREFIX}" )
-message ( STATUS "GVDB will be installed to this path post-build (win32) or during make install (linux)")
-
-
+install(DIRECTORY "$<TARGET_FILE_DIR:gvdb>/" DESTINATION ${BIN_INSTALL_PATH} FILES_MATCHING PATTERN "*.dll" PATTERN "*.glsl" PATTERN "*.ptx" PATTERN "*.so")
+install(DIRECTORY "$<TARGET_FILE_DIR:gvdb>/" DESTINATION ${LIB_INSTALL_PATH} FILES_MATCHING PATTERN "*.lib" PATTERN "*.exp" PATTERN "*.ilk" PATTERN "*.pdb")
+get_target_property(TEMP_INTERFACE_SOURCES gvdb INTERFACE_SOURCES)
+install(FILES ${TEMP_INTERFACE_SOURCES} DESTINATION ${INCLUDE_INSTALL_PATH})
+get_target_property(TEMP_INTERFACE_SOURCES gvdbPTX INTERFACE_SOURCES)
+install(FILES ${TEMP_INTERFACE_SOURCES} DESTINATION ${INCLUDE_INSTALL_PATH})

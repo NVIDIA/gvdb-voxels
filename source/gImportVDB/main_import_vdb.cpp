@@ -29,17 +29,19 @@ using namespace nvdb;
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <conio.h>
 #include "file_png.h"		// sample utils
 
 VolumeGVDB gvdb;
 
-void main (void)
+int main (int argc, char* argv)
 {
 	int w = 1024, h = 768;
 
 	// Initialize GVDB
 	printf ( "Starting GVDB.\n" );		
+#ifdef _DEBUG
+	gvdb.SetDebug(true);
+#endif // #ifdef _DEBUG
 	gvdb.SetVerbose ( true );		// enable/disable console output from gvdb
 	gvdb.SetCudaDevice ( GVDB_DEV_FIRST );
 	gvdb.Initialize ();			

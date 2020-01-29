@@ -80,8 +80,6 @@ bool Sample::ConvertToFloat(Vector3DI res, uchar* dat)
 
 bool Sample::LoadRAW (char* fname, Vector3DI res, int bpp)
 {
-	char buf[1024];
-
 	// Load RAW file into memory
 	FILE* fp = fopen(fname, "rb");
 	if (fp == 0) {
@@ -108,7 +106,6 @@ void Sample::Rebuild(Vector3DF vmax, bool bSparse, bool bHalo )
 	// Configure VDB 
 	printf("Configure GVDB.\n");	
 	gvdb.Configure(3, 3, 3, 3, 4);
-	gvdb.SetVoxelSize(1, 1, 1);
 	gvdb.SetChannelDefault(16, 16, 16);
 	gvdb.AddChannel(0, T_FLOAT, 1);
 
@@ -214,13 +211,13 @@ bool Sample::init()
 	gvdb.getScene()->LinearTransferFunc ( 0.15f, 0.25f, Vector4DF(0,0,0,0), Vector4DF(0,0,1,0.01f) );			// skin range, blue
 	gvdb.getScene()->LinearTransferFunc ( 0.25f, 0.50f, Vector4DF(0,0,1,0.01f), Vector4DF(1,0,0,0.02f) );		// bone range, red
 	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.02f), Vector4DF(.2f,.2f,0.2f,0.02f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.02f), Vector4DF(.1,.1,.1,0.1) );
+	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.02f), Vector4DF(.1f,.1f,.1f,.1f) );
 	gvdb.CommitTransferFunc ();
 
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
-	cam->setNearFar(.1, 5000);
+	cam->setNearFar(.1f, 5000);
 	cam->setOrbit ( Vector3DF(90,20,0), Vector3DF(128,100,128), 1000, 1.0 );	
 	gvdb.getScene()->SetCamera( cam );
 	

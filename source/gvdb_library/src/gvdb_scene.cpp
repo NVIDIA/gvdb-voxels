@@ -227,8 +227,6 @@ int Scene::AddShader ( int prog_id, const char* vertfile, const char* fragfile )
 
 bool Scene::FindFile ( std::string fname, char* path )
 {
-	// char fbuf[1024];
-	// strcpy ( fbuf, fname.c_str() );
 	return getFileLocation ( fname.c_str(), path, mSearchPaths );	
 }
 

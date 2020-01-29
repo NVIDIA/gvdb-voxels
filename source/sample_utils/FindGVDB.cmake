@@ -1,4 +1,3 @@
-
 #####################################################################################
 # Find GVDB
 #
@@ -45,14 +44,6 @@ if ( GVDB_ROOT_DIR )
 	   message ( "  NOT FOUND. GVDB Library. (so/dll or lib missing)" )	   
 	endif()
 
-	set ( OK_CUDPP 0 )
-	if ( WIN32 )
-		# _FIND_MULTIPLE ( LIST_CUDPP GVDB_LIB_DIR "lib" "so" OK_CUDPP )    
-	else ()    
-		_FIND_FILE ( LIST_CUDPP GVDB_LIB_DIR "" "libcudpp.so" OK_CUDPP )	        
-    	_FIND_FILE ( LIST_CUDPP GVDB_LIB_DIR "" "libcudpp_hash.so" OK_CUDPP )	     
-    endif()
-
 	#-------- Locate PTX/GLSL
         set ( OK_PTX 0 )	
         set ( OK_GLSL 0 )	
@@ -79,14 +70,11 @@ if ( ${GVDB_FOUND} STREQUAL "NO" )
    )
 endif()
 
-list ( APPEND LIST_LIB ${LIST_CUDPP})
-
 set ( GVDB_DLL ${LIST_DLL} CACHE INTERNAL "" FORCE)
 set ( GVDB_LIB ${LIST_LIB} CACHE INTERNAL "" FORCE)
 set ( GVDB_PTX ${LIST_PTX} CACHE INTERNAL "" FORCE)
 set ( GVDB_GLSL ${LIST_GLSL} CACHE INTERNAL "" FORCE)
 set ( GVDB_EXTRA ${LIST_EXTRA} CACHE INTERNAL "" FORCE)
-# set ( GVDB_CUDPP ${LIST_CUDPP} CACHE INTERNAL "" FORCE)
 
 #-- Create a list of all binary files needed for exes
 unset ( LIST_FULL )	
@@ -94,7 +82,6 @@ LIST ( APPEND LIST_FULL ${LIST_DLL} )
 LIST ( APPEND LIST_FULL ${LIST_PTX} )	
 LIST ( APPEND LIST_FULL ${LIST_GLSL} )	
 LIST ( APPEND LIST_FULL ${LIST_EXTRA} )	
-LIST ( APPEND LIST_FULL ${LIST_CUDPP} )	
 set ( GVDB_LIST ${LIST_FULL} CACHE INTERNAL "" )
 
 #-- We do not want user to modified these vars, but helpful to show them
@@ -104,12 +91,5 @@ message ( STATUS "  GVDB_LIB:  ${GVDB_LIB}" )
 message ( STATUS "  GVDB_PTX:  ${GVDB_PTX}" )
 message ( STATUS "  GVDB_GLSL: ${GVDB_GLSL}" )
 message ( STATUS "  GVDB_EXTRA:${GVDB_EXTRA}" )
-# message ( STATUS "  GVDB_CUDPP:${GVDB_CUDPP}" )
 
 mark_as_advanced(GVDB_FOUND)
-
-
-
-
-
-

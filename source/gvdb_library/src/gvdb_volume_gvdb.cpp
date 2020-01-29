@@ -29,7 +29,7 @@
 #include "app_perf.h"
 #include "string_helper.h"
 
-#include "cudpp.h"
+#include "gvdb_cutils.cuh"
 
 #include <algorithm>
 #include <iostream>
@@ -46,51 +46,40 @@ using namespace nvdb;
 
 // Version history
 // GVDB 1.0  - First release. GTC'2017
-// GVDB 1.1  - Beta pre-release. 
-// GVDB 1.11 - Second release. GTC'2018
-// GVDB 2.0  - Simulation
+// GVDB 1.0 - Incremental fixes, Beta pre-release. 
+// GVDB 1.1 - Second release. GTC'2018
+// GVDB 1.1.1  - Bug Fixes
 
 
 #define PUSH_CTX		cuCtxPushCurrent(mContext);
 #define POP_CTX			CUcontext pctx; cuCtxPopCurrent(&pctx);
-
-#ifdef BUILD_OPENVDB
-	// Link GVDB to OpenVDB for loading .vdb files
-	#pragma message ( "Building OpenVDB." )	
-	#ifdef OPENVDB_USE_BLOSC
-		#pragma message ( "  OPENVDB_USE_BLOSC = Yes" )	
-	#else
-		#pragma message ( "  OPENVDB_USE_BLOSC = NO" )	
-	#endif
-	#include <openvdb\openvdb.h>
-	#include <openvdb\io\Stream.h>
-	#include <openvdb\tree\LeafNode.h>		// access to leaf buffers
-	#include <openvdb/tools/ValueTransformer.h>
-	#include <fstream>
-	using namespace openvdb;
-#endif
-
 #define	MRES	2048
 
+#ifndef GVDB_CPU_VERSION
+#define GVDB_CPU_VERSION  0
+#endif
+
 #ifdef BUILD_OPENVDB
+	#include <openvdb/tools/ValueTransformer.h>
+
 	// OpenVDB helper
 	class OVDBGrid {
 	public:
-
-		FloatGrid543::Ptr			grid543F;			// grids
+		// grids
+		FloatGrid543::Ptr			grid543F;
 		Vec3fGrid543::Ptr			grid543VF;
-		FloatGrid34::Ptr			grid34F;			
+		FloatGrid34::Ptr			grid34F;
 		Vec3fGrid34::Ptr			grid34VF;
-
-		TreeType543F::LeafCIter		iter543F;			// iterators
+		// iterators
+		TreeType543F::LeafCIter		iter543F;
 		TreeType543VF::LeafCIter	iter543VF;
 		TreeType34F::LeafCIter		iter34F;
 		TreeType34VF::LeafCIter		iter34VF;
-															// buffers
+		// buffers
 		openvdb::tree::LeafNode<float, 3U>::Buffer buf3U;	// 2^3 leaf res
-		openvdb::tree::LeafNode<Vec3f, 3U>::Buffer buf3VU;
+		openvdb::tree::LeafNode<openvdb::Vec3f, 3U>::Buffer buf3VU;
 		openvdb::tree::LeafNode<float, 4U>::Buffer buf4U;	// 2^4 leaf res
-		openvdb::tree::LeafNode<Vec3f, 4U>::Buffer buf4VU;
+		openvdb::tree::LeafNode<openvdb::Vec3f, 4U>::Buffer buf4VU;
 	};
 #endif
 
@@ -171,49 +160,49 @@ VolumeGVDB::VolumeGVDB ()
 	mAuxName[AUX_DATA3D] = "DATA3D";
 	mAuxName[AUX_MATRIX4F] = "MATRIX4F";
 
-		mAuxName[AUX_PBRICKDX] = "PBRICKDX"; 
-		mAuxName[AUX_ACTIVBRICKCNT] = "ACTIVEBRICKCNT";
-		mAuxName[AUX_BRICK_LEVXYZ] = "BRICK_LEVXYZ";
-		mAuxName[AUX_RANGE_RES] = "RANGE_RES";
-		mAuxName[AUX_MARKER] = "MARKER";
-		mAuxName[AUX_RADIX_PRESCAN] = "RADIX_PRESCAN";
-		mAuxName[AUX_SORTED_LEVXYZ] = "SORTED_LEVXYZ";
-		mAuxName[AUX_TMP] = "TMP";
-		mAuxName[AUX_UNIQUE_CNT] = "UNIQUE_CNT";
-		mAuxName[AUX_MARKER_PRESUM] = "MARKER_PRESUM";
-		mAuxName[AUX_UNIQUE_LEVXYZ] = "UNIQUE_LEVXYZ";
-		mAuxName[AUX_LEVEL_CNT] = "LEVEL_CNT";
+	mAuxName[AUX_PBRICKDX] = "PBRICKDX"; 
+	mAuxName[AUX_ACTIVBRICKCNT] = "ACTIVEBRICKCNT";
+	mAuxName[AUX_BRICK_LEVXYZ] = "BRICK_LEVXYZ";
+	mAuxName[AUX_RANGE_RES] = "RANGE_RES";
+	mAuxName[AUX_MARKER] = "MARKER";
+	mAuxName[AUX_RADIX_PRESCAN] = "RADIX_PRESCAN";
+	mAuxName[AUX_SORTED_LEVXYZ] = "SORTED_LEVXYZ";
+	mAuxName[AUX_TMP] = "TMP";
+	mAuxName[AUX_UNIQUE_CNT] = "UNIQUE_CNT";
+	mAuxName[AUX_MARKER_PRESUM] = "MARKER_PRESUM";
+	mAuxName[AUX_UNIQUE_LEVXYZ] = "UNIQUE_LEVXYZ";
+	mAuxName[AUX_LEVEL_CNT] = "LEVEL_CNT";
 
-		mAuxName[AUX_EXTRA_BRICK_CNT] = "EXTRA_BRICK_CNT";
-		mAuxName[AUX_NODE_MARKER] = "NODE_MARKER";
-		mAuxName[AUX_PNTVEL] = "PNTVEL";
-		mAuxName[AUX_DIV] = "DIV";
+	mAuxName[AUX_EXTRA_BRICK_CNT] = "EXTRA_BRICK_CNT";
+	mAuxName[AUX_NODE_MARKER] = "NODE_MARKER";
+	mAuxName[AUX_PNTVEL] = "PNTVEL";
+	mAuxName[AUX_DIV] = "DIV";
 
-		mAuxName[AUX_SUBCELL_CNT] = "SUBCELL_CNT";
-		mAuxName[AUX_SUBCELL_PREFIXSUM] = "SUBCELL_PREFIXSUM";
-		mAuxName[AUX_SUBCELL_PNTS] = "SUBCELL_PNTS";
-		mAuxName[AUX_SUBCELL_POS] = "SUBCELL_POS";
-		mAuxName[AUX_SUBCELL_PNT_POS] = "SUBCELL_PNT_POS";
-		mAuxName[AUX_SUBCELL_PNT_VEL] = "SUBCELL_PNT_VEL";
-		mAuxName[AUX_SUBCELL_PNT_CLR] = "SUBCELL_PNT_CLR";
-		mAuxName[AUX_BOUNDING_BOX] = "BOUNDING_BOX";
-		mAuxName[AUX_WORLD_POS_X] = "WORLD_POS_X";
-		mAuxName[AUX_WORLD_POS_Y] = "WORLD_POS_Y";
-		mAuxName[AUX_WORLD_POS_Z] = "WORLD_POS_Z";
+	mAuxName[AUX_SUBCELL_CNT] = "SUBCELL_CNT";
+	mAuxName[AUX_SUBCELL_PREFIXSUM] = "SUBCELL_PREFIXSUM";
+	mAuxName[AUX_SUBCELL_PNTS] = "SUBCELL_PNTS";
+	mAuxName[AUX_SUBCELL_POS] = "SUBCELL_POS";
+	mAuxName[AUX_SUBCELL_PNT_POS] = "SUBCELL_PNT_POS";
+	mAuxName[AUX_SUBCELL_PNT_VEL] = "SUBCELL_PNT_VEL";
+	mAuxName[AUX_SUBCELL_PNT_CLR] = "SUBCELL_PNT_CLR";
+	mAuxName[AUX_BOUNDING_BOX] = "BOUNDING_BOX";
+	mAuxName[AUX_WORLD_POS_X] = "WORLD_POS_X";
+	mAuxName[AUX_WORLD_POS_Y] = "WORLD_POS_Y";
+	mAuxName[AUX_WORLD_POS_Z] = "WORLD_POS_Z";
 
-		mAuxName[AUX_VOLUME] = "VOLUME";
-		mAuxName[AUX_CG] = "CG";
-		mAuxName[AUX_INNER_PRODUCT] = "INNER_PRODUCT";
-		mAuxName[AUX_TEXTURE_MAX] = "TEXTURE_MAX";
-		mAuxName[AUX_TEXTURE_MAX_TMP] = "TEXTURE_MAX_TMP";
-		mAuxName[AUX_TEST] = "TEST";
-		mAuxName[AUX_TEST_1] = "TEST_1";
-		mAuxName[AUX_OUT1] = "OUT1";
-		mAuxName[AUX_OUT2] = "OUT2";
-		mAuxName[AUX_SUBCELL_MAPPING] = "SUBCELL_MAPPING";
-		mAuxName[AUX_SUBCELL_FLAG] = "SUBCELL_FLAG";
-		mAuxName[AUX_SUBCELL_NID] = "SUBCELL_NID";
-		mAuxName[AUX_SUBCELL_OBS_NID] = "SUBCELL_OBS_ND";
+	mAuxName[AUX_VOLUME] = "VOLUME";
+	mAuxName[AUX_CG] = "CG";
+	mAuxName[AUX_INNER_PRODUCT] = "INNER_PRODUCT";
+	mAuxName[AUX_TEXTURE_MAX] = "TEXTURE_MAX";
+	mAuxName[AUX_TEXTURE_MAX_TMP] = "TEXTURE_MAX_TMP";
+	mAuxName[AUX_TEST] = "TEST";
+	mAuxName[AUX_TEST_1] = "TEST_1";
+	mAuxName[AUX_OUT1] = "OUT1";
+	mAuxName[AUX_OUT2] = "OUT2";
+	mAuxName[AUX_SUBCELL_MAPPING] = "SUBCELL_MAPPING";
+	mAuxName[AUX_SUBCELL_FLAG] = "SUBCELL_FLAG";
+	mAuxName[AUX_SUBCELL_NID] = "SUBCELL_NID";
+	mAuxName[AUX_SUBCELL_OBS_NID] = "SUBCELL_OBS_ND";
 
 }
 
@@ -229,14 +218,13 @@ void VolumeGVDB::SetDebug ( bool d )
 }
 
 // Loads a CUDA function into memory from ptx file
-void VolumeGVDB::LoadFunction ( int fid, std::string func, int mid )
+void VolumeGVDB::LoadFunction ( int fid, std::string func, int mid, std::string ptx )
 {
-	char ptxfile[512];		
-	strcpy ( ptxfile, CUDA_GVDB_MODULE_PATH "/cuda_gvdb_module.ptx" );
+	char cptx[512];		strcpy ( cptx, ptx.c_str() );
 	char cfn[512];		strcpy ( cfn, func.c_str() );
 
 	if ( cuModule[mid] == (CUmodule) -1 ) 
-		cudaCheck ( cuModuleLoad ( &cuModule[mid], ptxfile ), "VolumeGVDB", "LoadFunction", "cuModuleLoad", ptxfile, mbDebug);
+		cudaCheck ( cuModuleLoad ( &cuModule[mid], cptx ), "VolumeGVDB", "LoadFunction", "cuModuleLoad", cptx, mbDebug);
 	if ( cuFunc[fid] == (CUfunction) -1 )
 		cudaCheck ( cuModuleGetFunction ( &cuFunc[fid], cuModule[mid], cfn ), "VolumeGVDB", "LoadFunction", "cuModuleGetFunction", cfn, mbDebug);
 }
@@ -253,88 +241,88 @@ void VolumeGVDB::SetCudaDevice ( int devid, CUcontext ctx )
 
 	//--- Load cuda kernels
 	// Raytracing
-	LoadFunction ( FUNC_RAYDEEP,			"gvdbRayDeep",					MODL_PRIMARY );
-	LoadFunction ( FUNC_RAYVOXEL,			"gvdbRaySurfaceVoxel",			MODL_PRIMARY );
-	LoadFunction ( FUNC_RAYTRILINEAR,		"gvdbRaySurfaceTrilinear",		MODL_PRIMARY );
-	LoadFunction ( FUNC_RAYTRICUBIC,		"gvdbRaySurfaceTricubic",		MODL_PRIMARY );
-	LoadFunction ( FUNC_RAYSURFACE_DEPTH,	"gvdbRaySurfaceDepth",			MODL_PRIMARY );
-	LoadFunction ( FUNC_RAYLEVELSET,		"gvdbRayLevelSet",				MODL_PRIMARY );
-	LoadFunction ( FUNC_EMPTYSKIP,			"gvdbRayEmptySkip",				MODL_PRIMARY );
-	LoadFunction ( FUNC_SECTION2D,			"gvdbSection2D",				MODL_PRIMARY );
-	LoadFunction ( FUNC_SECTION3D,			"gvdbSection3D",				MODL_PRIMARY );
-	LoadFunction ( FUNC_RAYTRACE,			"gvdbRaytrace",					MODL_PRIMARY );
+	LoadFunction ( FUNC_RAYDEEP,			"gvdbRayDeep",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_RAYVOXEL,			"gvdbRaySurfaceVoxel",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_RAYTRILINEAR,		"gvdbRaySurfaceTrilinear",		MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_RAYTRICUBIC,		"gvdbRaySurfaceTricubic",		MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_RAYSURFACE_DEPTH,	"gvdbRaySurfaceDepth",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_RAYLEVELSET,		"gvdbRayLevelSet",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_EMPTYSKIP,			"gvdbRayEmptySkip",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_SECTION2D,			"gvdbSection2D",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_SECTION3D,			"gvdbSection3D",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_RAYTRACE,			"gvdbRaytrace",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 	
 	// Sorting / Points / Triangles
-	LoadFunction ( FUNC_PREFIXSUM,			"prefixSum",					MODL_PRIMARY );
-	LoadFunction ( FUNC_PREFIXFIXUP,		"prefixFixup",					MODL_PRIMARY );
-	LoadFunction ( FUNC_INSERT_POINTS,		"gvdbInsertPoints",				MODL_PRIMARY );
-	LoadFunction ( FUNC_SORT_POINTS,		"gvdbSortPoints",				MODL_PRIMARY );
-	LoadFunction ( FUNC_SCATTER_DENSITY,	"gvdbScatterPointDensity",		MODL_PRIMARY );
-	LoadFunction ( FUNC_SCATTER_AVG_COL,	"gvdbScatterPointAvgCol",		MODL_PRIMARY );
-	LoadFunction ( FUNC_INSERT_TRIS,		"gvdbInsertTriangles",			MODL_PRIMARY );
-	LoadFunction ( FUNC_SORT_TRIS,			"gvdbSortTriangles",			MODL_PRIMARY );
-	LoadFunction ( FUNC_VOXELIZE,			"gvdbVoxelize",					MODL_PRIMARY );
-	LoadFunction ( FUNC_RESAMPLE,			"gvdbResample",					MODL_PRIMARY );
-	LoadFunction ( FUNC_REDUCTION,			"gvdbReduction",				MODL_PRIMARY );
-	LoadFunction ( FUNC_DOWNSAMPLE,			"gvdbDownsample",				MODL_PRIMARY );
-	LoadFunction ( FUNC_SCALE_PNT_POS,		"gvdbScalePntPos",				MODL_PRIMARY );
-	LoadFunction ( FUNC_CONV_AND_XFORM,		"gvdbConvAndTransform",			MODL_PRIMARY );
+	LoadFunction ( FUNC_PREFIXSUM,			"prefixSum",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_PREFIXFIXUP,		"prefixFixup",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_INSERT_POINTS,		"gvdbInsertPoints",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_SORT_POINTS,		"gvdbSortPoints",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_SCATTER_DENSITY,	"gvdbScatterPointDensity",		MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_SCATTER_AVG_COL,	"gvdbScatterPointAvgCol",		MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_INSERT_TRIS,		"gvdbInsertTriangles",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_SORT_TRIS,			"gvdbSortTriangles",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_VOXELIZE,			"gvdbVoxelize",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_RESAMPLE,			"gvdbResample",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_REDUCTION,			"gvdbReduction",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_DOWNSAMPLE,			"gvdbDownsample",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_SCALE_PNT_POS,		"gvdbScalePntPos",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_CONV_AND_XFORM,		"gvdbConvAndTransform",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 
-	LoadFunction ( FUNC_ADD_SUPPORT_VOXEL,	"gvdbAddSupportVoxel",			MODL_PRIMARY );
-	LoadFunction ( FUNC_INSERT_SUPPORT_POINTS, "gvdbInsertSupportPoints",	MODL_PRIMARY );
+	LoadFunction ( FUNC_ADD_SUPPORT_VOXEL,	"gvdbAddSupportVoxel",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_INSERT_SUPPORT_POINTS, "gvdbInsertSupportPoints",	MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 
 	// Topology
-	LoadFunction ( FUNC_FIND_ACTIV_BRICKS,	"gvdbFindActivBricks",			MODL_PRIMARY );
-	LoadFunction ( FUNC_BITONIC_SORT,		"gvdbBitonicSort",				MODL_PRIMARY );
-	LoadFunction ( FUNC_CALC_BRICK_ID,		"gvdbCalcBrickId",				MODL_PRIMARY );
-	LoadFunction ( FUNC_RADIX_SUM,			"RadixSum",						MODL_PRIMARY );
-	LoadFunction ( FUNC_RADIX_PREFIXSUM,	"RadixPrefixSum",				MODL_PRIMARY );
-	LoadFunction ( FUNC_RADIX_SHUFFLE,		"RadixAddOffsetsAndShuffle",	MODL_PRIMARY );
-	LoadFunction ( FUNC_FIND_UNIQUE,		"gvdbFindUnique",				MODL_PRIMARY );
-	LoadFunction ( FUNC_COMPACT_UNIQUE,		"gvdbCompactUnique",			MODL_PRIMARY );
-	LoadFunction ( FUNC_LINK_BRICKS,		"gvdbLinkBricks",				MODL_PRIMARY );
+	LoadFunction ( FUNC_FIND_ACTIV_BRICKS,	"gvdbFindActivBricks",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_BITONIC_SORT,		"gvdbBitonicSort",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_CALC_BRICK_ID,		"gvdbCalcBrickId",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_RADIX_SUM,			"RadixSum",						MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_RADIX_PREFIXSUM,	"RadixPrefixSum",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_RADIX_SHUFFLE,		"RadixAddOffsetsAndShuffle",	MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_FIND_UNIQUE,		"gvdbFindUnique",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_COMPACT_UNIQUE,		"gvdbCompactUnique",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_LINK_BRICKS,		"gvdbLinkBricks",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 
 	// Incremental Topology
-	LoadFunction ( FUNC_CALC_EXTRA_BRICK_ID,"gvdbCalcExtraBrickId",			MODL_PRIMARY );
+	LoadFunction ( FUNC_CALC_EXTRA_BRICK_ID,"gvdbCalcExtraBrickId",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
 
-	LoadFunction ( FUNC_CALC_INCRE_BRICK_ID,"gvdbCalcIncreBrickId",			MODL_PRIMARY );
-	LoadFunction ( FUNC_CALC_INCRE_EXTRA_BRICK_ID,"gvdbCalcIncreExtraBrickId", MODL_PRIMARY );
+	LoadFunction ( FUNC_CALC_INCRE_BRICK_ID,"gvdbCalcIncreBrickId",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_CALC_INCRE_EXTRA_BRICK_ID,"gvdbCalcIncreExtraBrickId",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
 
-	LoadFunction ( FUNC_DELINK_LEAF_BRICKS,	"gvdbDelinkLeafBricks",			MODL_PRIMARY );
-	LoadFunction ( FUNC_DELINK_BRICKS,		"gvdbDelinkBricks",				MODL_PRIMARY );
-	LoadFunction ( FUNC_MARK_LEAF_NODE,		"gvdbMarkLeafNode",				MODL_PRIMARY );
+	LoadFunction ( FUNC_DELINK_LEAF_BRICKS,	"gvdbDelinkLeafBricks",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_DELINK_BRICKS,		"gvdbDelinkBricks",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_MARK_LEAF_NODE,		"gvdbMarkLeafNode",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 
 	// Gathering
-	LoadFunction ( FUNC_COUNT_SUBCELL,		"gvdbCountSubcell",				MODL_PRIMARY );
-	LoadFunction ( FUNC_INSERT_SUBCELL,		"gvdbInsertSubcell",			MODL_PRIMARY );
-	LoadFunction ( FUNC_INSERT_SUBCELL_FP16,"gvdbInsertSubcell_fp16",		MODL_PRIMARY );
-	LoadFunction ( FUNC_GATHER_DENSITY,		"gvdbGatherDensity",			MODL_PRIMARY );
-	LoadFunction ( FUNC_GATHER_LEVELSET,	"gvdbGatherLevelSet",			MODL_PRIMARY );
-	LoadFunction ( FUNC_GATHER_LEVELSET_FP16, "gvdbGatherLevelSet_fp16",	MODL_PRIMARY );
+	LoadFunction ( FUNC_COUNT_SUBCELL,		"gvdbCountSubcell",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_INSERT_SUBCELL,		"gvdbInsertSubcell",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_INSERT_SUBCELL_FP16,"gvdbInsertSubcell_fp16",		MODL_PRIMARY, "cuda_gvdb_module.ptx");
+	LoadFunction ( FUNC_GATHER_DENSITY,		"gvdbGatherDensity",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_GATHER_LEVELSET,	"gvdbGatherLevelSet",			MODL_PRIMARY, "cuda_gvdb_module.ptx");
+	LoadFunction ( FUNC_GATHER_LEVELSET_FP16, "gvdbGatherLevelSet_fp16",    MODL_PRIMARY, "cuda_gvdb_module.ptx");
 	
-	LoadFunction ( FUNC_CALC_SUBCELL_POS,	"gvdbCalcSubcellPos",			MODL_PRIMARY );
-	LoadFunction ( FUNC_MAP_EXTRA_GVDB,		"gvdbMapExtraGVDB",				MODL_PRIMARY );
-	LoadFunction ( FUNC_SPLIT_POS,			"gvdbSplitPos",					MODL_PRIMARY );
-	LoadFunction ( FUNC_SET_FLAG_SUBCELL,	"gvdbSetFlagSubcell",			MODL_PRIMARY );
+	LoadFunction ( FUNC_CALC_SUBCELL_POS,	"gvdbCalcSubcellPos",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_MAP_EXTRA_GVDB,		"gvdbMapExtraGVDB",			    MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_SPLIT_POS,			"gvdbSplitPos",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_SET_FLAG_SUBCELL,	"gvdbSetFlagSubcell",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
 
-	LoadFunction ( FUNC_READ_GRID_VEL,		"gvdbReadGridVel",				MODL_PRIMARY );
-	LoadFunction ( FUNC_CHECK_VAL,			"gvdbCheckVal",					MODL_PRIMARY );
+	LoadFunction ( FUNC_READ_GRID_VEL,		"gvdbReadGridVel",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_CHECK_VAL,			"gvdbCheckVal",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
 	
 	// Apron Updates
-	LoadFunction ( FUNC_UPDATEAPRON_F,		"gvdbUpdateApronF",				MODL_PRIMARY );
-	LoadFunction ( FUNC_UPDATEAPRON_F4,		"gvdbUpdateApronF4",			MODL_PRIMARY );
-	LoadFunction ( FUNC_UPDATEAPRON_C,		"gvdbUpdateApronC",				MODL_PRIMARY );
-	LoadFunction ( FUNC_UPDATEAPRON_C4,		"gvdbUpdateApronC4",			MODL_PRIMARY );
-	LoadFunction ( FUNC_UPDATEAPRONFACES_F, "gvdbUpdateApronFacesF",		MODL_PRIMARY );
+	LoadFunction ( FUNC_UPDATEAPRON_F,		"gvdbUpdateApronF",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_UPDATEAPRON_F4,		"gvdbUpdateApronF4",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_UPDATEAPRON_C,		"gvdbUpdateApronC",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_UPDATEAPRON_C4,		"gvdbUpdateApronC4",			MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_UPDATEAPRONFACES_F, "gvdbUpdateApronFacesF",		MODL_PRIMARY, "cuda_gvdb_module.ptx" );
 	
 	// Operators
-	LoadFunction ( FUNC_FILL_F,				"gvdbOpFillF",					MODL_PRIMARY );
-	LoadFunction ( FUNC_FILL_C,				"gvdbOpFillC",					MODL_PRIMARY );
-	LoadFunction ( FUNC_FILL_C4,			"gvdbOpFillC4",					MODL_PRIMARY );
-	LoadFunction ( FUNC_SMOOTH,				"gvdbOpSmooth",					MODL_PRIMARY );
-	LoadFunction ( FUNC_NOISE,				"gvdbOpNoise",					MODL_PRIMARY );
-	LoadFunction ( FUNC_CLR_EXPAND,			"gvdbOpClrExpand",				MODL_PRIMARY );
-	LoadFunction ( FUNC_EXPANDC,			"gvdbOpExpandC",				MODL_PRIMARY );
+	LoadFunction ( FUNC_FILL_F,				"gvdbOpFillF",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_FILL_C,				"gvdbOpFillC",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_FILL_C4,			"gvdbOpFillC4",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_SMOOTH,				"gvdbOpSmooth",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );
+	LoadFunction ( FUNC_NOISE,				"gvdbOpNoise",					MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_CLR_EXPAND,			"gvdbOpClrExpand",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
+	LoadFunction ( FUNC_EXPANDC,			"gvdbOpExpandC",				MODL_PRIMARY, "cuda_gvdb_module.ptx" );	
 
 	SetModule ( cuModule[MODL_PRIMARY] );	
 
@@ -594,7 +582,7 @@ bool VolumeGVDB::LoadVBX(std::string fname, int force_maj, int force_min)
 		fread(&grid_dtype, sizeof(uchar), 1, fp);		// grid data type
 		fread(&grid_components, sizeof(uchar), 1, fp);	// grid components
 		fread(&grid_compress, sizeof(uchar), 1, fp);		// grid compression (0=none, 1=blosc, 2=..)
-		fread(&voxelsize_deprecated, sizeof(float), 3, fp);			// voxel size
+		fread(&voxelsize_deprecated, sizeof(float), 3, fp);	// voxel size
 		fread(&leafcnt, sizeof(int), 1, fp);				// total brick count
 		fread(&leafdim.x, sizeof(int), 3, fp);			// brick dimensions
 		fread(&apron, sizeof(int), 1, fp);				// brick apron
@@ -765,10 +753,6 @@ void VolumeGVDB::SetupAtlasAccess ()
 			texDesc.addressMode[0] = CU_TR_ADDRESS_MODE_BORDER;
 			texDesc.addressMode[1] = CU_TR_ADDRESS_MODE_BORDER;
 			texDesc.addressMode[2] = CU_TR_ADDRESS_MODE_BORDER;		
-			// CUDA 8.0 ONLY - Set border color
-			/* texDesc.borderColor[0] = 0.0f;
-			texDesc.borderColor[1] = 0.0f;
-			texDesc.borderColor[2] = 0.0f; */
 			break;
 		case F_CLAMP:
 			texDesc.addressMode[0] = CU_TR_ADDRESS_MODE_CLAMP;
@@ -854,47 +838,19 @@ void VolumeGVDB::FindUniqueBrick(int pNumPnts, int pLevDepth, int& pNumUniqueBri
 	
 	PUSH_CTX
 
-	//int* uniqueCnt = (int*)mAux[AUX_UNIQUE_CNT].cpu;
-	//uniqueCnt[0] = 0;
-	//mPool->CommitMem(mAux[AUX_UNIQUE_CNT]);
-
 	void* argsFindUnique[5] = { &numPnts, &mAux[AUX_SORTED_LEVXYZ].gpu, &mAux[AUX_MARKER].gpu, &mAux[AUX_UNIQUE_CNT].gpu, &mAux[AUX_LEVEL_CNT].gpu};
 	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_FIND_UNIQUE], 
 		pblks, 1, 1, threads, 1, 1, 0, NULL, argsFindUnique, NULL ), "VolumeGVDB", "FindUniqueBrick", "cuLaunch", "FUNC_FIND_UNIQUE", mbDebug);
 
-	
-
-	//int* dat0 = (int*) malloc ( numPnts * sizeof(int) );
-	//cudaCheck ( cuMemcpyDtoH ( dat0, mAux[AUX_MARKER].gpu, numPnts * sizeof(int) ), "Memcpy dat 0", "FindUniqueBrick" );
-	//for (int i = 0; i < numPnts; i++)	std::cout << dat0[i] << std::endl;
-	
 	cudaCheck ( cuMemcpyDtoH ( &pNumUniqueBrick, mAux[AUX_UNIQUE_CNT].gpu, sizeof(int) ), "VolumeGVDB", "FindUniqueBrick", "cuMemcpyDtoH", "AUX_UNIQUE_CNT", mbDebug);
-	//std::cout << pNumUniqueBrick << std::endl;
 	
 	PrefixSum(mAux[AUX_MARKER].gpu, mAux[AUX_MARKER_PRESUM].gpu, numPnts);
-
-	//int* dat1 = (int*) malloc ( numPnts * sizeof(int) );
-	//cudaCheck ( cuMemcpyDtoH ( dat1, mAux[AUX_MARKER_PRESUM].gpu, numPnts * sizeof(int) ), "Memcpy dat 1", "FindUniqueBrick" );
-	//for (int i = 1024*1024; i < numPnts; i++)	std::cout << i << " " << dat1[i] << std::endl;
 
 	PrepareAux ( AUX_UNIQUE_LEVXYZ, pNumUniqueBrick, sizeof(long long), false);
 	void* argsCompactUnique[5] = { &numPnts, &mAux[AUX_SORTED_LEVXYZ].gpu, &mAux[AUX_MARKER].gpu, &mAux[AUX_MARKER_PRESUM].gpu, &mAux[AUX_UNIQUE_LEVXYZ].gpu};
 	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_COMPACT_UNIQUE], 
 		pblks, 1, 1, threads, 1, 1, 0, NULL, argsCompactUnique, NULL ), "VolumeGVDB", "FindUniqueBrick", "cuLaunch", "FUNC_COMPACT_UNIQUE", mbDebug );
 
-	//int* dat3 = (int*) malloc ( pLevDepth * sizeof(int) );
-	//cudaCheck ( cuMemcpyDtoH ( dat3, mAux[AUX_LEVEL_CNT].gpu, pLevDepth * sizeof(int) ), "Memcpy dat 1", "FindUniqueBrick" );
-	//for (int i = 0; i < pLevDepth; i++)	std::cout << i << " " << dat3[i] << std::endl;
-
-	//unsigned short* dat4 = (unsigned short*) malloc ( pNumUniqueBrick * 4 * sizeof(unsigned short) );
-	//cudaCheck ( cuMemcpyDtoH ( dat4, mAux[AUX_UNIQUE_LEVXYZ].gpu, pNumUniqueBrick * 4 * sizeof(unsigned short) ), "Memcpy dat 4", "FindUniqueBrick" );
-	//for (int i = 0; i < pNumUniqueBrick; i++)
-	//{
-	//	std::cout << " " << dat4[ i * 4 + 0];
-	//	std::cout << " " << dat4[ i * 4 + 1];
-	//	std::cout << " " << dat4[ i * 4 + 2];
-	//	std::cout << " " << dat4[ i * 4 + 3] << std::endl;
-	//}
 	PERF_POP ();
 
 	POP_CTX
@@ -937,106 +893,18 @@ void VolumeGVDB::RadixSortByByte(int pNumPnts, int pLevDepth)
 
 	int numPnts = pNumPnts;
 
-	// Round element count to total number of threads for efficiency
-	/*uint elements_rounded_to_3072;
-
-	int modval = numPnts % 3072;
-	if( modval == 0 )
-		elements_rounded_to_3072 = numPnts;
-	else
-		elements_rounded_to_3072 = numPnts + (3072 - (modval));
-
-	int RADIX = 8;
-	int bits = 7;*/
-
 	int threads = 512;		
 	int pblks = int(numPnts / threads)+1;
 	int length = pNumPnts * 4;
 
 	PrepareAux ( AUX_SORTED_LEVXYZ, pNumPnts * 4, sizeof(unsigned short), false);
-	//////////////////////////////////////////////////////////////////////////
-	//PrepareAux ( AUX_TMP, pNumPnts * pLevDepth * 4, sizeof(unsigned short), false);
 
 	cudaCheck ( cuMemcpyDtoD (mAux[AUX_SORTED_LEVXYZ].gpu, mAux[AUX_BRICK_LEVXYZ].gpu, length * sizeof(unsigned short) ),
 		               "VolumeGVDB", "RadixSortByByte", "cuMemcpyDtoD", "AUX_SORTED_LEVXYZ", mbDebug);
 
-	//for (uint shift = 56, i = 0; i < 8; i++)
-	//{
-	//	shift -= RADIX;
-
-	//	// Perform one round of radix sorting
-	//	CUdeviceptr tmp = mAux[AUX_TMP].gpu;
-	//	mAux[AUX_TMP].gpu = mAux[AUX_SORTED_LEVXYZ].gpu;
-	//	mAux[AUX_SORTED_LEVXYZ].gpu = tmp;
-	//	//cudaCheck ( cuMemcpyDtoD (mAux[AUX_TMP].gpu, mAux[AUX_SORTED_LEVXYZ].gpu, length * sizeof(unsigned short) ), "Memcpy dat3", "ActivateBricksGPU" );
-
-	//	void* argsRadixSum[4] = { &mAux[AUX_TMP].gpu, &numPnts, &elements_rounded_to_3072, &shift};
-	//	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_RADIX_SUM], 
-	//		NUM_BLOCKS, 1, 1, NUM_THREADS_PER_BLOCK, 1, 1, GRFSIZE, NULL, argsRadixSum, NULL ), "cuLaunch(FUNC_RADIX_BINCOUNT)", "RadixSortByByte" );
-
-	//	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_RADIX_PREFIXSUM], 
-	//		PREFIX_NUM_BLOCKS, 1, 1, PREFIX_NUM_THREADS_PER_BLOCK, 1, 1, PREFIX_GRFSIZE, NULL, argsRadixSum, NULL ), "cuLaunch(FUNC_RADIX_BINCOUNT)", "RadixSortByByte" );
-
-	//	void* argsRadixShuffle[5] = { &mAux[AUX_TMP].gpu, &mAux[AUX_SORTED_LEVXYZ].gpu, &numPnts, &elements_rounded_to_3072, &shift};
-	//	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_RADIX_SHUFFLE], 
-	//		NUM_BLOCKS, 1, 1, NUM_THREADS_PER_BLOCK, 1, 1, SHUFFLE_GRFSIZE, NULL, argsRadixShuffle, NULL ), "cuLaunch(FUNC_RADIX_BINCOUNT)", "RadixSortByByte" );
-	//}
-#if 1
-	//unsigned short* dat3 = (unsigned short*) malloc ( pNumPnts * pLevDepth * 4 * sizeof(unsigned short) );
-	//cudaCheck ( cuMemcpyDtoH ( dat3, mAux[AUX_SORTED_LEVXYZ].gpu, pNumPnts * pLevDepth * 4 * sizeof(unsigned short) ), "Memcpy dat 3", "RadixSortByByte" );
-	//for (int i = 0; i < pNumPnts * pLevDepth; i++)
-	//{
-	//	std::cout << " " << dat3[ i * 4 + 0];
-	//	std::cout << " " << dat3[ i * 4 + 1];
-	//	std::cout << " " << dat3[ i * 4 + 2];
-	//	std::cout << " " << dat3[ i * 4 + 3] << std::endl;
-	//}
-
-	//////////////////////////////////////////////////////////////////////////
-	
-	//long long int* h_tmp_keys = (long long int*)malloc(pNumPnts * pLevDepth * sizeof(long long int));
-	//unsigned short* h_keys = (unsigned short*)h_tmp_keys;
-	//for (int i = 0; i < pNumPnts * pLevDepth; i++)
-	//{
-	//	h_keys[i * 4 + 0] = dat3[ i * 4 + 3];
-	//	h_keys[i * 4 + 1] = dat3[ i * 4 + 2];
-	//	h_keys[i * 4 + 2] = dat3[ i * 4 + 1];
-	//	h_keys[i * 4 + 3] = dat3[ i * 4 + 0];
-	//}
-
-	//int *d_keys;
-	//cudaMalloc( (void**) &d_keys, pNumPnts * pLevDepth * sizeof(long long int));
-	//cudaMemcpy(d_keys, h_keys, pNumPnts * pLevDepth * sizeof(long long int), cudaMemcpyHostToDevice);
-
-	cudppRadixSort(mPlan_sort, (void*)mAux[AUX_SORTED_LEVXYZ].gpu, 0, pNumPnts);
-
-	//cudppRadixSort(mPlan_sort, d_keys, 0, pNumPnts * pLevDepth);
-	//cudppMergeSort(plan, d_keys, 0, pNumPnts * pLevDepth);
-
-	//cudaMemcpy(h_keys, d_keys, pNumPnts * pLevDepth * sizeof(long long int), cudaMemcpyDeviceToHost);
-
-	//for (int i = 0; i < pNumPnts * pLevDepth; i++)
-	//{
-	//	std::cout << h_keys[i * 4 + 3] << " ";
-	//	std::cout << h_keys[i * 4 + 2] << " ";
-	//	std::cout << h_keys[i * 4 + 1] << " ";
-	//	std::cout << h_keys[i * 4 + 0] << std::endl;
-	//}
-
-	//delete h_keys;
-
-	//////////////////////////////////////////////////////////////////////////
-	//unsigned short* dat4 = (unsigned short*) malloc ( pNumPnts * pLevDepth * 4 * sizeof(unsigned short) );
-	//cudaCheck ( cuMemcpyDtoH ( dat4, mAux[AUX_SORTED_LEVXYZ].gpu, pNumPnts * pLevDepth * 4 * sizeof(unsigned short) ), "Memcpy dat 4", "RadixSortByByte" );
-	//std::cout << "after sort\n";
-	//for (int i = 0; i < pNumPnts * pLevDepth; i++)
-	//{
-	//	std::cout << " " << dat4[ i * 4 + 3];
-	//	std::cout << " " << dat4[ i * 4 + 2];
-	//	std::cout << " " << dat4[ i * 4 + 1];
-	//	std::cout << " " << dat4[ i * 4 + 0] << std::endl;
-	//}
-#endif
+	// gvdbDeviceRadixSort takes a pointer to memory interpreted as 64-bit
+	// integers, and the number of 64-bit integers in the array.
+	gvdbDeviceRadixSort(mAux[AUX_SORTED_LEVXYZ].gpu, pNumPnts);
 
 	PERF_POP();
 
@@ -1066,7 +934,6 @@ void VolumeGVDB::ActivateExtraBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 
 	RetrieveData(mAux[AUX_EXTRA_BRICK_CNT]);
 	int* extraNodeNum = (int *)mAux[AUX_EXTRA_BRICK_CNT].cpu;
-	//std::cout << "Extra lev,x,y,z number: " << extraNodeNum[0] << std::endl;
 
 	int numUniqueExtraBrick = 0;	
 	RadixSortByByte(extraNodeNum[0], pRootLev);
@@ -1075,8 +942,6 @@ void VolumeGVDB::ActivateExtraBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 	PERF_PUSH ( "Create pool (CPU)");
 	int* extraLevCnt = (int*) malloc ( pRootLev * sizeof(int) );
 	cudaCheck ( cuMemcpyDtoH ( extraLevCnt, mAux[AUX_LEVEL_CNT].gpu, pRootLev * sizeof(int) ), "VolumeGVDB", "ActivateExtraBricksGPU", "cuMemcpyDtoH", "AUX_LEVEL_CNT", mbDebug);
-
-	//std::cout << "extraLevCnt " << extraLevCnt[0] << " " << extraLevCnt[1] << std::endl;
 
 	unsigned short* extraUniBricks = (unsigned short*) malloc ( numUniqueExtraBrick * 4 * sizeof(unsigned short) );
 	cudaCheck ( cuMemcpyDtoH ( extraUniBricks, mAux[AUX_UNIQUE_LEVXYZ].gpu, numUniqueExtraBrick * 4 * sizeof(unsigned short) ), "VolumeGVDB", "ActivateExtraBricksGPU", "cuMemcpyDtoH", "AUX_UNIQUE_LEVXYZ", mbDebug);
@@ -1177,13 +1042,10 @@ void VolumeGVDB::ActivateIncreBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 
 	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_CALC_INCRE_EXTRA_BRICK_ID], pblks, 1, 1, threads, 1, 1, 0, NULL, argsCalcExtraLevXYZ, NULL ), 
 						"VolumeGVDB", "ActivateIncreBricksGPU", "cuLaunch", "FUNC_CALC_INCRE_EXTRA_BRICK_ID", mbDebug);
-	//cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_CALC_INCRE_BRICK_ID], pblks, 1, 1, threads, 1, 1, 0, NULL, argsCalcExtraLevXYZ, NULL ), "cuLaunch(FUNC_CALC_INCRE_BRICK_ID)", "ActivateIncreBricksGPU" );
-
+	
 	RetrieveData(mAux[AUX_EXTRA_BRICK_CNT]);
 	int* extraNodeNum = (int *)mAux[AUX_EXTRA_BRICK_CNT].cpu;
 
-
-	//std::cout << "Total lev,x,y,z number: " << extraNodeNum[0] << std::endl; 
 
 	if (extraNodeNum[0] == 0) { POP_CTX; PERF_POP(); return; }	// no new node, then return
 
@@ -1193,8 +1055,6 @@ void VolumeGVDB::ActivateIncreBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 
 	int* extraLevCnt = (int*) malloc ( pRootLev * sizeof(int) );
 	cudaCheck ( cuMemcpyDtoH ( extraLevCnt, mAux[AUX_LEVEL_CNT].gpu, pRootLev * sizeof(int) ), "VolumeGVDB", "ActivateIncreBricksGPU", "cuMemcpyDtoH", "AUX_LEVEL_CNT", mbDebug);
-
-	//std::cout << "extraLevCnt " << extraLevCnt[0] << " " << extraLevCnt[1] << std::endl;
 
 	unsigned short* extraUniBricks = (unsigned short*) malloc ( numUniqueExtraBrick * 4 * sizeof(unsigned short) );
 	cudaCheck ( cuMemcpyDtoH ( extraUniBricks, mAux[AUX_UNIQUE_LEVXYZ].gpu, numUniqueExtraBrick * 4 * sizeof(unsigned short) ), "VolumeGVDB", "ActivateIncreBricksGPU", "cuMemcpyDtoH", "AUX_UNIQUE_LEVXYZ", mbDebug);
@@ -1269,7 +1129,6 @@ void VolumeGVDB::ActivateIncreBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 	int usedNum = mPool->getPoolTotalCnt(0,0);
 	for (int ni = 0; ni < mPool->getPoolTotalCnt(0,0); ni++) if(!getNode(0,0,ni)->mFlags) usedNum--;
 	mPool->SetPoolUsedCnt(0,0,usedNum);
-	//std::cout << mPool->getPoolUsedCnt(0,lev) << " " << mPool->getPoolTotalCnt(0,lev) << std::endl;
 	PERF_POP();
 
 	delete extraLevCnt;
@@ -1427,8 +1286,6 @@ void VolumeGVDB::ActivateBricksGPU(int pNumPnts, float pRadius, Vector3DF pOrig,
 	int* levCnt = (int*) malloc ( pRootLev * sizeof(int) );
 	cudaCheck ( cuMemcpyDtoH ( levCnt, mAux[AUX_LEVEL_CNT].gpu, pRootLev * sizeof(int) ), "VolumeGVDB", "ActivateBricksGPU", "cuMemcpyDtoH", "AUX_LEVEL_CNT", mbDebug);
 
-	//std::cout << "levcnt " << levCnt[0] << " " << levCnt[1] << std::endl;
-
 	unsigned short* uniBricks = (unsigned short*) malloc ( numUniqueBrick * 4 * sizeof(unsigned short) );
 	cudaCheck ( cuMemcpyDtoH ( uniBricks, mAux[AUX_UNIQUE_LEVXYZ].gpu, numUniqueBrick * 4 * sizeof(unsigned short) ), "VolumeGVDB", "ActivateBricksGPU", "cuMemcpyDtoH", "AUX_UNIQUE_LEVXYZ", mbDebug);
 
@@ -1463,7 +1320,7 @@ void VolumeGVDB::ActivateBricksGPU(int pNumPnts, float pRadius, Vector3DF pOrig,
 	//////////////////////////////////////////////////////////////////////////
 		
 	
-#if 0 // CPU version 	
+#if GVDB_CPU_VERSION // CPU version 	
 	Vector3DF posInNode;
 	uint32 bitMaskPos;
 	for (int lev = pRootLev-1; lev >= 0; lev--)	
@@ -1521,15 +1378,10 @@ void VolumeGVDB::ActivateBricksGPU(int pNumPnts, float pRadius, Vector3DF pOrig,
 	PERF_PUSH("Link Levels");
 	for (int lev = pRootLev-1; lev >= 0; lev--)	
 	{
-		//std::cout << "link " << lev << std::endl;
 		pblks = int(mPool->getPoolTotalCnt(0,lev) / threads)+1;
-		//PrepareAux ( AUX_TEST_1, 1, sizeof(uint64), true, true );
 		void* argsLink[3] = { &cuVDBInfo, &lev};
 		cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_LINK_BRICKS], 
 			pblks, 1, 1, threads, 1, 1, 0, NULL, argsLink, NULL ), "VolumeGVDB", "ActivateBricksGPU", "cuLaunch", "FUNC_LINK_BRICKS", mbDebug);
-		//RetrieveData(mAux[AUX_TEST_1]);
-		//uint64* tmp = (uint64*)mAux[AUX_TEST_1].cpu;
-		//std::cout << tmp[0] << std::endl;
 	}
 	PERF_POP();
 
@@ -1583,7 +1435,6 @@ void VolumeGVDB::FindActivBricks(int pLev,  int pRootlev,  int pNumPnts, Vector3
 
 	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_FIND_ACTIV_BRICKS], pblks, 1, 1, threads, 1, 1, 0, NULL, args, NULL ), 
 					"VolumeGVDB", "ActivateBricksGPU", "cuLaunch", "FUNC_FIND_ACTIV_BRICKS", mbDebug);
-	//cudaCheck ( cuCtxSynchronize (), "cuCtxSync", "FindActivBricks" );
 	
 	// retrieve data
 	int* brickIdx = (int*) malloc ( pNumPnts*sizeof(int) );
@@ -1829,7 +1680,7 @@ void VolumeGVDB::SaveVBX ( std::string fname )
 		fwrite ( &grid_dtype, sizeof(uchar), 1, fp );		// grid data type
 		fwrite ( &grid_components, sizeof(uchar), 1, fp );	// grid components
 		fwrite ( &grid_compress, sizeof(uchar), 1, fp );	// grid compression (0=none, 1=blosc, 2=..)
-		fwrite ( &voxelsize_deprecated.x, sizeof(float), 3, fp );		// voxel size (deprecated)
+		fwrite ( &voxelsize_deprecated.x, sizeof(float), 3, fp );		// voxel size
 		fwrite ( &leafcnt, sizeof(int), 1, fp );			// total brick count
 		fwrite ( &leafdim.x, sizeof(int), 3, fp );			// brick dimensions
 		fwrite ( &apron, sizeof(int), 1, fp );				// brick apron
@@ -1910,8 +1761,8 @@ void VolumeGVDB::SetBounds(Vector3DF pMin, Vector3DF pMax)
 	mVoxMax.y = int(pMax.y / range.y) * range.y + 2 * range.y;
 	mVoxMax.z = int(pMax.z / range.z) * range.z + 2 * range.z;
 
-	mObjMin = mVoxMin;	
-	mObjMax = mVoxMax; 
+	mObjMin = mVoxMin;
+	mObjMax = mVoxMax;
 	mVoxRes = mVoxMax;  mVoxRes -= mVoxMin;
 
 	if ( mVoxRes.x > mVoxResMax.x ) mVoxResMax.x = mVoxRes.x;
@@ -1938,8 +1789,8 @@ void VolumeGVDB::ComputeBounds ()
 		if ( curr->mPos.y + range.y > mVoxMax.y ) mVoxMax.y = curr->mPos.y + range.y;
 		if ( curr->mPos.z + range.z > mVoxMax.z ) mVoxMax.z = curr->mPos.z + range.z;		
 	}
-	mObjMin = mVoxMin;	
-	mObjMax = mVoxMax; 
+	mObjMin = mVoxMin;
+	mObjMax = mVoxMax;
 	mVoxRes = mVoxMax;  mVoxRes -= mVoxMin;
 
 	if ( mVoxRes.x > mVoxResMax.x ) mVoxResMax.x = mVoxRes.x;
@@ -1971,7 +1822,7 @@ void VolumeGVDB::ComputeBounds ()
 		};
 		return false;
 	}
-	void vdbOrigin ( OVDBGrid* ovg, Coord& orig, int gt, bool isFloat )
+	void vdbOrigin ( OVDBGrid* ovg, openvdb::Coord& orig, int gt, bool isFloat )
 	{
 		switch ( gt ) {
 		case 0: if ( isFloat) (ovg->iter543F)->getOrigin( orig ); else (ovg->iter543VF)->getOrigin( orig );	break;
@@ -2122,7 +1973,6 @@ bool VolumeGVDB::LoadBRK ( std::string fname )
 			if ( mPool->AtlasAlloc ( 0, brickpos ) ) {
 				node = getNode ( leaf );
 				node->mValue = brickpos; 
-				// gprintf ( "%d %d %d: %d %d %d, %lld\n", node->mPos.x, node->mPos.y, node->mPos.z, brickpos.x, brickpos.y, brickpos.z, leaf );				
 				mPool->AtlasCopyTex ( 0, brickpos, vtemp.getPtr() );
 			}
 			leaf_cnt++;
@@ -2166,8 +2016,8 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 
 	mOVDB = new OVDBGrid;
 
-	CoordBBox box;
-	Coord orig;
+	openvdb::CoordBBox box;
+	openvdb::Coord orig;
 	Vector3DF p0, p1;
 
 	PERF_PUSH ( "Clear grid" );
@@ -2201,6 +2051,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	PERF_POP ();
 
 	// Initialize GVDB config
+	Vector3DF voxelsize;
 	int gridtype = 0;
 
 	bool isFloat = false;
@@ -2210,30 +2061,31 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 		gridtype = 0;
 		isFloat = true;
 		mOVDB->grid543F = openvdb::gridPtrCast< FloatGrid543 >(baseGrid);	
-		//voxelsize.Set ( mOVDB->grid543F->voxelSize().x(), mOVDB->grid543F->voxelSize().y(), mOVDB->grid543F->voxelSize().z() );			
+		voxelsize.Set ( mOVDB->grid543F->voxelSize().x(), mOVDB->grid543F->voxelSize().y(), mOVDB->grid543F->voxelSize().z() );			
 		Configure ( 5, 5, 5, 4, 3 );
 	}
 	if ( baseGrid->isType< Vec3fGrid543 >() ) {
 		gridtype = 0;
 		isFloat = false;
 		mOVDB->grid543VF = openvdb::gridPtrCast< Vec3fGrid543 >(baseGrid);	
-		//voxelsize.Set ( mOVDB->grid543VF->voxelSize().x(), mOVDB->grid543VF->voxelSize().y(), mOVDB->grid543VF->voxelSize().z() );	
+		voxelsize.Set ( mOVDB->grid543VF->voxelSize().x(), mOVDB->grid543VF->voxelSize().y(), mOVDB->grid543VF->voxelSize().z() );	
 		Configure ( 5, 5, 5, 4, 3 );
 	}	 
 	if ( baseGrid->isType< FloatGrid34 >() ) {
 		gridtype = 1;
 		isFloat = true;
 		mOVDB->grid34F = openvdb::gridPtrCast< FloatGrid34 >(baseGrid);	
-		//voxelsize.Set ( mOVDB->grid34F->voxelSize().x(), mOVDB->grid34F->voxelSize().y(), mOVDB->grid34F->voxelSize().z() );	
+		voxelsize.Set ( mOVDB->grid34F->voxelSize().x(), mOVDB->grid34F->voxelSize().y(), mOVDB->grid34F->voxelSize().z() );	
 		Configure ( 3, 3, 3, 3, 4 );
 	}
 	if ( baseGrid->isType< Vec3fGrid34 >() ) {
 		gridtype = 1;
 		isFloat = false;
 		mOVDB->grid34VF = openvdb::gridPtrCast< Vec3fGrid34 >(baseGrid);	
-		//voxelsize.Set ( mOVDB->grid34VF->voxelSize().x(), mOVDB->grid34VF->voxelSize().y(), mOVDB->grid34VF->voxelSize().z() );	
+		voxelsize.Set ( mOVDB->grid34VF->voxelSize().x(), mOVDB->grid34VF->voxelSize().y(), mOVDB->grid34VF->voxelSize().z() );	
 		Configure ( 3, 3, 3, 3, 4 );
 	}
+	SetTransform(Vector3DF(0.f, 0.f, 0.f), voxelsize, Vector3DF(0.f, 0.f, 0.f), Vector3DF(0.f, 0.f, 0.f));
 	SetApron ( 1 );
 
 	float pused = MeasurePools ();
@@ -2445,7 +2297,7 @@ void VolumeGVDB::SaveVDB ( std::string fname )
 	for (int n=0; n < leafcnt; n++ ) {
 		node = getNode ( 0, 0, n );
 		pos = node->mPos;
-		leaf = tree->touchLeaf ( Coord(pos.x, pos.y, pos.z) );
+		leaf = tree->touchLeaf ( openvdb::Coord(pos.x, pos.y, pos.z) );
 		leaf->setValuesOff ();		
 		leafbuf = leaf->buffer().data();	
 	
@@ -2511,8 +2363,6 @@ void VolumeGVDB::Initialize ()
 	// Create VDB object
 	cudaCheck(cuMemAlloc(&cuVDBInfo, sizeof(VDBInfo)), "VolumeGVDB", "Initialize", "cuMemAlloc", "cuVDBInfo", mbDebug);
 
-	//std::cout << "cuVDBInfo " << cuVDBInfo << std::endl;
-
 	// Default Camera & Light
 	mScene->SetCamera ( new Camera3D );		// Default camera
 	mScene->SetLight ( 0, new Light );		// Default light
@@ -2529,37 +2379,7 @@ void VolumeGVDB::Initialize ()
 	AddPath ( "../source/shared_assets/" );	
 	AddPath ( "../shared_assets/" );
 	
-
-	CUDPPResult result = CUDPP_SUCCESS;  
 	
-	gprintf(" Creating CUDPP..\n");
-	result = cudppCreate(&mCudpp);
-	if(result != CUDPP_SUCCESS) printf("Error initializing CUDPP Library.\n");
-
-	CUDPPConfiguration config;
-	config.algorithm = CUDPP_REDUCE;
-	config.datatype = CUDPP_FLOAT;
-	config.options = 0;
-	config.op = CUDPP_MAX;
- 
-
-	int maxNum = 1000000;	// TODO: no hard code later
-
-	result = cudppPlan(mCudpp, &mPlan_max, config, maxNum, 1, 0);  
-	if(result != CUDPP_SUCCESS) printf("Error in plan creation.\n");
-
-	config.op = CUDPP_MIN;
-	result = cudppPlan(mCudpp, &mPlan_min, config, maxNum, 1, 0);  
-	if(result != CUDPP_SUCCESS) printf("Error in plan creation.\n");
-
-	CUDPPConfiguration config_sort;
-	config_sort.algorithm = CUDPP_SORT_RADIX;
-	config_sort.datatype = CUDPP_LONGLONG;
-	config_sort.options = CUDPP_OPTION_KEYS_ONLY;
-
-	result = cudppPlan(mCudpp, &mPlan_sort, config_sort, maxNum, 1, 0);  
-	if(result != CUDPP_SUCCESS) printf("Error in plan creation.\n");
-
 	mRebuildTopo = true;
 	mCurrDepth = -1;
 
@@ -2822,38 +2642,6 @@ float Mandelbulb ( Vector3DF s )
 	return -0.5*log(r)*r / dr;
 }
 
-/*void VolumeGVDB::Generate ()
-{	
-	float sz = MRES;
-	float v;
-	Vector3DI p ( sz, sz, sz);
-
-	if (mPnt.y > sz) return;
-	
-	int i;
-	for ( i=0; i < 16; i++ ) {		
-		for ( mPnt.x=0; mPnt.x < sz; mPnt.x+=8 ) {
-			v = Mandelbulb ( Vector3DF((mPnt.x+4)/sz,(mPnt.z+4)/sz,(mPnt.y+4)/sz ) );	
-
-			if ( v > 0 && v < 0.005 && mPnt.Length() > sz/2 ) {			
-				ActivateSpace ( mRoot, p+Vector3DI( mPnt.x, mPnt.y,	mPnt.z) );
-				ActivateSpace ( mRoot, p+Vector3DI(-mPnt.x, mPnt.y, mPnt.z) );
-				ActivateSpace ( mRoot, p+Vector3DI( mPnt.x,-mPnt.y, mPnt.z) );
-				ActivateSpace ( mRoot, p+Vector3DI(-mPnt.x,-mPnt.y, mPnt.z) );
-				ActivateSpace ( mRoot, p+Vector3DI( mPnt.x, mPnt.y,-mPnt.z) );
-				ActivateSpace ( mRoot, p+Vector3DI(-mPnt.x, mPnt.y,-mPnt.z) );
-				ActivateSpace ( mRoot, p+Vector3DI( mPnt.x,-mPnt.y,-mPnt.z) );
-				ActivateSpace ( mRoot, p+Vector3DI(-mPnt.x,-mPnt.y,-mPnt.z) );
-			}
-		}
-		mPnt.z += 8;
-		if ( mPnt.z > sz ) {
-			mPnt.z = 0;
-			mPnt.y += 8;			
-		}
-	}
-}*/
-
 void VolumeGVDB::CopyChannel(int chanDst, int chanSrc)
 {
 	PUSH_CTX
@@ -2878,9 +2666,6 @@ void VolumeGVDB::UpdateAtlas ()
 	
 	mPool->AtlasEmptyAll ();
 
-	//std::cout << "Update Atlas\n";
-	//std::cout << usedLeafcnt << std::endl;
-	//std::cout << mPool->getAtlas(0).max << std::endl;
 	// Resize atlas
 	int amax = mPool->getAtlas(0).max;
 	if ( usedLeafcnt > amax ) {
@@ -2896,10 +2681,9 @@ void VolumeGVDB::UpdateAtlas ()
 	for (int n=0; n < totalLeafcnt; n++ ) {
 		node = getNode ( 0, 0, n );
 		if (!node->mFlags) continue;
-		//if ( node->mValue.x == -1 ) {					// node not yet assigned to atlas		(disabled)	
 			if ( mPool->AtlasAlloc ( 0, brickpos ) )	// assign to atlas brick
 				node->mValue = brickpos;
-		//}
+		
 	}
 	PERF_POP ();
 
@@ -2923,7 +2707,6 @@ void VolumeGVDB::UpdateAtlas ()
 	for (int n=0; n < totalLeafcnt; n++ ) {
 		Node* node = getNode ( 0, 0, n );
 		if (!node->mFlags) continue;
-		//if ( node->mValue.x == -1 ) continue;	(disabled)
 		if ( node->mValue.x > atlasmax.x || node->mValue.y > atlasmax.y || node->mValue.z > atlasmax.z ) {
 			gprintf ( "ERROR: Node value exceeds atlas res. node: %d, val: %d %d %d, atlas: %d %d %d\n", n, node->mValue.x, node->mValue.y, node->mValue.z, atlasres.x, atlasres.y, atlasres.z );
 			gerror ();
@@ -2932,8 +2715,6 @@ void VolumeGVDB::UpdateAtlas ()
 	}
 	PERF_POP ();
 	
-	// Update Neighbor Table
-	// UpdateNeighbors();
 
 	// Commit to GPU
 	PERF_PUSH ( "Commit Atlas Map" );
@@ -3009,7 +2790,7 @@ slong VolumeGVDB::Reparent(int lev, slong prevroot_id, Vector3DI pos, bool& bNew
 
 // Activate region of space at 3D position
 slong VolumeGVDB::ActivateSpace ( Vector3DF pos )
-{	
+{
 	Vector3DI brickpos;
 	bool bnew = false;
 	slong node_id = ActivateSpace ( mRoot, pos, bnew, ID_UNDEFL, 0 );
@@ -3136,8 +2917,6 @@ void VolumeGVDB::DebugNode ( slong nodeid )
 	Node* curr = getNode ( nodeid );
 
 	int b = -1;	
-	//int grp = ElemGrp ( nodeid );
-	//int lev = ElemLev ( nodeid );
 	int ndx = ElemNdx ( nodeid );
 	
 	if ( curr->mLev < 4 && curr->mParent != ID_UNDEFL ) {
@@ -3166,7 +2945,6 @@ Vector3DI VolumeGVDB::GetCoveringNode ( int lev, Vector3DI pos, Vector3DI& range
 
 	if ( lev == MAXLEV-1 ) {		
 		nodepos = Vector3DI(0,0,0);
-		//nodepos = Vector3DI( -range.x/2, -range.y/2, -range.z/2 );  // highest level root must cover origin
 	} else {
 		nodepos = pos;
 		nodepos /= range;	
@@ -3194,7 +2972,7 @@ slong VolumeGVDB::FindParent(int lev,  Vector3DI pos)
 	{
 		res = getRes3DI(l);
 		range = getRange(l);
-		posInNode = pos - nd->mPos;//sortedPos[n] + pOrig - nd->mPos; 
+		posInNode = pos - nd->mPos;
 		posInNode *= res;
 		posInNode /= range;
 		posInNode.x = floor(posInNode.x);	// IMPORTANT!!! truncate decimal 
@@ -3355,11 +3133,11 @@ void VolumeGVDB::writeCube (  FILE* fp, unsigned char vpix[], slong& numfaces, i
 	v[6] = vbase + vgToVert[ gv[6] ];
 	v[7] = vbase + vgToVert[ gv[7] ];
 
-	if ( vpix[1] == 0 )	{fprintf(fp, "f %ld//0 %ld//0 %ld//0 %ld//0\n", v[1], v[2], v[6], v[5] );  numfaces++; }	// x+	
+	if ( vpix[1] == 0 ) {fprintf(fp, "f %ld//0 %ld//0 %ld//0 %ld//0\n", v[1], v[2], v[6], v[5] );  numfaces++; }	// x+	
 	if ( vpix[2] == 0 ) {fprintf(fp, "f %ld//1 %ld//1 %ld//1 %ld//1\n", v[0], v[3], v[7], v[4] );  numfaces++; }	// x-
 	if ( vpix[3] == 0 ) {fprintf(fp, "f %ld//2 %ld//2 %ld//2 %ld//2\n", v[2], v[3], v[7], v[6] );  numfaces++; }	// y+
 	if ( vpix[4] == 0 ) {fprintf(fp, "f %ld//3 %ld//3 %ld//3 %ld//3\n", v[1], v[0], v[4], v[5] );  numfaces++; }	// y- 
-	if ( vpix[5] == 0 )	{fprintf(fp, "f %ld//4 %ld//4 %ld//4 %ld//4\n", v[4], v[5], v[6], v[7] );  numfaces++; }	// z+
+	if ( vpix[5] == 0 ) {fprintf(fp, "f %ld//4 %ld//4 %ld//4 %ld//4\n", v[4], v[5], v[6], v[7] );  numfaces++; }	// z+
 	if ( vpix[6] == 0 ) {fprintf(fp, "f %ld//5 %ld//5 %ld//5 %ld//5\n", v[0], v[1], v[2], v[3] );  numfaces++; }	// z-	
 }
 
@@ -3389,115 +3167,8 @@ void VolumeGVDB::setupVerts ( int gv[], Vector3DI g, int r1, int r2 )
 
 void VolumeGVDB::WriteObj ( char* fname )
 {
-	// Allocate CPU memory for leaf
-	/*int res0 = getRes ( 0 );	
-	Vector3DI vres0 ( res0, res0, res0 );	
-	Vector3DF vrange0 = getRange(0);
-	unsigned char* vdat = (unsigned char*) malloc ( res0*res0*res0 );
-	unsigned char vpix[8];
-	Vector3DF vmin;
-
-	FILE* fp = fopen( fname, "w");
-
-	fprintf(fp, "# Wavefront OBJ format\n\n");  
-			
-	// Output 6 normals (shared by all cubes)
-	fprintf(fp, "vn  1  0  0\n" );	// x+
-	fprintf(fp, "vn -1  0  0\n" );	// x-	
-	fprintf(fp, "vn  0  1  0\n" );	// y+
-	fprintf(fp, "vn  0 -1  0\n" );	// y-
-	fprintf(fp, "vn  0  0  1\n" );	// z+
-	fprintf(fp, "vn  0  0 -1\n" );	// z-
-
-	slong numverts = 0, numfaces = 0, numvox = 0;
-
-	// Create map from grid points to vertices
-	Vector3DI g;
-	int gv[8];
-	int r1 = (res0+1);
-	int r2 = (res0+1)*(res0+1);
-	int r3 = r2*r1;
-	int* vgToVert = (int*) malloc ( r3 * sizeof(int) );	
-	std::vector< Vector3DF >  verts;	
-
-	// Loop over every leaf in GVDB	
-	LeafNode* leaf = 0x0;
-	Vol3D* vox = 0x0;
-	gprintf ( "Write OBJ file: %s\n", fname );
-	for (int ln=0; ln < mLeaves.size(); ln++ ) {
-		gprintf ( "  Writing: %d of %d (%f%%)\n", ln, mLeaves.size(), float(ln*100.f)/mLeaves.size() );
-
-		// Get leaf
-		leaf = mLeaves[ ln ];	
-		vox = leaf->getVox( 0 );
-
-		// Transfer leaf data to CPU
-		vox->MemRetrieve ( vox->mData, vdat );
-
-		// Find all active vertices in leaf		
-		for (int n=0; n < r3; n++ ) vgToVert[n] = -1;
-		verts.clear ();
-		for (g.z=0; g.z < res0; g.z++)  {
-			for (g.y=0; g.y < res0; g.y++) {
-				for (g.x = 0; g.x < res0; g.x++) {
-					vpix[0] = *(vdat + (g.z*res0 + g.y)*res0 + g.x );
-					if ( vpix[0] > 0 ) {						
-						vmin = vox->mVolMin;				// world coordinates of leaf
-						vmin /= vrange0;					//  (reduce voxel to 1 unit size, for better rendering)
-						vmin *= vres0; 
-						vmin += g;						
-						setupVerts ( gv, g, r1, r2 );						
-						enableVerts ( vgToVert, verts, vmin, gv );
-					}
-				}
-			}
-		}
-
-		// Write vertices
-		long vbase = numverts;			// remember first vertex in this leaf 
-		fprintf ( fp, "#---- leaf: %d %lld\n", ln, vbase );
-		for (int v=0; v < verts.size(); v++ ) {			
-			fprintf(fp, "v %d %d %d\n", (int) verts[v].x, (int) verts[v].y, (int) verts[v].z );
-			numverts++;
-		}
-
-		// Write out faces from each voxel in leaf
-		int goff = 0;
-		for (g.z=0; g.z < res0; g.z++)  {
-			for (g.y=0; g.y < res0; g.y++) {
-				for (g.x = 0; g.x < res0; g.x++) {
-					goff = (g.z*res0 + g.y)*res0 + g.x;
-					vpix[0] = *(vdat + goff);					
-					if ( vpix[0] > 0 ) {
-						vpix[1] = (g.x==res0-1) ?	0 : *(vdat + goff + 1);			// x+;
-						vpix[2] = (g.x==0) ?		0 : *(vdat + goff - 1);			// x-;
-						vpix[3] = (g.y==res0-1) ?	0 : *(vdat + goff + res0);		// y+;
-						vpix[4] = (g.y==0) ?		0 : *(vdat + goff - res0);		// y-;
-						vpix[5] = (g.z==res0-1) ?	0 : *(vdat + goff + res0*res0);	// z+;
-						vpix[6] = (g.z==0) ?		0 : *(vdat + goff - res0*res0);	// z-;
-						setupVerts ( gv, g, r1, r2 );
-						writeCube ( fp, vpix, numfaces, gv, vgToVert, vbase );
-						numvox++;					
-					}
-				}
-			}
-		}
-	}
-	
-	fprintf(fp,     "# %ld voxels.\n", numvox ); 		
-	fprintf(fp,     "# %ld vertices.\n", numverts); 		
-	fprintf(fp,     "# %ld faces.\n", numfaces); 				
-	
-	verbosef( "Write OBJ complete: %s\n", fname );
-	verbosef( "  %lld voxels.\n", numvox ); 		
-	verbosef( "  %lld vertices.\n", numverts); 	
-	verbosef( "  %lld faces.\n", numfaces); 	
-
-	fclose(fp);	
-
-	// free temporary memory
-	free ( vdat );
-	free ( vgToVert );*/
+	//NOT IMPLEMENTED
+	//TODO - IMPLEMENT OR RAISE EXCEPTION
 }
 
 // Validate OpenGL
@@ -3530,17 +3201,8 @@ void VolumeGVDB::StartRasterGL ()
 {
 	#ifdef BUILD_OPENGL
 		ValidateOpenGL ();
-
-		char vertfile[1024], fragfile[1024], geomfile[1024];
-
-		strcpy(vertfile, CUDA_GVDB_MODULE_PATH "/simple.vert.glsl");
-		strcpy(fragfile, CUDA_GVDB_MODULE_PATH "/simple.frag.glsl");
-		makeSimpleShaderGL(mScene, vertfile, fragfile);
-
-		strcpy(vertfile, CUDA_GVDB_MODULE_PATH "/voxelize.vert.glsl");
-		strcpy(fragfile, CUDA_GVDB_MODULE_PATH "/voxelize.frag.glsl");
-		strcpy(geomfile, CUDA_GVDB_MODULE_PATH "/voxelize.geom.glsl");
-		makeVoxelizeShader(mScene, vertfile, fragfile, geomfile);
+		makeSimpleShaderGL (mScene, "simple.vert.glsl", "simple.frag.glsl");
+		makeVoxelizeShader  ( mScene, "voxelize.vert.glsl", "voxelize.frag.glsl", "voxelize.geom.glsl" );
 	#endif
 }
 
@@ -3622,7 +3284,6 @@ void VolumeGVDB::AuxGeometryMap ( Model* model, int vertaux, int elemaux )
     cudaCheck(cuGraphicsGLRegisterBuffer( &vaux->grsc, model->vertBufferID, CU_GRAPHICS_MAP_RESOURCE_FLAGS_READ_ONLY), "VolumeGVDB", "AuxGeometryMap", "cuGraphicsGLRegisterBuffer", "vaux", mbDebug);
     cudaCheck(cuGraphicsMapResources(1, &vaux->grsc, 0), "VolumeGVDB", "AuxGeometryMap", "cuGraphicsMapResources", "vaux", mbDebug );
     cudaCheck(cuGraphicsResourceGetMappedPointer ( &vaux->gpu, &vsize, vaux->grsc ), "VolumeGVDB", "AuxGeometryMap", "cuGraphicsResourceGetMappedPointer ", "vaux", mbDebug );
-    //cudaCheck(cuGraphicsUnmapResources(1, &vaux->grsc, 0), "cudaGraphicsUnmapRsrc (AuxGeom)");
 	vaux->lastEle = model->vertCount;
 	vaux->usedNum = model->vertCount;
 	vaux->stride = model->vertStride;
@@ -3631,7 +3292,6 @@ void VolumeGVDB::AuxGeometryMap ( Model* model, int vertaux, int elemaux )
     cudaCheck(cuGraphicsGLRegisterBuffer( &eaux->grsc, model->elemBufferID, CU_GRAPHICS_MAP_RESOURCE_FLAGS_READ_ONLY), "VolumeGVDB", "AuxGeometryMap", "cuGraphicsGLRegisterBuffer", "eaux", mbDebug);
     cudaCheck(cuGraphicsMapResources(1, &eaux->grsc, 0), "VolumeGVDB", "AuxGeometryMap", "cuGraphicsMapResources", "eaux", mbDebug );
     cudaCheck(cuGraphicsResourceGetMappedPointer ( &eaux->gpu, &esize, eaux->grsc ), "VolumeGVDB", "AuxGeometryMap", "cuGraphicsResourceGetMappedPointer", "eaux", mbDebug);
-    //cudaCheck(cuGraphicsUnmapResources(1, &eaux->grsc, 0), "cudaGraphicsUnmapRsrc (AuxGeom)");
 	eaux->lastEle = model->elemCount;
 	eaux->usedNum = model->elemCount;
 	eaux->stride = model->elemStride;
@@ -3846,8 +3506,8 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	// Identify model bounding box
 	model->ComputeBounds ( *xform, 0.1 );
 	mObjMin = model->objMin; mObjMax = model->objMax;
-	mVoxMin = mObjMin;	
-	mVoxMax = mObjMax; 
+	mVoxMin = mObjMin;
+	mVoxMax = mObjMax;
 	mVoxRes = mVoxMax; mVoxRes -= mVoxMin;
 
 	// VDB Hierarchical Rasterization	
@@ -3931,7 +3591,6 @@ Vector3DI VolumeGVDB::InsertTriangles ( Model* model, Matrix4F* xform, float& yd
 
 	// Prepare output triangle buffer
 	PrepareAux ( AUX_TRI_BUF, tri_cnt, sizeof(Vector3DF)*3, false, false );
-	// verbosef ( "ybins: %d, tri_cnt: %d\n", ybins, tri_cnt );
 
 	// Deep copy sorted tris into output buffer
 	block.Set ( 512, 1, 1 );
@@ -3969,8 +3628,8 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 	// Configure model
 	model->ComputeBounds ( *xform, 0.1 );
 	mObjMin = model->objMin; mObjMax = model->objMax;
-	mVoxMin = mObjMin;	
-	mVoxMax = mObjMax;  
+	mVoxMin = mObjMin;
+	mVoxMax = mObjMax;
 	mVoxRes = mVoxMax; mVoxRes -= mVoxMin;
 	
 	// Determine which leaf voxels to activate
@@ -4038,7 +3697,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 									vmin0.y = vmin1.y + y0 * vrange1.y / res1;
 									vmin0.z = vmin1.z + z0 * vrange1.z / res1;									
 									leaf = ActivateSpace ( mRoot, vmin0, bnew );
-									if ( leaf != ID_UNDEFL ) {										
+									if ( leaf != ID_UNDEFL ) {
 										leaf_pos.push_back ( vmin0 );
 										leaf_ptr.push_back ( leaf );
 									}
@@ -4057,7 +3716,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 									vmin0.y = vmin1.y + y0 * vrange1.y / res1;
 									vmin0.z = vmin1.z + z0 * vrange1.z / res1;									
 									leaf = ActivateSpace ( mRoot, vmin0, bnew );
-									if ( leaf != ID_UNDEFL ) {									
+									if ( leaf != ID_UNDEFL ) {
 										leaf_pos.push_back ( vmin0 );
 										leaf_ptr.push_back ( leaf );
 									}
@@ -4123,8 +3782,6 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 	glFinish ();
 
 	cudaCheck ( cuCtxSynchronize(), "VolumeGVDB", "SurfaceVoxelizeGL", "cuCtxSynchronize", "", mbDebug );
-
-	//UpdateApron ();
 
 	free ( vdat ); 	
 
@@ -4410,7 +4067,6 @@ void VolumeGVDB::WriteDepthTexGL(int chan, int glid)
 
 	// Copy contents of depth target into _depthBuffer for use in CUDA rendering:
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, mRenderBuf[chan].glid);
-	//glReadPixels(0, 0, mRenderBuf[chan].stride, mRenderBuf[chan].max / mRenderBuf[chan].stride, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0);
 	glReadPixels(0, 0, mRenderBuf[chan].stride, mRenderBuf[chan].max / mRenderBuf[chan].stride, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 	glCheck();
@@ -4800,12 +4456,11 @@ void VolumeGVDB::UpdateApron ( uchar chan, float boundval, bool changeCtx)
 
 	if (bricks == 0) return;
 
-	if ( bricks > 65535 ) bricks = 65535;
-
-	Vector3DI threadcnt(brickres, brickres, bricks);		// brickres ^ 2
-	Vector3DI block(8, 8, 6 * mApron);
-	Vector3DI grid(int(threadcnt.x / block.x) + 1, int(threadcnt.y / block.y) + 1, threadcnt.z );
+	Vector3DI threadcnt(bricks, brickres, brickres);		// First component is passed directly to grid
+	Vector3DI block(6 * mApron, 8, 8);
+	Vector3DI grid(threadcnt.x, (threadcnt.y + block.y - 1) / block.y, (threadcnt.y + block.z - 1) / block.z);
 	
+	// Note: Kernels currently assume apron size of 1.
 	void* args[6] = { &cuVDBInfo, &chan, &bricks, &brickres, &brickwid, &boundval };
 	cudaCheck(cuLaunchKernel(cuFunc[kern], grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL), 
 				"VolumeGVDB", "UpdateApron", "cuLaunch", typ, mbDebug);
@@ -4829,10 +4484,6 @@ void VolumeGVDB::UpdateApronFaces (uchar chan)
 	int kern;
 	switch (mPool->getAtlas(chan).type) {
 	case T_FLOAT:	kern = FUNC_UPDATEAPRONFACES_F;		break;
-	/*case T_FLOAT3:  kern = FUNC_UPDATEAPRONFACES_F4;		break;		// F3 is implemented as F4 
-	case T_FLOAT4:  kern = FUNC_UPDATEAPRONFACES_F4;		break;
-	case T_UCHAR:	kern = FUNC_UPDATEAPRONFACES_C;		break;
-	case T_UCHAR4:	kern = FUNC_UPDATEAPRONFACES_C4;		break;*/
 	}
 
 	PUSH_CTX
@@ -4842,9 +4493,9 @@ void VolumeGVDB::UpdateApronFaces (uchar chan)
 	int brickres = mPool->getAtlasBrickres(chan);			// dimension of brick (including apron)
 	int brickwid = mPool->getAtlasBrickwid(chan);			// dimension of brick (without apron)
 
-	Vector3DI threadcnt(brickwid, brickwid, bricks);		// brickwid ^ 2
-	Vector3DI block(8, 8, 3 * mApron);
-	Vector3DI grid(int(threadcnt.x / block.x) + 1, int(threadcnt.y / block.y) + 1, threadcnt.z);
+	Vector3DI threadcnt(bricks, brickwid, brickwid);		// First component is passed directly to grid
+	Vector3DI block(3 * mApron, 8, 8);
+	Vector3DI grid(threadcnt.x, (threadcnt.y + block.y - 1) / block.y, (threadcnt.z + block.z - 1) / block.z);
 
 	DataPtr* ntable = mPool->getNeighborTable();			// get neighbor table
 
@@ -5314,17 +4965,13 @@ void VolumeGVDB::PrepareAux ( int id, int cnt, int stride, bool bZero, bool bCPU
 {
 	PUSH_CTX
 	if ( mAux[id].lastEle < cnt || mAux[id].stride != stride ) {
-		//std::cout << "prepare aux " << id << "\n";
 		mPool->CreateMemLinear ( mAux[id], 0x0, stride, cnt, bCPU );
-		//std::cout << "prepare aux - done\n";
 	}
 	if ( bZero ) {
 		cudaCheck ( cuMemsetD8 ( mAux[id].gpu, 0, mAux[id].size ), "VolumeGVDB", "PrepareAux", "cuMemsetD8", "", mbDebug);
 	}
 	POP_CTX
 }
-
-//#define SUBCELL_SIZE 8	// 8 * 8 * 8 = 512
 
 
 
@@ -5360,30 +5007,9 @@ void VolumeGVDB::InsertPointsSubcell( int subcell_size, int num_pnts, float pRad
 	cudaCheck(cuLaunchKernel(cuFunc[FUNC_SET_FLAG_SUBCELL], pblks, 1, 1, threads, 1, 1, 0, NULL, argsSetFlag, NULL),
 					"VolumeGVDB", "InsertPointsSubcell", "cuLaunch", "FUNC_SET_FLAG_SUBCELL", mbDebug);
 
-//	RetrieveData(mAux[AUX_SUBCELL_FLAG]);
-//	int* tmp2 = (int*) mAux[AUX_SUBCELL_FLAG].cpu;
-//	for (int i = 0; i < mPool->getPoolTotalCnt(0, 0); i++)
-//		std::cout << tmp2[i] << " ";
-//	std::cout << std::endl;
 
 	PrefixSum ( mAux[AUX_SUBCELL_FLAG].gpu, mAux[AUX_SUBCELL_MAPPING].gpu, numSCellMapping);
 
-//	RetrieveData(mAux[AUX_SUBCELL_MAPPING]);
-//	int* tmp = (int*) mAux[AUX_SUBCELL_MAPPING].cpu;
-//
-//	int idx = 0;
-//	for (int i = 0; i < mPool->getPoolTotalCnt(0, 0); i++)
-//	{
-//		Node* node = getNode(0, 0, i);
-//		if (node->mFlags)
-//			tmp[i] = idx++;
-//		else 
-//			tmp[i] = -1;
-//		std::cout << tmp[i] << " ";
-//	}
-//	std::cout << std::endl;
-//
-//	CommitData(mAux[AUX_SUBCELL_MAPPING]);
 
 	//////////////////////////////////////////////////////////////////////////
 	PERF_PUSH("SC counting");
@@ -5499,30 +5125,7 @@ void VolumeGVDB::InsertPointsSubcell_FP16(int subcell_size, int num_pnts, float 
 	cudaCheck(cuLaunchKernel(cuFunc[FUNC_SET_FLAG_SUBCELL], pblks, 1, 1, threads, 1, 1, 0, NULL, argsSetFlag, NULL), 
 					"VolumeGVDB", "InsertPointsSubcell_FP16", "cuLaunch", "FUNC_SET_FLAG_SUBCELL", mbDebug);		
 
-	//RetrieveData(mAux[AUX_SUBCELL_FLAG]);
-	//int* tmp2 = (int*) mAux[AUX_SUBCELL_FLAG].cpu;
-	//for (int i = 0; i < mPool->getPoolTotalCnt(0, 0); i++)
-	//	std::cout << tmp2[i] << " ";
-	//std::cout << std::endl;
-
 	PrefixSum(mAux[AUX_SUBCELL_FLAG].gpu, mAux[AUX_SUBCELL_MAPPING].gpu, numSCellMapping);
-
-	//	RetrieveData(mAux[AUX_SUBCELL_MAPPING]);
-	//	int* tmp = (int*) mAux[AUX_SUBCELL_MAPPING].cpu;
-	//
-	//	int idx = 0;
-	//	for (int i = 0; i < mPool->getPoolTotalCnt(0, 0); i++)
-	//	{
-	//		Node* node = getNode(0, 0, i);
-	//		if (node->mFlags)
-	//			tmp[i] = idx++;
-	//		else 
-	//			tmp[i] = -1;
-	//		std::cout << tmp[i] << " ";
-	//	}
-	//	std::cout << std::endl;
-	//
-	//	CommitData(mAux[AUX_SUBCELL_MAPPING]);
 
 	//////////////////////////////////////////////////////////////////////////
 	PERF_PUSH("SC counting");
@@ -5538,24 +5141,6 @@ void VolumeGVDB::InsertPointsSubcell_FP16(int subcell_size, int num_pnts, float 
 
 	PERF_POP();
 
-#if 0
-	int* sc_cnt = (int*)malloc(numSCell * sizeof(int));
-	cudaCheck(cuMemcpyDtoH(sc_cnt, mAux[AUX_SUBCELL_CNT].gpu, numSCell * sizeof(int)), "Memcpy sc_cnt", "InsertPointsSubcell");
-	int maxSCCnt = 0;
-	int minSCCnt = 1000000;
-	int totalCnt = 0;
-	for (int i = 0; i < numSCell; i++)
-	{
-		if (sc_cnt[i] > maxSCCnt)  maxSCCnt = sc_cnt[i];
-		if (sc_cnt[i] < minSCCnt)  minSCCnt = sc_cnt[i];
-		totalCnt += sc_cnt[i];
-	}
-	//std::cout << "Num of SC " << numSCell << std::endl;
-	std::cout << "Max pnt cnt in SC " << maxSCCnt << std::endl;
-	//std::cout << "Min pnt cnt in SC " << minSCCnt << std::endl;
-	//std::cout << "Avg pnt cnt in SC " << totalCnt / float (numSCell) << std::endl;
-	delete sc_cnt;
-#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// prefixsum
@@ -5721,12 +5306,6 @@ void VolumeGVDB::InsertSupportPoints ( int num_pnts, float offset, Vector3DF tra
 
 	POP_CTX
 
-	/*---- debugging
-	mPool->RetrieveMem ( mNCnt );
-	mPool->RetrieveMem ( mNOff );
-	for (int n=0; n < bricks; n++ ) {
-		gprintf ( " %d: %u %u\n", n, ((uint*) mNCnt.cpu)[n], ((uint*) mNOff.cpu)[n] );
-	}*/
 }
 
 
@@ -5856,12 +5435,21 @@ void VolumeGVDB::GetBoundingBox(int num_pnts, Vector3DF pTrans)
 	PERF_PUSH("Reduce");
 	PrepareAux(AUX_BOUNDING_BOX, 6, sizeof(float), false, true);
 
-	cudppReduce(mPlan_min, (void*)mAux[AUX_BOUNDING_BOX].gpu, (void*)mAux[AUX_WORLD_POS_X].gpu, num_pnts);
-	cudppReduce(mPlan_min, (void*)(mAux[AUX_BOUNDING_BOX].gpu + sizeof(float)), (void*)mAux[AUX_WORLD_POS_Y].gpu, num_pnts);
-	cudppReduce(mPlan_min, (void*)(mAux[AUX_BOUNDING_BOX].gpu + 2 * sizeof(float)), (void*)mAux[AUX_WORLD_POS_Z].gpu, num_pnts);
-	cudppReduce(mPlan_max, (void*)(mAux[AUX_BOUNDING_BOX].gpu + 3 * sizeof(float)), (void*)mAux[AUX_WORLD_POS_X].gpu, num_pnts);
-	cudppReduce(mPlan_max, (void*)(mAux[AUX_BOUNDING_BOX].gpu + 4 * sizeof(float)), (void*)mAux[AUX_WORLD_POS_Y].gpu, num_pnts);
-	cudppReduce(mPlan_max, (void*)(mAux[AUX_BOUNDING_BOX].gpu + 5 * sizeof(float)), (void*)mAux[AUX_WORLD_POS_Z].gpu, num_pnts);
+	const int axes[] = {
+		AUX_WORLD_POS_X,
+		AUX_WORLD_POS_Y,
+		AUX_WORLD_POS_Z
+	};
+
+	for (uint32_t i = 0; i < 6; ++i) {
+		if (i < 3) {
+			gvdbDeviceMinElementF((mAux[AUX_BOUNDING_BOX].gpu + i * sizeof(float)),mAux[axes[i%3]].gpu,num_pnts);
+		}
+		else {
+			gvdbDeviceMaxElementF((mAux[AUX_BOUNDING_BOX].gpu + i * sizeof(float)), mAux[axes[i % 3]].gpu, num_pnts);
+		}
+	}
+
 	PERF_POP();
 
 	RetrieveData(mAux[AUX_BOUNDING_BOX]);
@@ -5912,12 +5500,21 @@ void VolumeGVDB::GetMinMaxVel(int num_pnts)
 	PERF_PUSH("Reduce");
 	PrepareAux(AUX_VEL_BOUNDING_BOX, 6, sizeof(float), false, true);
 
-	cudppReduce(mPlan_min, (void*)mAux[AUX_VEL_BOUNDING_BOX].gpu, (void*)mAux[AUX_WORLD_VEL_X].gpu, num_pnts);
-	cudppReduce(mPlan_min, (void*)(mAux[AUX_VEL_BOUNDING_BOX].gpu + sizeof(float)), (void*)mAux[AUX_WORLD_VEL_Y].gpu, num_pnts);
-	cudppReduce(mPlan_min, (void*)(mAux[AUX_VEL_BOUNDING_BOX].gpu + 2 * sizeof(float)), (void*)mAux[AUX_WORLD_VEL_Z].gpu, num_pnts);
-	cudppReduce(mPlan_max, (void*)(mAux[AUX_VEL_BOUNDING_BOX].gpu + 3 * sizeof(float)), (void*)mAux[AUX_WORLD_VEL_X].gpu, num_pnts);
-	cudppReduce(mPlan_max, (void*)(mAux[AUX_VEL_BOUNDING_BOX].gpu + 4 * sizeof(float)), (void*)mAux[AUX_WORLD_VEL_Y].gpu, num_pnts);
-	cudppReduce(mPlan_max, (void*)(mAux[AUX_VEL_BOUNDING_BOX].gpu + 5 * sizeof(float)), (void*)mAux[AUX_WORLD_VEL_Z].gpu, num_pnts);
+	const int axes[] = {
+		AUX_WORLD_VEL_X,
+		AUX_WORLD_VEL_Y,
+		AUX_WORLD_VEL_Z
+	};
+
+	for (uint32_t i = 0; i < 6; ++i) {
+		if (i < 3) {
+			gvdbDeviceMinElementF((mAux[AUX_VEL_BOUNDING_BOX].gpu + i * sizeof(float)), mAux[axes[i % 3]].gpu, num_pnts);
+		}
+		else {
+			gvdbDeviceMaxElementF((mAux[AUX_VEL_BOUNDING_BOX].gpu + i * sizeof(float)), mAux[axes[i % 3]].gpu, num_pnts);
+		}
+	}
+
 	PERF_POP();
 
 	RetrieveData(mAux[AUX_VEL_BOUNDING_BOX]);
@@ -5928,9 +5525,6 @@ void VolumeGVDB::GetMinMaxVel(int num_pnts)
 	mVelMax.x = dat[3]; mVelMax.y = dat[4]; mVelMax.z = dat[5];
 
 	mVelRange = mVelMax - mVelMin;
-
-	//std::cout << mVelMin.x << " " << mVelMin.y << " " << mVelMin.z << std::endl;
-	//std::cout << mVelMax.x << " " << mVelMax.y << " " << mVelMax.z << std::endl;
 
 	PERF_POP();
 
@@ -5946,8 +5540,7 @@ void VolumeGVDB::ReadGridVel(int N)
 {
 	PUSH_CTX
 
-		int cellNum = N * N * (N);
-	//int cellNum = N * N * (N );
+	int cellNum = N * N * N;
 	PrepareAux(AUX_TEST, cellNum, sizeof(float), true, true);		// cell_vel
 	PrepareAux(AUX_TEST_1, cellNum, sizeof(int) * 3, true, true);	// cell_pos
 
@@ -5982,7 +5575,6 @@ void VolumeGVDB::ReadGridVel(int N)
 		for (int j = 0; j < N; j++) {
 			myfile << "C " << i << " " << j << " : ";
 			for (int k = 0; k < N; k++) {
-				//std::cout << cell_pos[index].x << " " << cell_pos[index].y << " " << cell_pos[index].z << " " << cell_vel[index]  << "| ";
 				myfile << cell_vel[index] << " ";
 				index++;
 			}
@@ -6056,8 +5648,8 @@ void VolumeGVDB::ScatterDensity ( int num_pnts, float radius, float amp, Vector3
 		PrepareAux(AUX_COLAVG, 4 * num_voxels, sizeof(uint), true);					// node which each point falls into
 		if (mbProfile) PERF_POP();
     }
-
-	void *args[14] = {&cuVDBInfo, &num_pnts, &radius, &amp, &mAux[AUX_PNTPOS].gpu, &mAux[AUX_PNTPOS].subdim.x, &mAux[AUX_PNTPOS].stride, &mAux[AUX_PNTCLR].gpu, &mAux[AUX_PNTCLR].subdim.x, &mAux[AUX_PNTCLR].stride, &mAux[AUX_PNODE].gpu, &trans.x, &expand, &mAux[AUX_COLAVG].gpu};
+	
+	void* args[13] = { &num_pnts, &radius, &amp, &mAux[AUX_PNTPOS].gpu, &mAux[AUX_PNTPOS].subdim.x, &mAux[AUX_PNTPOS].stride, &mAux[AUX_PNTCLR].gpu, &mAux[AUX_PNTCLR].subdim.x, &mAux[AUX_PNTCLR].stride, &mAux[AUX_PNODE].gpu, &trans.x, &expand, &mAux[AUX_COLAVG].gpu };
 	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_SCATTER_DENSITY], pblks, 1, 1, threads, 1, 1, 0, NULL, args, NULL ), 
 				"VolumeGVDB", "ScatterPointDensity", "cuLaunch", "FUNC_SCATTER_DENSITY", mbDebug);		
 
@@ -6134,26 +5726,13 @@ void VolumeGVDB::PrintPool(uchar grp, uchar lev)
 		char* pool = p->cpu;
 		nvdb::Node* nd = (nvdb::Node*) (pool + p->stride * i);
 		std::cout << "   Node " << i << ":\n";
-		//std::cout << "      mlev : " << (int)nd->mLev << std::endl;
-		//std::cout << "      mPos : " << nd->mPos.x << " " << nd->mPos.y << " " << nd->mPos.z << std::endl;
+		
 #ifdef USE_BITMASKS	
 		if ((int)lev > 0) {
 			std::cout << "      mMask: " << nd->countOn() << std::endl;
 			uint64* w1 = (uint64*) &nd->mMask;
 			uint64* we = (uint64*) &nd->mMask + nd->getMaskWords();
-			//int count = 0;
-			//for ( ; w1 != we ; ) 
-			//{	uint64 tmp = *w1++;
-			//	for (int n = 0; n < 64; n++)
-			//	{
-			//		//if (tmp & 0x1) std::cout << "1";
-			//		//else std::cout << "0";
-			//		if (tmp & 0x1) std::cout << count << std::endl;
-			//		count++;
-			//		tmp >>= 1;
-			//	}		
-			//	//std::cout << std::endl;
-			//}
+			
 		}
 		std::cout << "   Parent ID:" << nd->mParent << std::endl;
 		std::cout << "   Childlist address:" << (int)nd->mChildList << std::endl;
@@ -6221,7 +5800,9 @@ void VolumeGVDB::SetTransform(Vector3DF pretrans, Vector3DF scal, Vector3DF angs
 int	VolumeGVDB::getNumUsedNodes ( int lev )			{ return mPool->getPoolUsedCnt(0, lev); }
 int	VolumeGVDB::getNumTotalNodes ( int lev )		{ return mPool->getPoolTotalCnt(0, lev); }
 Node* VolumeGVDB::getNodeAtLevel ( int n, int lev )	{ return (Node*) (mPool->PoolData( 0, lev, n )); }
-Vector3DF VolumeGVDB::getWorldMin ( Node* node )	{ return Vector3DF(node->mPos) ; }
+
+//--- must be updated to use mXform
+Vector3DF VolumeGVDB::getWorldMin ( Node* node )	{ return Vector3DF(node->mPos); }
 Vector3DF VolumeGVDB::getWorldMax ( Node* node )	{ return Vector3DF(node->mPos) + getCover(node->mLev); }
 
 Vector3DF VolumeGVDB::getWorldMin() {

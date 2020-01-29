@@ -54,10 +54,17 @@ void OptixScene::InitializeOptix ( int w, int h )
 {
 	// Create OptiX context
 	nvprintf ( "Creating OptiX context.\n" );
-	m_OptixContext = Context::create();
-	int devlist[2];
-	devlist[0] = 0;		// assign context to optix
-	rtContextSetDevices(m_OptixContext->get(), 1, devlist);
+	m_OptixContext = optix::Context::create();
+
+	// Get the device that is being used for OpenGL
+	// For multi-GPU systems (e.g. SLI systems), this may not be device 0!
+	unsigned int cudaGLDeviceCount = 0;
+	int cudaGLDevices[1];
+	cuGLGetDevices(&cudaGLDeviceCount, cudaGLDevices, 1, CU_GL_DEVICE_LIST_NEXT_FRAME);
+	// cudaGLDeviceCount should now be greater than 0.
+
+	// Assign context to optix
+	rtContextSetDevices(m_OptixContext->get(), 1, cudaGLDevices);
 	m_OptixContext->setEntryPointCount ( 1 );
 	m_OptixContext->setRayTypeCount( 2 );
 	m_OptixContext->setStackSize( 1024 );
@@ -69,7 +76,7 @@ void OptixScene::InitializeOptix ( int w, int h )
 	m_OptixContext["scene_epsilon"]->setFloat( 1.0e-6f );	
 
 	// Create Output buffer	
-	Variable outbuf = m_OptixContext["output_buffer"];
+	optix::Variable outbuf = m_OptixContext["output_buffer"];
 	m_OptixBuffer = CreateOutputOptix( RT_FORMAT_FLOAT3, w, h );
 	outbuf->set ( m_OptixBuffer );
 
@@ -134,7 +141,7 @@ void OptixScene::ResizeOutput ( int w, int h )
 	// Recreate output buffer
 	m_OptixBuffer->destroy();
 	nvprintf ( "OptiX buffer size: %d, %d\n", w, h );
-	Variable outbuf = m_OptixContext["output_buffer"];
+	optix::Variable outbuf = m_OptixContext["output_buffer"];
 	m_OptixBuffer = CreateOutputOptix( RT_FORMAT_FLOAT3, w, h );
 	outbuf->set ( m_OptixBuffer );
 }
@@ -142,10 +149,10 @@ void OptixScene::ResizeOutput ( int w, int h )
 
 // CreateOutputOptiX
 // Creates an optix output buffer from an opengl buffer
-Buffer OptixScene::CreateOutputOptix ( RTformat format, unsigned int width, unsigned int height )
+optix::Buffer OptixScene::CreateOutputOptix ( RTformat format, unsigned int width, unsigned int height )
 {
 	// Create OpenGL buffer 
-	Buffer buffer;
+	optix::Buffer buffer;
 	GLuint vbo = 0;
 	glGenBuffers (1, &vbo );
 	glBindBuffer ( GL_ARRAY_BUFFER, vbo );
@@ -171,9 +178,9 @@ optix::Program OptixScene::CreateProgramOptix ( std::string name, std::string pr
 	nvprintf  ( "  Loading: %s, %s\n", name.c_str(), prog_func.c_str() );
 	try { 
 		program = m_OptixContext->createProgramFromPTXFile ( name, prog_func );
-	} catch (Exception e) {
+	} catch (optix::Exception e) {
 		nvprintf  ( "  OPTIX ERROR: %s \n", m_OptixContext->getErrorString( e.getErrorCode() ).c_str() );
-		nverror ();		
+		nverror ();
 	}
 	return program;
 }
@@ -220,8 +227,8 @@ int OptixScene::AddMaterial ( std::string fname, std::string cast_prog, std::str
 
 	// Load material shaders
 	std::string ptx_file = fname + ".ptx";
-	Program ch_program = CreateProgramOptix ( ptx_file, cast_prog );		
-	Program ah_program = CreateProgramOptix ( ptx_file, shadow_prog );
+	optix::Program ch_program = CreateProgramOptix ( ptx_file, cast_prog );
+	optix::Program ah_program = CreateProgramOptix ( ptx_file, shadow_prog );
 	omat->setClosestHitProgram ( 0, ch_program );
 	omat->setAnyHitProgram ( 1, ah_program );			
 	m_OptixMats.push_back ( omat );	
@@ -270,12 +277,12 @@ OptixModel* OptixScene::AddPolygons ( Model* model, int mat_id, Matrix4F& xform 
 	UpdatePolygons ( om, model, mat_id, xform );
 
 	// Geometry Instance node
-	Material mat;
+	optix::Material mat;
 	mat = m_OptixMats[ mat_id ];
-	GeometryInstance geominst = m_OptixContext->createGeometryInstance ( om->m_geom, &mat, &mat+1 );		// <-- geom is specified as child here
+	optix::GeometryInstance geominst = m_OptixContext->createGeometryInstance ( om->m_geom, &mat, &mat+1 );		// <-- geom is specified as child here
 
 	// Geometry Group node
-	GeometryGroup geomgroup;
+	optix::GeometryGroup geomgroup;
 	geomgroup = m_OptixContext->createGeometryGroup ();		
 	const char* Builder = "Sbvh";
 	const char* Traverser = "Bvh";
@@ -331,6 +338,9 @@ void OptixScene::UpdatePolygons ( OptixModel* om, Model* model, int mat_id, Matr
 	om->m_mibuf = m_OptixContext->createBuffer( RT_BUFFER_INPUT, RT_FORMAT_UNSIGNED_INT, om->m_numtri );
 
 	// Map buffers
+	using optix::float2;
+	using optix::float3;
+	using optix::int3;
 	float3* vbuffer_data = static_cast<float3*>( om->m_vbuf->map() );
 	float3* nbuffer_data = static_cast<float3*>( om->m_nbuf->map() );
 	float2* tbuffer_data = static_cast<float2*>( om->m_tbuf->map() );
@@ -435,11 +445,11 @@ void OptixScene::AddVolume ( int atlas_glid, Vector3DF vmin, Vector3DF vmax, Mat
 
 	// Brick buffer	
 	int num_bricks = 1;
-	Buffer brick_buffer = m_OptixContext->createBuffer( RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, num_bricks*2 );
+	optix::Buffer brick_buffer = m_OptixContext->createBuffer( RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, num_bricks*2 );
 	
-	float3* brick_data = static_cast<float3*>( brick_buffer->map() );		
-	brick_data[0] = * (float3*) &vmin;		// Cast Vector3DF to float3. Assumes both are 3x floats
-	brick_data[1] = * (float3*) &vmax;	
+	optix::float3* brick_data = static_cast<optix::float3*>( brick_buffer->map() );		
+	brick_data[0] = * (optix::float3*) &vmin;		// Cast Vector3DF to float3. Assumes both are 3x floats
+	brick_data[1] = * (optix::float3*) &vmax;
 
 	geom[ "brick_buffer" ]->setBuffer( brick_buffer );
 	
@@ -448,12 +458,12 @@ void OptixScene::AddVolume ( int atlas_glid, Vector3DF vmin, Vector3DF vmax, Mat
 	geom[ "mat_id"]->setUint( mat_id );	
 
 	// Geometry Instance node
-	Material mat;
+	optix::Material mat;
 	mat = m_OptixMats[ mat_id ];
-	GeometryInstance geominst = m_OptixContext->createGeometryInstance ( geom, &mat, &mat+1 );		// <-- geom is specified as child here
+	optix::GeometryInstance geominst = m_OptixContext->createGeometryInstance ( geom, &mat, &mat+1 );		// <-- geom is specified as child here
 
 	// Geometry Group node
-	GeometryGroup geomgroup;
+	optix::GeometryGroup geomgroup;
 	geomgroup = m_OptixContext->createGeometryGroup ();		
 
 	const char* Builder = "NoAccel";		// or "Trbvh"
@@ -472,7 +482,7 @@ void OptixScene::AddVolume ( int atlas_glid, Vector3DF vmin, Vector3DF vmax, Mat
 	geomgroup->setChild( 0, geominst );
 
 	// Transform node
-	Transform tform = m_OptixContext->createTransform ();
+	optix::Transform tform = m_OptixContext->createTransform ();
 	tform->setMatrix ( true, xform.GetDataF(), 0x0 );	
 	tform->setChild ( geomgroup );
 	
@@ -494,14 +504,14 @@ void OptixScene::ValidateGraph ()
 {
 	try {
 		m_OptixContext->validate ();
-	} catch (const Exception& e) {		
+	} catch (const optix::Exception& e) {
 		std::string msg = m_OptixContext->getErrorString ( e.getErrorCode() );		
 		nvprintf  ( "OPTIX ERROR:\n%s\n", msg.c_str() );
 		nverror ();		
 	}
 	try {
 		m_OptixContext->compile ();
-	} catch (const Exception& e) {		
+	} catch (const optix::Exception& e) {
 		std::string msg = m_OptixContext->getErrorString ( e.getErrorCode() );		
 		nvprintf  ( "OPTIX ERROR:\n%s\n", msg.c_str() );
 		nverror ();		
@@ -549,8 +559,8 @@ void OptixScene::SetTransferFunc ( Vector4DF* src )
 {
 	m_OptixTransferFunc = m_OptixContext->createBuffer( RT_BUFFER_INPUT, RT_FORMAT_FLOAT4, 16384 );
 	
-	float4* buf_data = static_cast<float4*>( m_OptixTransferFunc->map() );
-	memcpy ( buf_data, src, 16384*sizeof(float4) );
+	optix::float4* buf_data = static_cast<optix::float4*>( m_OptixTransferFunc->map() );
+	memcpy ( buf_data, src, 16384*sizeof(optix::float4) );
 	m_OptixTransferFunc->unmap();	
 		
 	m_OptixContext[ "scn_transfer_func" ]->set( m_OptixTransferFunc );
@@ -569,7 +579,7 @@ void OptixScene::CreateEnvmap (char* fpath)
 	if ( m_OptixEnvmap != 0 ) m_OptixEnvmap->destroy();
 	m_OptixEnvmap = m_OptixContext->createTextureSampler();
 	m_OptixEnvmap->setWrapMode(0, RT_WRAP_REPEAT);
-	m_OptixEnvmap->setWrapMode(1, RT_WRAP_REPEAT);
+	m_OptixEnvmap->setWrapMode(1, RT_WRAP_CLAMP_TO_EDGE); // To handle wrapping at the poles
 	m_OptixEnvmap->setWrapMode(2, RT_WRAP_REPEAT);
 	m_OptixEnvmap->setIndexingMode(RT_TEXTURE_INDEX_NORMALIZED_COORDINATES);
 	m_OptixEnvmap->setMaxAnisotropy(1.0f);
@@ -652,7 +662,7 @@ void OptixScene::Render ( VolumeGVDB* gvdb, char shading, char chan )
 	
 	try {
 		m_OptixContext->launch ( 0, (int) bw, (int) bh );	
-	} catch (const Exception& e) {		
+	} catch (const optix::Exception& e) {
 		std::string msg = m_OptixContext->getErrorString ( e.getErrorCode() );		
 		nvprintf  ( "OPTIX ERROR:\n%s\n", msg.c_str() );
 		//nverror ();		
@@ -721,11 +731,3 @@ void OptixScene::ReadOutputTex ( int out_tex )
 	glBindBuffer( GL_PIXEL_UNPACK_BUFFER, 0 );	
 	glBindTexture( GL_TEXTURE_2D, 0);
 }
-
-// int msz = sizeof(PMaterial);
-// PMaterial* mdat = gView.getMaterial();
-// m_OptixContext[ "mat" ]->setUserData ( msz, mdat );
-// g_OptixContext[ "gvdb" ]->setUserData ( vdb_sz, vdb_dat );
-
-
-

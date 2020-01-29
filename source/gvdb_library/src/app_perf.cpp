@@ -103,16 +103,6 @@ bool				g_perfConsOut = true;
 std::string			g_perfFName = "";			// File name for CPU output. Set with PERF_SET
 FILE*				g_perfFile = 0x0;			// File handle for output
 
-/*void PERF_PRINTF ( char* format, ... )
-{
-	if ( g_perfCons == 0x0 ) return;
-	va_list argptr;
-	va_start (argptr, format);				
-	vfprintf ( g_perfCons, format, argptr);			
-	va_end (argptr);			
-	fflush ( g_perfCons );
-}*/
-
 void PERF_START ()
 {
 	g_perfStack [ g_perfLevel ] = TimeX::GetSystemNSec ();

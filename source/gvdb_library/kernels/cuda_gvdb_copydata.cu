@@ -30,12 +30,8 @@
 
 #include "cuda_math.cuh"
 
-texture<unsigned char, cudaTextureType3D, cudaReadModeElementType>		volTexInC;
-texture<float, cudaTextureType3D, cudaReadModeElementType>		volTexInF;
-surface<void, cudaTextureType3D>								volTexOut;
-
 // Zero memory of 3D volume
-extern "C" __global__ void kernelFillTex ( int3 res, int dsize )
+extern "C" __global__ void kernelFillTex ( int3 res, int dsize, CUsurfObject volTexOut )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;
@@ -44,25 +40,25 @@ extern "C" __global__ void kernelFillTex ( int3 res, int dsize )
 }
 
 // Copy 3D texture into sub-volume of another 3D texture (char)
-extern "C" __global__ void kernelCopyTexC ( int3 offs, int3 res )
+extern "C" __global__ void kernelCopyTexC ( int3 offs, int3 res, CUtexObject volTexInC, CUsurfObject volTexOut )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;
-	uchar val = tex3D ( volTexInC, t.x, t.y, t.z );
+	uchar val = tex3D<unsigned int>( volTexInC, t.x, t.y, t.z );
 	surf3Dwrite ( val, volTexOut, (t.x+offs.x)*sizeof(char), (t.y+offs.y), (t.z+offs.z) );
 }
 
 // Copy 3D texture into sub-volume of another 3D texture (float)
-extern "C" __global__ void kernelCopyTexF ( int3 offs, int3 res )
+extern "C" __global__ void kernelCopyTexF ( int3 offs, int3 res, CUtexObject volTexInF, CUsurfObject volTexOut )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;	
-	float val = tex3D ( volTexInF, t.x, t.y, t.z );
+	float val = tex3D<float> ( volTexInF, t.x, t.y, t.z );
 	surf3Dwrite ( val, volTexOut, (t.x+offs.x)*sizeof(float), (t.y+offs.y), (t.z+offs.z) );
 }
 
 // Copy linear memory as 3D volume into sub-volume of a 3D texture
-extern "C" __global__ void kernelCopyBufToTexC ( int3 offs, int3 res, uchar* inbuf)
+extern "C" __global__ void kernelCopyBufToTexC ( int3 offs, int3 res, uchar* inbuf, CUsurfObject volTexOut)
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;	
@@ -70,7 +66,7 @@ extern "C" __global__ void kernelCopyBufToTexC ( int3 offs, int3 res, uchar* inb
 	surf3Dwrite ( val, volTexOut, (t.x+offs.x)*sizeof(uchar), (t.y+offs.y), (t.z+offs.z) );
 }
 // Copy linear memory as 3D volume into sub-volume of a 3D texture
-extern "C" __global__ void kernelCopyBufToTexF ( int3 offs, int3 res, float* inbuf)
+extern "C" __global__ void kernelCopyBufToTexF ( int3 offs, int3 res, float* inbuf, CUsurfObject volTexOut)
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;	
@@ -79,45 +75,45 @@ extern "C" __global__ void kernelCopyBufToTexF ( int3 offs, int3 res, float* inb
 }
 
 // Copy 3D texture into sub-volume of another 3D texture with ZYX swizzle (float)
-extern "C" __global__ void kernelCopyTexZYX (  int3 offs, int3 res )
+extern "C" __global__ void kernelCopyTexZYX (  int3 offs, int3 res, CUtexObject volTexInF, CUsurfObject volTexOut )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;
-	float val = tex3D ( volTexInF, t.z, t.y, t.x );
+	float val = tex3D<float>( volTexInF, t.z, t.y, t.x );
 	surf3Dwrite ( val, volTexOut, (t.x+offs.x)*sizeof(float), (t.y+offs.y), (t.z+offs.z) );
 }
 
 // Retrieve 3D texture into linear memory (float)
-extern "C" __global__ void kernelRetrieveTexXYZ ( int3 offs, int3 src_res, int3 res, float* buf )
+extern "C" __global__ void kernelRetrieveTexXYZ ( int3 offs, int3 src_res, int3 res, float* buf, CUtexObject volTexInF )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= src_res.x || t.y >= src_res.y || t.z >= src_res.z ) return;
-	float val = tex3D ( volTexInF, t.x+offs.x, t.y+offs.y, t.z+offs.z );
+	float val = tex3D<float> ( volTexInF, t.x+offs.x, t.y+offs.y, t.z+offs.z );
 	buf[ (t.x*res.y + t.y)*res.x + t.z ] = val;
 }
 
 // Copy 2D slice of 3D texture into 2D linear buffer
-extern "C" __global__ void kernelSliceTexToBufF ( int slice, int3 res, float* outbuf  )
+extern "C" __global__ void kernelSliceTexToBufF ( int slice, int3 res, float* outbuf, CUtexObject volTexInF )
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;	
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 	if ( x >= res.x || y >= res.y ) return;
-	float val = tex3D ( volTexInF, x, y, slice );
+	float val = tex3D<float> ( volTexInF, x, y, slice );
 	outbuf[ y*res.x + x ] = val;
 }
 
-extern "C" __global__ void kernelSliceTexToBufC ( int slice, int3 res, uchar* outbuf  )
+extern "C" __global__ void kernelSliceTexToBufC ( int slice, int3 res, uchar* outbuf, CUtexObject volTexInC  )
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;	
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 	if ( x >= res.x || y >= res.y ) return;
-	uchar val = tex3D ( volTexInC, x, y, slice );
+	uchar val = tex3D<uchar> ( volTexInC, x, y, slice );
 	outbuf[ y*res.x + x ] = val;
 }
 
 
 // Copy 2D linear buffer into the 2D slice of a 3D texture
-extern "C" __global__ void kernelSliceBufToTexF ( int slice, int3 res, float* inbuf  )
+extern "C" __global__ void kernelSliceBufToTexF ( int slice, int3 res, float* inbuf, CUsurfObject volTexOut  )
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;	
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -125,7 +121,7 @@ extern "C" __global__ void kernelSliceBufToTexF ( int slice, int3 res, float* in
 	float val = inbuf[ y*res.x + x ];
 	surf3Dwrite ( val, volTexOut, x*sizeof(float), y, slice );
 }
-extern "C" __global__ void kernelSliceBufToTexC ( int slice, int3 res, uchar* inbuf  )
+extern "C" __global__ void kernelSliceBufToTexC ( int slice, int3 res, uchar* inbuf, CUsurfObject volTexOut )
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;	
 	int y = blockIdx.y * blockDim.y + threadIdx.y;

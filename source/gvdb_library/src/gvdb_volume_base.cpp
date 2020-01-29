@@ -63,9 +63,7 @@ void VolumeBase::CommitGeometry ( Model* m )
 
 		// Update Vertex VBO
 		if ( m->vertBufferID == -1 ) glGenBuffers( 1, (GLuint*) &m->vertBufferID );	
-		//glBindBuffer ( GL_ARRAY_BUFFER, vertBufferID );	
-		//glBufferData ( GL_ARRAY_BUFFER, vertCount * vertStride, vertBuffer, GL_STATIC_DRAW );
-	
+		
 		glNamedBufferDataEXT( m->vertBufferID, m->vertCount * m->vertStride, m->vertBuffer, GL_STATIC_DRAW );
 		glEnableVertexAttribArray ( 0 );
 		glBindVertexBuffer ( 0, m->vertBufferID, 0, m->vertStride );
@@ -77,8 +75,6 @@ void VolumeBase::CommitGeometry ( Model* m )
 	
 		// Update Element VBO
 		if ( m->elemBufferID == -1 ) glGenBuffers( 1, (GLuint*) &m->elemBufferID );
-		//glBindBuffer ( GL_ELEMENT_ARRAY_BUFFER, elemBufferID );
-		//glBufferData( GL_ELEMENT_ARRAY_BUFFER, elemCount * elemStride, elemBuffer, GL_STATIC_DRAW );	
 		glNamedBufferDataEXT( m->elemBufferID, m->elemCount * m->elemStride, m->elemBuffer, GL_STATIC_DRAW );	
 
 		glBindVertexArray ( 0 );

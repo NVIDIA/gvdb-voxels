@@ -189,7 +189,7 @@ inline __device__ int3 getAtlasPos ( VDBInfo* gvdb, uint64 id )
 }
 inline __device__ int getBitPos ( VDBInfo* gvdb, int lev, int3 pos )
 {
-	int res = gvdb->res[ lev ]; 
+	int res = gvdb->res[ lev ];
 	return (pos.z*res + pos.y)*res+ pos.x;
 }
 
@@ -255,7 +255,7 @@ inline __device__ VDBNode* getNodeAtPoint ( VDBInfo* gvdb, float3 pos, float3* o
 	
 	// compute node bounding box
 	*vmin = make_float3(node->mPos);
-	*vdel = gvdb->vdel[ node->mLev ]; 
+	*vdel = gvdb->vdel[ node->mLev ];
 	*offs = make_float3( node->mValue );
 	return node;
 }

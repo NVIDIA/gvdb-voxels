@@ -82,6 +82,7 @@ void handle_gui(int gui, float val)
 	}
 }
 
+
 void Sample::start_guis (int w, int h)
 {
 	clearGuis();
@@ -120,7 +121,7 @@ void Sample::revoxelize()
 	case 2:	m_voxel_size = 0.3;		break;
 	case 3:	m_voxel_size = 0.2;		break;
 	};
-	
+
 	// Create a transform	
 	Matrix4F xform, m;
 	xform.Identity();
@@ -132,7 +133,7 @@ void Sample::revoxelize()
 	xform *= m;									// 4th) Apply part size 
 	m.Scale(1 / m_voxel_size, 1 / m_voxel_size, 1 / m_voxel_size);
 	xform *= m;									// 3rd) Apply voxel size (scale by inverse of this)
-	m.Translate( m_pivot.x, m_pivot.y, m_pivot.z);	// 2nd) Move part so origin is at bottom corner 
+	m.Translate(m_pivot.x, m_pivot.y, m_pivot.z);	// 2nd) Move part so origin is at bottom corner 
 	xform *= m;
 	m.RotateZYX(Vector3DF(0, -10, 0));			// 1st) Rotate part about the geometric center
 	xform *= m;
@@ -149,13 +150,11 @@ void Sample::revoxelize()
 
 	gvdb1.Measure(true);
 
-	#ifdef USE_GVDB2
-		printf("SurfaceVoxelizeGL 2.\n");
-		gvdb2.SetVoxelSize(voxelsize.x, voxelsize.y, voxelsize.z);
-		gvdb2.SurfaceVoxelizeGL(0, m, &xform);
-	#endif
-		
-
+#ifdef USE_GVDB2
+	printf("SurfaceVoxelizeGL 2.\n");
+	gvdb2.SetVoxelSize(voxelsize.x, voxelsize.y, voxelsize.z);
+	gvdb2.SurfaceVoxelizeGL(0, m, &xform);
+#endif
 }
 
 bool Sample::init ()
@@ -196,9 +195,9 @@ bool Sample::init ()
 	// This loads an obj file into scene memory on cpu.
 	printf ( "Loading polygon model.\n" );
 	gvdb1.getScene()->AddModel ( "lucy.obj", 1.0, 0, 0, 0 );
-	gvdb1.CommitGeometry( 0 );				// Send the polygons to GPU as OpenGL VBO
+	gvdb1.CommitGeometry( 0 );		// Send the polygons to GPU as OpenGL VBO
 
-	m_pivot.Set(0.3, 0.45, 0.3);			// this is the center of the polygon model
+	m_pivot.Set(0.3f, 0.45f, 0.3f); // This is the center of the polygon model.
 
 #ifdef USE_GVDB2
 	gvdb2.getScene()->AddModel("lucy.obj", 1.1, 0, 0, 0);
@@ -210,7 +209,7 @@ bool Sample::init ()
 	// An apron of 1 is used for correct smoothing and trilinear surface rendering.
 	printf("Configure.\n");
 	gvdb1.Configure(3, 3, 3, 3, 5);
-	gvdb1.SetChannelDefault(8, 8, 1);
+	gvdb1.SetChannelDefault(16, 16, 1);
 
 #ifdef USE_GVDB2
 	gvdb2.Configure ( 3, 3, 3, 3, 4);
@@ -243,16 +242,16 @@ bool Sample::init ()
 	gvdb2.CommitTransferFunc();
 	gvdb2.getScene()->SetBackgroundClr(0.1f, 0.2f, 0.4f, 1.0f);
 #endif
-
+	
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
 	cam->setFov ( 50.0 );
-	cam->setOrbit ( Vector3DF(-45.f, 30.f, 0.f ), m_pivot*m_part_size, 300.f, 1.0f );	
+	cam->setOrbit ( Vector3DF(-45.f, 30.f, 0.f ), m_pivot * m_part_size, 300.f, 1.0f );	
 	gvdb1.getScene()->SetCamera( cam );		
 
 	// Create Light
 	Light* lgt = new Light;								
-	lgt->setOrbit ( Vector3DF(299.0f, 57.3f, 0.f), m_pivot*m_part_size*Vector3DF(1.3f, 1.8f, 1.1f), 200.f, 1.0f );
+	lgt->setOrbit ( Vector3DF(299.0f, 57.3f, 0.f), m_pivot * m_part_size * Vector3DF(1.3f, 1.8f, 1.1f), 200.f, 1.0f );
 	gvdb1.getScene()->SetLight ( 0, lgt );	
 
 	// Add render buffer 
@@ -283,15 +282,15 @@ void Sample::render_section ()
 	// Render cross-section
 	float h = (float) getHeight();
 	Vector3DF world;
-	world = m_pivot * m_part_size / m_voxel_size;	// gvdb voxel grid to world coordinates
-	world.y *= 1.0 - getCurY() / h;					// select cross section on world y-axis
+	world = m_pivot * m_part_size / m_voxel_size;	// GVDB voxel grid to world coordinates
+	world.y *= 1.0 - getCurY() / h;					// Select cross-section on world y-axis 
 	gvdb1.getScene()->SetCrossSection ( world, Vector3DF(world.x, 1.f, world.z) );
 
 	gvdb1.Render ( SHADE_SECTION2D, 0, 1 );		
 
 	gvdb1.ReadRenderTexGL ( 1, gl_section_tex );
 	
-	renderScreenQuadGL ( gl_section_tex, -1, 0, 0, getWidth()/4, getHeight()/4, 0  );
+	renderScreenQuadGL ( gl_section_tex, -1, 0, 0, getWidth()/4, getHeight()/4, 0 );
 }
 
 void Sample::display()
@@ -354,15 +353,15 @@ void Sample::draw_topology ( VolumeGVDB* gvdb )
 	
 	start3D ( gvdb->getScene()->getCamera() );		// start 3D drawing
 	
-	Vector3DF vs(m_voxel_size, m_voxel_size, m_voxel_size);	// scaling by voxel size 
+	Vector3DF vs(m_voxel_size, m_voxel_size, m_voxel_size); // scaling by voxel size
 	Vector3DF bmin, bmax;
 	Node* node;
 	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
 		int node_cnt = gvdb->getNumNodes(lev);
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb->getNodeAtLevel ( n, lev );
-			bmin = gvdb->getWorldMin ( node ) * vs;		// get node bounding box
-			bmax = gvdb->getWorldMax ( node ) * vs;		// draw node as a box
+			bmin = gvdb->getWorldMin ( node ) * vs; // get node bounding box
+			bmax = gvdb->getWorldMax ( node ) * vs;	// draw node as a box
 			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, clrs[lev].x, clrs[lev].y, clrs[lev].z, 1 );			
 		}		
 	}

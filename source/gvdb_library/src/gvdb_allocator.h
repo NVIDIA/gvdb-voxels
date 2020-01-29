@@ -63,7 +63,9 @@
 		int			glid;				// gpu opengl id
 		CUgraphicsResource	grsc;		// gpu graphics resource (cuda)		
 		CUarray		garray;				// gpu array (cuda)
-		CUdeviceptr	gpu;				// gpu pointer (cuda)		
+		CUdeviceptr	gpu;				// gpu pointer (cuda)	
+		CUtexObject tex_obj;			// gpu texture object
+		CUsurfObject surf_obj;			// gpu surface object
 	};	
 	
 	// Element conversions

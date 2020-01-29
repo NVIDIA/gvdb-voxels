@@ -103,16 +103,9 @@ void Sample::reconfigure ()
 {
 	// Configure new GVDB volume
 	gvdb.Configure ( 3, 3, 3, 3, 5 );	
-	
-	// VoxelSize. Determines the effective resolution of the voxel grid. 
-	//gvdb.SetVoxelSize ( 1.0f, 1.0f, 1.0f ); // voxelsize is now always (1.0,1.0,1.0)
+
 	gvdb.DestroyChannels ();	
 
-	// Atlas memory expansion will be supported in the Fall 2016 release, 
-	// allowing the number of bricks to change dynamically. 
-	// For this GVDB Beta, the last argument to AddChannel specifies the
-	// maximum number of bricks. Keep this as low as possible for performance reasons.
-	// AddChanell ( channel_id, channel_type, apron, max bricks )
 	gvdb.SetChannelDefault ( 16, 16, 1 );
 	gvdb.AddChannel ( 0, T_FLOAT, 1 );	
 	if ( m_use_color ) {
@@ -176,8 +169,11 @@ void Sample::RebuildOptixGraph ()
 
 	// Add GVDB volume to the OptiX scene
 	nvprintf("Adding GVDB Volume to OptiX graph.\n");
-	Vector3DF volmin = gvdb.getVolMin();
-	Vector3DF volmax = gvdb.getVolMax();
+	// Get the dimensions of the volume by looking at how the fluid system was
+	// initialized (since at this moment, gvdb.getVolMin and gvdb.getVolMax
+	// are both 0).
+	Vector3DF volmin = fluid.GetGridMin();
+	Vector3DF volmax = fluid.GetGridMax();
 	Matrix4F xform;
 	xform.Identity();
 	int atlas_glid = gvdb.getAtlasGLID(0);
@@ -275,7 +271,7 @@ bool Sample::init()
 	Vector3DF ctr = (fluid.GetGridMax() + fluid.GetGridMin()) * Vector3DF(0.5,0.5,0.5);
 
 	// Create Camera 
-	Camera3D* cam = new Camera3D;						
+	Camera3D* cam = new Camera3D;
 	cam->setFov ( 50.0 );
 	cam->setOrbit ( Vector3DF(50,30,0), ctr, 1200, 1.0 );	
 	gvdb.getScene()->SetCamera( cam );

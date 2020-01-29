@@ -39,7 +39,8 @@ bool Sample::init()
 	gvdb.SetVerbose ( true );
 	gvdb.SetCudaDevice ( GVDB_DEV_FIRST );
 	gvdb.Initialize ();
-	gvdb.AddPath ( "../source/shared_assets/" );
+	gvdb.AddPath("../../source/shared_assets/");
+	gvdb.AddPath("../source/shared_assets/");
 	gvdb.AddPath ( "../shared_assets/" );
 	gvdb.AddPath ( ASSET_PATH );
 
