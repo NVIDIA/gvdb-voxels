@@ -2,8 +2,7 @@ NVIDIA® GVDB VOXELS
 Release 1.1.1
 
 ## OVERVIEW
-NVIDIA® GVDB Voxels is a new library and SDK for simulation, compute, and rendering of sparse volumetric data. Details on the GVDB technology can be found at
-                                                  http://developer.nvidia.com/gvdb
+NVIDIA® GVDB Voxels is a new library and SDK for simulation, compute, and rendering of sparse volumetric data. Details on the GVDB technology can be found at [http://developer.nvidia.com/gvdb](http://developer.nvidia.com/gvdb).
 
 ## RELEASE NOTES
 
