@@ -2,8 +2,8 @@ NVIDIA® GVDB VOXELS
 Release 1.1.1
 
 ## OVERVIEW
-NVIDIA® GVDB Voxels is a new library and SDK for simulation, compute, and rendering of sparse volumetric data. Details on the GVDB technology can be found at:
-                                                                 http://developer.nvidia.com/gvdb
+NVIDIA® GVDB Voxels is a new library and SDK for simulation, compute, and rendering of sparse volumetric data. Details on the GVDB technology can be found at
+                                                  http://developer.nvidia.com/gvdb
 
 ## RELEASE NOTES
 
@@ -94,7 +94,7 @@ A few samples have on-screen GUIs with features that can be toggled by clicking 
 
 ### To build the samples and the library at the same time:
 
-4. In CMake, configure and generate the build system using gvdb-voxels/CMakeLists.txt, then build the `BUILD_ALL` target in your IDE (such as Visual Studio).
+3. In CMake, configure and generate the build system using gvdb-voxels/CMakeLists.txt, then build the `BUILD_ALL` target in your IDE (such as Visual Studio).
    1. The OptiX samples are built by default; if you haven't installed OptiX, you can remove them from the build by setting the `GVDB_BUILD_OPTIX_SAMPLES` cache entry to OFF (you can do this in CMake's GUI by unchecking the box next to `GVDB_BUILD_OPTIX_SAMPLES` after configuration, or you can do this in the command line by adding `-DGVDB_BUILD_OPTIX_SAMPLES=OFF`.)
 
 That's it!
@@ -105,13 +105,13 @@ You can also build a specific sample or the GVDB library this way by building it
 
 ### To build the GVDB Library by itself:
 
-4. In CMake, configure and generate the build system using gvdb-voxels/source/gvdb_library/CMakeLists.txt, then build the `gvdb` target.
+3. In CMake, configure and generate the build system using `gvdb-voxels/source/gvdb_library/CMakeLists.txt`, then build the `gvdb` target.
 
 As above, you can create a redistributable build of the NVIDIA GVDB Voxels library by building the `INSTALL` target.
 
 ### To build a sample by itself:
 
-4. In CMake, configure and generate the build system using gvdb-voxels/source/[your sample name here]/CMakeLists.txt, then build your sample's target.
+3. In CMake, configure and generate the build system using `gvdb-voxels/source/[your sample name here]/CMakeLists.txt`, then build your sample's target.
 
 That's it! In Visual Studio, you can also run a sample by right-clicking it inside Visual Studio, selecting "Set as StartUp Project", and then pressing F5 or clicking the green triangle in the toolbar.
 
