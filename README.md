@@ -146,8 +146,9 @@ Building a sample will also automatically build GVDB, so you no longer need to b
 
 
 ## License
-==========================
-BSD 3-clause. Please refer to License.txt
 
+==========================
+  
+BSD 3-clause. Please refer to [LICENSE.txt](https://github.com/NVIDIA/gvdb-voxels/blob/master/LICENSE.txt).
 
 © 2020 NVIDIA
