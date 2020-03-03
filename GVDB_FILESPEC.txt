@@ -3,7 +3,7 @@ NVIDIA GVDB Sparse Volumes
 NVIDIA Corporation (c) 2016
 
 Created: Rama Hoetzlein, rhoetzlein@nvidia.com, 8/28/2016
-Last Revised: 3/25/2018
+Last Revised: 3/3/2020
 
 This file outlines the VBX file format specification.
 
@@ -16,60 +16,69 @@ File Format Versions
 
  1.1  GVDB Release (1/1/2018)
       Bitmask flags are optional. 
-      Versions on or after 1.1 save setting to vbx file.
+      Versions on or after 2.0 save setting to vbx file.
 
  1.0  GVDB Beta Release (10/2/2016)
-      Grid data types:	Only 'f' (float)
-      Grid components: 	Only 1 
+      Grid data types:  Only 'f' (float)
+      Grid components:  Only 1 
       Grid compression: Only 0 (none)
-      Topology type: 	Only 2 (gvdb)
+      Topology type:    Only 2 (gvdb)
       Brick layout:     Only 0 (atlas layout)
       
       
-File Format	
+File Format
 ===============
 
 VBX HEADER
 --------------
-File Major Version #	1 byte
-File Minor Version #	1 byte
-# of Grids		4 byte, int
-Grid offset 0		8 byte, ulong 	[a]
-Grid offset 1		8 byte, ulong
-Grid offset ..		8 byte, ulong
-Grid offset N		8 byte, ulong
+File Major Version #    1 byte
+File Minor Version #    1 byte
+Pre-translation         12 byte, vec3f \
+XYZ Euler angles        12 byte, vec3f |[a]
+Scale                   12 byte, vec3f |
+Translation             12 byte, vec3f /
+# of Grids              4 byte, int
+Uses bitmasks           1 byte, bool    [b] Only present in GVDB 2.0+ VBX files
+Grid offset 0           8 byte, ulong   [c]
+Grid offset 1           8 byte, ulong
+Grid offset ..          8 byte, ulong
+Grid offset N           8 byte, ulong
   
-  Note [a]: The grid table is given as a list of file offsets 
-  to allow random access to grids without having to read 
-  the entire vbx file.
+  Note [a]: Only present in GVDB 1.11+ VBX files. GVDB applies
+  pre-translation first, followed by scale, then rotation about
+  the X, Y, and Z axes sequentially, followed finally by translation.
+  
+  Note [c]: The grid table is given as a list of file offsets
+  to allow random access to grids without having to read
+  the entire VBX file.
 
-FOR EACH GRID..
-------------- 		GRID HEADER
-Name			256 bytes 	[b] Stored as a c-string with a terminal '\0'
-Grid Data Type		1 byte, uchar 	[c] Values are: 'c'=char, 's'=signed int, 'u'=unsigned int, 'f'=float, 'd'=double
-Grid Components		1 byte, uchar	[d] Gives the number of components for each voxels. e.g. 1=scalar, 3=vector
-Grid Compression	1 byte, uchar   [e] Compression type. Values are: 0=none, 1=blosc, 2=other
-Voxelsize 		12 byte, vec3f 	[f] Voxel size in world units as a float vec3. 
-# Bricks		4 byte, int	[g] Number of bricks stored for this grid
-Brick dims		12 byte, vec3i  [h] Dimensions of a single brick, not including the apron voxels
-Brick apron		4 byte, int	[i] Brick apron size (in voxels) stored in the file
-Total Atlas Size	8 byte, ulong	[j] Total size of the atlas data in bytes
-Topology Type?		1 byte, uchar	[k] Type of topology. Values: 0=None, 1=Reuse, 2=GVDB, 3=other. 
-Topology Reuse Grid	4 byte, int	[l] Reuse another gvdb grid for topology. No topology section if set.
-Brick layout?		1 byte, uchar   [m] Layout of bricks. Values: 0=Atlas layout, 1=Brick layout
-Atlas leaf count	12 byte, vec3i  [n] Atlas leaf count
-Atlas res		12 byte, vec3i  [o] Atlas resolution (in voxels)
+FOR EACH GRID...
+-------------           GRID HEADER
+Name                    256 bytes       [d] Stored as a c-string with a terminal '\0'
+Grid Data Type          1 byte, uchar   [e] Values are: 'c'=char, 's'=signed int, 'u'=unsigned int, 'f'=float, 'd'=double
+Grid Components         1 byte, uchar   [f] Gives the number of components for each voxels. e.g. 1=scalar, 3=vector
+Grid Compression        1 byte, uchar   [g] Compression type. Values are: 0=none, 1=blosc, 2=other
+Voxel size              12 byte, vec3f  [h] The size of each voxel in world units (since 1.1.1, always )
+# of Bricks             4 byte, int     [i] Number of bricks stored for this grid
+Brick dims              12 byte, vec3i  [j] Dimensions of a single brick, not including the apron voxels
+Brick apron             4 byte, int     [k] Brick apron size (in voxels) stored in the file
+Total Atlas Size        8 byte, ulong   [l] Total size of the atlas data in bytes
+Topology Type?          1 byte, uchar   [m] Type of topology. Values: 0=None, 1=Reuse, 2=GVDB, 3=other. 
+Topology Reuse Grid     4 byte, int     [n] Reuse another gvdb grid for topology. No topology section if set.
+Brick layout?           1 byte, uchar   [o] Layout of bricks. Values: 0=Atlas layout, 1=Brick layout
+Atlas leaf count        12 byte, vec3i  [p] Atlas leaf count
+Atlas res               12 byte, vec3i  [q] Atlas resolution (in voxels)
 
---------		TOPOLOGY SECTION
-# Levels		4 byte, int	[p] Number of levels in tree		
-Root ID			8 byte, int	[q] Pool ID of the tree root
+--------                TOPOLOGY SECTION
+# of Levels             4 byte, int     [r] Number of levels in tree            
+Root ID                 8 byte, int     [s] Pool ID of the tree root
 FOR EACH LEVEL..
- Level Dim		4 byte, int	[r] Log2 dimension of the level
- Res			4 byte, int	[s] Resolution of the level. Res=2^(Level Dim)
- Range			12 byte, vec3i	[t] Range of the node in index-space
- Node cnt		4 byte, int	[u] Number of nodes at this level
- P0 width		4 byte, int	[v] Width of Pool 0 for this level
- P1 width		4 byte, int	[w] Width of Pool 1 for this level
+ Log2 Level Dim         4 byte, int     [t] Log2 dimension of the level
+ Res                    4 byte, int     [u] Resolution of the level. Res=2^(Log2 Level Dim)
+ Range                  12 byte, vec3i  [v] Range of the node in index-space
+ Node count             4 byte, int     [w] Number of nodes at this level
+ P0 width               4 byte, int     [x] Width of Pool 0 for this level
+ P1 width               4 byte, int     [y] Width of Pool 1 for this level
 
 --- TOPOLOGY POOLS
 Topology data is stored next. 
@@ -96,7 +105,7 @@ The ordering of storage is pool, level, row:
   Pool 1, Level ., Row 0..n
   Pool 1, Level L, Row 0..n    where L = # Levels    
 
---------		ATLAS SECTION
+--------                ATLAS SECTION
 Atlas (brick) data is stored next.
 
 When the bricks are stored in "atlas layout", the data is stored
@@ -111,4 +120,3 @@ Bricks are written sequentially to the file.
 This layout is ideal for out-of-core streaming, where individual bricks are delay loaded.
 
 -------- Next stored GRID starts here
-

@@ -373,8 +373,8 @@
 			// File I/O
 			bool LoadBRK ( std::string fname );
 			bool LoadVDB ( std::string fname );
-			bool LoadVBX ( std::string fname, int force_maj=0, int force_min=0 );
-			void SaveVBX ( std::string fname );
+			bool LoadVBX ( const std::string fname, int force_maj=0, int force_min=0 );
+			void SaveVBX ( const std::string fname );
 			void SaveVDB ( std::string fname );
 			bool ImportVTK ( std::string fname, std::string field, Vector3DI& res );
 			void WriteObj ( char* fname );

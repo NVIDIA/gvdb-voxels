@@ -84,7 +84,7 @@ void Allocator::PoolCreate ( uchar grp, uchar lev, uint64 width, uint64 initmax,
 	if ( p.size == 0 ) return;		// placeholder pool, do not allocate
 
 	// cpu allocate
-	p.cpu = (char*) malloc ( p.size );
+	p.cpu = (char*) calloc ( p.size, 1 );
 	if ( p.cpu == 0x0 ) {
 		gprintf ( "ERROR: Unable to malloc %lld for pool lev %d\n", p.size, lev );
 		gerror ();
@@ -94,6 +94,7 @@ void Allocator::PoolCreate ( uchar grp, uchar lev, uint64 width, uint64 initmax,
 	if ( bGPU ) {
 		size_t sz = p.size;
 		cudaCheck ( cuMemAlloc ( &p.gpu, sz ), "Allocator", "PoolCreate", "cuMemAlloc", "", mbDebug );
+		cudaCheck ( cuMemsetD8 ( p.gpu, 0, sz ), "Allocator", "PoolCreate", "cuMemsetD8", "", mbDebug );
 	}
 	mPool[grp].push_back ( p );
 }
@@ -178,7 +179,7 @@ uint64 Allocator::PoolAlloc ( uchar grp, uchar lev, bool bGPU )
 		p->max *= 2;
 		p->size = p->stride * p->max;
 		if ( p->cpu != 0x0 ) {
-			char* new_cpu = (char*) malloc ( p->size );
+			char* new_cpu = (char*) calloc ( p->size, 1 );
 			memcpy ( new_cpu, p->cpu, p->stride*p->lastEle );
 			free ( p->cpu );
 			p->cpu = new_cpu;
@@ -187,6 +188,7 @@ uint64 Allocator::PoolAlloc ( uchar grp, uchar lev, bool bGPU )
 			size_t sz = p->size;	
 			CUdeviceptr new_gpu;
 			cudaCheck ( cuMemAlloc ( &new_gpu, sz ), "Allocator", "PoolAlloc", "cuMemAlloc", "", mbDebug);
+			cudaCheck ( cuMemsetD8 ( new_gpu, 0, sz ), "Allocator", "PoolAlloc", "cuMemsetD8", "", mbDebug);
 			cudaCheck ( cuMemcpy ( new_gpu, p->gpu, p->stride*p->lastEle), "Allocator", "PoolAlloc", "cuMemcpy", "", mbDebug);
 			cudaCheck ( cuMemFree ( p->gpu ), "Allocator", "PoolAlloc", "cuMemFree", "", mbDebug );
 			p->gpu = new_gpu;
