@@ -767,10 +767,10 @@ void Allocator::AtlasCopyLinear ( uchar chan, Vector3DI offset, CUdeviceptr gpu_
 void Allocator::AtlasRetrieveTexXYZ ( uchar chan, Vector3DI val, DataPtr& dest )
 {
 	Vector3DI atlasres = getAtlasRes(chan);
-	int brickres = mAtlas[chan].subdim.x;
+	Vector3DI brickres = mAtlas[chan].subdim;
 	
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI grid ( int(brickres/block.x)+1, int(brickres/block.y)+1, int(brickres/block.z)+1 );
+	Vector3DI grid ( int(brickres.x/block.x)+1, int(brickres.y/block.y)+1, int(brickres.z/block.z)+1 );
 
 	void* args[5] = { &val, &atlasres, &brickres, &dest.gpu, &mAtlas[chan].tex_obj };
 	cudaCheck ( cuLaunchKernel ( cuRetrieveTexXYZ, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasRetrieveXYZ", "cuLaunch", "cuRetrieveTexXYZ", mbDebug);
