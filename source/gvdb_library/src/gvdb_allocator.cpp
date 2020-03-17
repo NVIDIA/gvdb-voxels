@@ -45,7 +45,7 @@ Allocator::Allocator ()
 {
 	mVFBO[0] = -1;
 
-	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, "cuda_gvdb_copydata.ptx" ), "Allocator", "Allocator", "cuModuleLoad", "cuda_gvdb_copydata.ptx", mbDebug);
+	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, CUDA_GVDB_COPYDATA_PTX ), "Allocator", "Allocator", "cuModuleLoad", CUDA_GVDB_COPYDATA_PTX, mbDebug);
 		
 	cudaCheck ( cuModuleGetFunction ( &cuFillTex,		cuAllocatorModule, "kernelFillTex" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuFillTex",  mbDebug);
 	cudaCheck ( cuModuleGetFunction ( &cuCopyTexC,		cuAllocatorModule, "kernelCopyTexC" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuCopyTexC", mbDebug);
