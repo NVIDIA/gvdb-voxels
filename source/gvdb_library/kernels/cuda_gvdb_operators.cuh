@@ -73,146 +73,89 @@ extern "C" __global__ void gvdbUpdateApronFacesF ( VDBInfo* gvdb, uchar chan, in
 	surf3Dwrite(v2, gvdb->volOut[chan], (vox.x - vinc.x) * sizeof(float), (vox.y - vinc.y), (vox.z - vinc.z));		// self apron
 }
 
+// Function template for updating the apron without UpdateApronFaces' neighbor
+// table. Each of the voxels of the apron computes its world-space
+// (= index-space) position and looks up what its value should be, sampling
+// from a neighboring brick, or using the boundary value if no brick contains
+// the voxel.
+// 
+// This should be called using blocks with an x dimension of 6, arranged in a
+// grid along the x axis. Each yz plane of the block will fill in the voxels
+// for a different face.
+template<class T>
+__device__ void UpdateApron(VDBInfo* gvdb, const uchar channel, const int brickCount, const int paddedBrickRes, const T boundaryValue)
+{
+	// The brick this block processes.
+	const int brick = blockIdx.x;
+	if (brick > brickCount) return;
+
+	// Determine which voxel of the apron to compute and write.
+	uint3 brickVoxel; // In the local coordinate space of the brick
+	{
+		const int side = threadIdx.x; // Side of the brick, from 0 to 5
+		uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z); // Position on the side of the brick
+		if (suv.x >= paddedBrickRes || suv.y >= paddedBrickRes || side >= 6) return;
+
+		switch (side) {
+		case 0:		brickVoxel = make_uint3(0, suv.x, suv.y);			break;
+		case 1:		brickVoxel = make_uint3(suv.x, 0, suv.y);			break;
+		case 2:		brickVoxel = make_uint3(suv.x, suv.y, 0);			break;
+		case 3:		brickVoxel = make_uint3(paddedBrickRes - 1, suv.x, suv.y);	break;
+		case 4:		brickVoxel = make_uint3(suv.x, paddedBrickRes - 1, suv.y);	break;
+		case 5:		brickVoxel = make_uint3(suv.x, suv.y, paddedBrickRes - 1);	break;
+		}
+	}
+
+	// Compute the position of the voxel in the atlas
+	uint3 atlasVoxel; // In the coordinate space of the entire atlas
+	{
+		VDBNode* node = getNode(gvdb, 0, brick);
+		if (node == 0x0) return; // This brick ID didn't correspond to a known brick, which is invalid
+		// (The (1,1,1) here accounts for the 1 unit of apron padding)
+		atlasVoxel = brickVoxel + make_uint3(node->mValue) - make_uint3(1, 1, 1);
+	}
+
+	// Get the value of the voxel by converting to index-space and then
+	// sampling the value at that index
+	T value;
+	{
+		float3 worldPos;
+		if (!getAtlasToWorld(gvdb, atlasVoxel, worldPos)) return;
+		float3 offs, vmin, vdel; uint64 nodeID;
+		VDBNode* node = getNodeAtPoint(gvdb, worldPos, &offs, &vmin, &vdel, &nodeID);
+
+		if (node == 0x0) {
+			// Out of range, use the boundary value
+			value = boundaryValue;
+		}
+		else {
+			offs += (worldPos - vmin) / vdel; // Get the atlas position
+			value = tex3D<T>(gvdb->volIn[channel], offs.x, offs.y, offs.z);
+		}
+	}
+
+	// Write to the apron voxel
+	surf3Dwrite(value, gvdb->volOut[channel], atlasVoxel.x * sizeof(T), atlasVoxel.y, atlasVoxel.z);
+}
 
 extern "C" __global__ void gvdbUpdateApronF (VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, float boundval)
 {
-	// Compute brick & atlas vox
-	int brk = blockIdx.x;
-	if (brk > brickcnt) return;
-
-	int side = threadIdx.x;
-	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
-	if (suv.x >= brickres || suv.y >= brickres || side >= 6) return;
-	uint3 vox;
-	switch (side) {
-	case 0:		vox = make_uint3(0, suv.x, suv.y);			break;
-	case 1:		vox = make_uint3(suv.x, 0, suv.y);			break;
-	case 2:		vox = make_uint3(suv.x, suv.y, 0);			break;
-	case 3:		vox = make_uint3(brickres-1, suv.x, suv.y);	break;
-	case 4:		vox = make_uint3(suv.x, brickres-1, suv.y);	break;
-	case 5:		vox = make_uint3(suv.x, suv.y, brickres-1);	break;	
-	}	
-
-	// Get current brick
-	VDBNode* node = getNode(gvdb, 0, brk);
-	if (node == 0x0) return;
-	vox += make_uint3(node->mValue) - make_uint3(1,1,1);							// self atlas start
-
-	// Get apron value
-	float3 wpos;
-	if (!getAtlasToWorld(gvdb, vox, wpos)) return;
-	float3 offs, vmin, vdel; uint64 nid;
-	node = getNodeAtPoint(gvdb, wpos, &offs, &vmin, &vdel, &nid);		// Evaluate at world position
-	offs += (wpos - vmin) / vdel;
-	
-	float v = (node == 0x0) ? boundval : tex3D<float>(gvdb->volIn[chan], offs.x, offs.y, offs.z);	// Sample at world point
-	surf3Dwrite(v, gvdb->volOut[chan], vox.x * sizeof(float), vox.y, vox.z);					// Write to apron voxel
+	UpdateApron<float>(gvdb, chan, brickcnt, brickres, boundval);
 }
-
 
 extern "C" __global__ void gvdbUpdateApronF4 ( VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, float boundval)
 {
-	// Compute brick & atlas vox	
-	int brk = blockIdx.x;
-	if (brk > brickcnt) return;
-
-	int side = threadIdx.x;
-	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
-	if (suv.x >= brickres || suv.y >= brickres || side >= 6) return;
-	uint3 vox;
-	switch (side) {
-	case 0:		vox = make_uint3(0, suv.x, suv.y);			break;
-	case 1:		vox = make_uint3(suv.x, 0, suv.y);			break;
-	case 2:		vox = make_uint3(suv.x, suv.y, 0);			break;
-	case 3:		vox = make_uint3(brickres-1, suv.x, suv.y);	break;
-	case 4:		vox = make_uint3(suv.x, brickres-1, suv.y);	break;
-	case 5:		vox = make_uint3(suv.x, suv.y, brickres-1);	break;	
-	}	
-
-	// Get current brick
-	VDBNode* node = getNode(gvdb, 0, brk);
-	if (node == 0x0) return;
-	vox += make_uint3(node->mValue) - make_uint3(1,1,1);							// self atlas start
-
-	// Get apron value
-	float3 wpos;
-	if (!getAtlasToWorld(gvdb, vox, wpos)) return;
-	float3 offs, vmin, vdel; uint64 nid;
-	node = getNodeAtPoint(gvdb, wpos, &offs, &vmin, &vdel, &nid);		// Evaluate at world position
-	offs += (wpos - vmin) / vdel;
-	
-	float4 v = (node == 0x0) ? make_float4(boundval,boundval,boundval,boundval) : tex3D<float4>(gvdb->volIn[chan], offs.x, offs.y, offs.z);	// Sample at world point
-	surf3Dwrite(v, gvdb->volOut[chan], vox.x * sizeof(float4), vox.y, vox.z);					// Write to apron voxel
+	UpdateApron<float4>(gvdb, chan, brickcnt, brickres, make_float4(boundval, boundval, boundval, boundval));
 }
 
 extern "C" __global__ void gvdbUpdateApronC ( VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, float boundval)
 {
-	// Compute brick & atlas vox	
-	int brk = blockIdx.x;
-	if (brk > brickcnt) return;
-
-	int side = threadIdx.x;
-	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
-	if (suv.x >= brickres || suv.y >= brickres || side >= 6) return;
-	uint3 vox;
-	switch (side) {
-	case 0:		vox = make_uint3(0, suv.x, suv.y);			break;
-	case 1:		vox = make_uint3(suv.x, 0, suv.y);			break;
-	case 2:		vox = make_uint3(suv.x, suv.y, 0);			break;
-	case 3:		vox = make_uint3(brickres-1, suv.x, suv.y);	break;
-	case 4:		vox = make_uint3(suv.x, brickres-1, suv.y);	break;
-	case 5:		vox = make_uint3(suv.x, suv.y, brickres-1);	break;	
-	}	
-
-	// Get current brick
-	VDBNode* node = getNode(gvdb, 0, brk);
-	if (node == 0x0) return;
-	vox += make_uint3(node->mValue) - make_uint3(1,1,1);							// self atlas start
-
-	// Get apron value
-	float3 wpos;
-	if (!getAtlasToWorld(gvdb, vox, wpos)) return;
-	float3 offs, vmin, vdel; uint64 nid;
-	node = getNodeAtPoint(gvdb, wpos, &offs, &vmin, &vdel, &nid);		// Evaluate at world position
-	offs += (wpos - vmin) / vdel;
-	
-	uchar v = (node == 0x0) ? boundval : tex3D<uchar>(gvdb->volIn[chan], offs.x, offs.y, offs.z);	// Sample at world point
-	surf3Dwrite(v, gvdb->volOut[chan], vox.x * sizeof(uchar), vox.y, vox.z);					// Write to apron voxel
+	UpdateApron<uchar>(gvdb, chan, brickcnt, brickres, boundval);
 }
 
 extern "C" __global__ void gvdbUpdateApronC4 ( VDBInfo* gvdb, uchar chan, int brickcnt, int brickres, int brickwid, float boundval)
 {
-	// Compute brick & atlas vox	
-	int brk = blockIdx.x;
-	if (brk > brickcnt) return;
-
-	int side = threadIdx.x;
-	uint2 suv = make_uint2(blockIdx.y*blockDim.y + threadIdx.y, blockIdx.z*blockDim.z + threadIdx.z);
-	if (suv.x >= brickres || suv.y >= brickres || side >= 6) return;
-	uint3 vox;
-	switch (side) {
-	case 0:		vox = make_uint3(0, suv.x, suv.y);			break;
-	case 1:		vox = make_uint3(suv.x, 0, suv.y);			break;
-	case 2:		vox = make_uint3(suv.x, suv.y, 0);			break;
-	case 3:		vox = make_uint3(brickres-1, suv.x, suv.y);	break;
-	case 4:		vox = make_uint3(suv.x, brickres-1, suv.y);	break;
-	case 5:		vox = make_uint3(suv.x, suv.y, brickres-1);	break;	
-	}	
-
-	// Get current brick
-	VDBNode* node = getNode(gvdb, 0, brk);
-	if (node == 0x0) return;
-	vox += make_uint3(node->mValue) - make_uint3(1,1,1);							// self atlas start
-
-	// Get apron value
-	float3 wpos;
-	if (!getAtlasToWorld(gvdb, vox, wpos)) return;
-	float3 offs, vmin, vdel; uint64 nid;
-	node = getNodeAtPoint(gvdb, wpos, &offs, &vmin, &vdel, &nid);		// Evaluate at world position
-	offs += (wpos - vmin) / vdel;
-	
-	uchar4 v = (node == 0x0) ? make_uchar4(boundval,boundval,boundval,boundval) : tex3D<uchar4>(gvdb->volIn[chan], offs.x, offs.y, offs.z);	// Sample at world point
-	surf3Dwrite(v, gvdb->volOut[chan], vox.x * sizeof(uchar4), vox.y, vox.z);					// Write to apron voxel
+	UpdateApron<uchar4>(gvdb, chan, brickcnt, brickres, make_uchar4(boundval, boundval, boundval, boundval));
 }
 
 #define GVDB_COPY_SMEM_F																	\
