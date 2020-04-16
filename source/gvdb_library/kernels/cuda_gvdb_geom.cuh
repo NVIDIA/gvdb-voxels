@@ -63,6 +63,8 @@ inline __device__ float3 getViewPos ()
 	return mmult ( scn.campos, SCN_INVXFORM );  
 }
 
+// Note that the view ray returned by this function is not normalized, but
+// rather corresponds to increments in world-space!
 inline __device__ float3 getViewRay ( float x, float y )
 {
   #ifdef CUDA_PATHWAY

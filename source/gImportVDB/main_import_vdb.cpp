@@ -68,7 +68,7 @@ int main (int argc, char* argv)
 	// Remainder of this sample demonstrates level set rendering to file.
 
 	// Set volume params
-	gvdb.getScene()->SetSteps ( 0.25, 16, 0.25 );				// Set raycasting steps
+	gvdb.getScene()->SetSteps ( 0.25*0.05f, 16*0.05f, 0.25*0.05f );	// Set raycasting steps (note that this is in world-space!)
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.0f, 1.0f, -1.0f );	// Set volume value range (for a level set)
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );
@@ -77,6 +77,7 @@ int main (int argc, char* argv)
 	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.02f), Vector4DF(1,.5f,0,0.01f) );
 	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(1,.5f,0,0.01f), Vector4DF(0,0,0,0.005f) );
 	gvdb.getScene()->SetBackgroundClr ( 0, 0, 0, 1 );
+	gvdb.SetEpsilon(0.01f, 256);
 	gvdb.CommitTransferFunc ();
 
 

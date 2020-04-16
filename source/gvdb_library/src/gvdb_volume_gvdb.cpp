@@ -4286,7 +4286,12 @@ void VolumeGVDB::PrepareRender ( int w, int h, char shading )
 	mScnInfo.camivprow2 = cam->invviewproj_matrix.GetRowVec(2);
 	mScnInfo.camivprow3 = cam->invviewproj_matrix.GetRowVec(3);
 	mScnInfo.bias		= m_bias;
-	mScnInfo.light_pos	= getScene()->getLight()->getPos();
+	// Transform the light position from application space to voxel space,
+	// like getViewPos:
+	nvdb::Vector4DF lightPos4 = getScene()->getLight()->getPos();
+	lightPos4.w = 1.0f; // Since it's a position, not a direction
+	lightPos4 *= mInvXform;
+	mScnInfo.light_pos  = Vector3DF(lightPos4.x, lightPos4.y, lightPos4.z);
 	Vector3DF crs 		= Vector3DF(0,0,0);		
 	mScnInfo.slice_pnt  = getScene()->getSectionPnt();
 	mScnInfo.slice_norm = getScene()->getSectionNorm();

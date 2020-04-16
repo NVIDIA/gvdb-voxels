@@ -130,11 +130,12 @@ Building a sample will also automatically build GVDB, so you no longer need to b
 **Windows:**
 
 1. Install OpenVDB: On Windows, one of the easiest ways to install OpenVDB is to use Microsoft's [vcpkg](https://github.com/microsoft/vcpkg); install `vcpkg`, then run `vcpkg install openvdb[tools]:x64-windows`. Make sure `vcpkg` is using the same compiler you'll use to compile GVDB!
-2. Configure CMake:
+2. Work around a temporary issue in vcpkg: If you plan to build GVDB in release mode, go to your `vcpkg/installed/x64-windows-debug/bin` folder and copy `openvdb_d.dll` to `openvdb.dll`. This works around an issue where a build system copies debug-mode `openvdb.lib` and `openvdb.dll` to `openvdb_d.lib` and `openvdb_d.dll` respectively, but doesn't update the DLL reference in `openvdb_d.lib`.
+3. Configure CMake:
    1. If you're using the **CMake GUI**, delete the cache, then click the "Configure" button, specify your generator and platform, check "Specify toolchain file for cross-compiling", and click "Next". Then specify the path to `vcpkg/scripts/buildsystems/vcpkg.cmake`, and click Finish. Then check `GVDB_BUILD_OPENVDB` (and if you'd like to build the gImportVDB sample as well, check `GVDB_BUILD_OPENVDB_SAMPLES`) and click "Configure" again.
    2. If you're using the **CMake command line**, you can also do this by specifying `-DCMAKE_TOOLCHAIN_FILE=<path to vcpkg.cmake> -DGVDB_BUILD_OPENVDB=ON -DGVDB_BUILD_OPENVDB_SAMPLES=ON`.
    3. Alternatively, if you're not using `vcpkg`, you can also specify `GVDB_OPENVDB_INCLUDE_DIR`, `GVDB_OPENVDB_LIB_RELEASE_DIR`, `GVDB_OPENVDB_LIB_DEBUG_DIR`, and `GVDB_OPENVDB_DLL_RELEASE_DIR` and copy in OpenVDB's DLLs using any method - see `gvdb_library/CMakeLists.txt` for more information.
-3. Finally, generate and build the CMake project. Now you can run GVDB with OpenVDB!
+4. Finally, generate and build the CMake project. Now you can run GVDB with OpenVDB!
 
 **Linux:**
 

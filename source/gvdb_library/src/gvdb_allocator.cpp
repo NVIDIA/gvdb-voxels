@@ -378,11 +378,11 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
 			surfReadDesc.res.array.hArray = reinterpret_cast<CUarray>(p.garray);
 
 			CUDA_TEXTURE_DESC texReadDesc = {};
-			texReadDesc.addressMode[0] = CU_TR_ADDRESS_MODE_WRAP;
-			texReadDesc.addressMode[1] = CU_TR_ADDRESS_MODE_WRAP;
-			texReadDesc.addressMode[2] = CU_TR_ADDRESS_MODE_WRAP;
+			texReadDesc.addressMode[0] = CU_TR_ADDRESS_MODE_CLAMP;
+			texReadDesc.addressMode[1] = CU_TR_ADDRESS_MODE_CLAMP;
+			texReadDesc.addressMode[2] = CU_TR_ADDRESS_MODE_CLAMP;
 
-			texReadDesc.filterMode = CU_TR_FILTER_MODE_LINEAR;
+			texReadDesc.filterMode = CU_TR_FILTER_MODE_POINT;
 
 			cudaCheck(cuTexObjectCreate(&p.tex_obj, &surfReadDesc, &texReadDesc, nullptr), "Allocator", "AllocateTextureGPU", "cuGraphicsUnmapResources", "", mbDebug);
 
@@ -423,11 +423,11 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
             surfReadDesc.res.array.hArray = reinterpret_cast<CUarray>(p.garray);
 
             CUDA_TEXTURE_DESC texReadDesc = {};
-            texReadDesc.addressMode[0] = CU_TR_ADDRESS_MODE_WRAP;
-            texReadDesc.addressMode[1] = CU_TR_ADDRESS_MODE_WRAP;
-            texReadDesc.addressMode[2] = CU_TR_ADDRESS_MODE_WRAP;
+            texReadDesc.addressMode[0] = CU_TR_ADDRESS_MODE_CLAMP;
+            texReadDesc.addressMode[1] = CU_TR_ADDRESS_MODE_CLAMP;
+            texReadDesc.addressMode[2] = CU_TR_ADDRESS_MODE_CLAMP;
 
-            texReadDesc.filterMode = CU_TR_FILTER_MODE_LINEAR;
+            texReadDesc.filterMode = CU_TR_FILTER_MODE_POINT;
 
             cudaCheck(cuTexObjectCreate(&p.tex_obj, &surfReadDesc, &texReadDesc, nullptr), "Allocator", "AllocateTextureGPU", "cuGraphicsUnmapResources", "", mbDebug);
             

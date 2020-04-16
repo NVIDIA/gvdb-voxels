@@ -197,7 +197,9 @@ if(GVDB_BUILD_OPENVDB)
         endif()
         
         # Find the paths to our .lib files manually:
-        _gvdb_find(GVDB_OPENVDB_LIB_DEBUG ${GVDB_OPENVDB_LIB_DEBUG_DIR}/openvdb.lib)
+        _gvdb_find(GVDB_OPENVDB_LIB_DEBUG ${GVDB_OPENVDB_LIB_DEBUG_DIR}/openvdb_d.lib)
+		# Compatibility for OpenVDB < 7.0
+		_gvdb_find(GVDB_OPENVDB_LIB_DEBUG ${GVDB_OPENVDB_LIB_DEBUG_DIR}/openvdb.lib)
         _gvdb_find(GVDB_TBB_LIB_DEBUG     ${GVDB_OPENVDB_LIB_DEBUG_DIR}/tbb_debug.lib)
         _gvdb_find(GVDB_BLOSC_LIB_DEBUG   ${GVDB_OPENVDB_LIB_DEBUG_DIR}/blosc.lib)
         _gvdb_find(GVDB_ZLIB_LIB_DEBUG    ${GVDB_OPENVDB_LIB_DEBUG_DIR}/zlib*.lib)
