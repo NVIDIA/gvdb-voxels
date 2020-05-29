@@ -2203,17 +2203,17 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	}
 
 	PERF_POP ();
-	if (mValMin!= 1.0E35 || mValMax != -1.0E35)
+	if (mValMin!= 1.0E35f || mValMax != -1.0E35f)
 		verbosef ( "\n    Value Range: %f %f\n", mValMin, mValMax );
 
 	UpdateApron ();
 
 	free ( src2 );
 
-	// vdbfile->close ();
-	// delete vdbfile;
-	// delete mOVDB;
-	// mOVDB = 0x0; 
+	vdbfile->close ();
+	delete vdbfile;
+	delete mOVDB;
+	mOVDB = 0x0;
 
 	return true;
 
