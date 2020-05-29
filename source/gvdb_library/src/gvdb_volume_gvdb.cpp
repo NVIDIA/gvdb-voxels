@@ -1841,40 +1841,6 @@ void VolumeGVDB::ComputeBounds ()
 
 #endif
 
-	
-#ifdef WRITE_TEST
-	openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create ( 0.0 );
-	grid->setTransform ( openvdb::math::Transform::createLinearTransform( 0.12 ) );
-	grid->setGridClass ( openvdb::GRID_FOG_VOLUME );
-	grid->setName ( "Rama's test" );
-
-	GridType::Accessor accessor = grid.get()->getAccessor ();
-
-	for (int x=0; x < 32; x++ ) {
-		for (int y=0; y < 32; y++ ) {
-			for (int z=0; z < 32; z++ ) {
-				float d = (1.0-sqrt((x-16.0)*(x-16.0) + (y-16.0)*(y-16.0) + (z-16.0)*(z-16.0))/16.0) * 0.10;
-				if ( x>16 && y>16 && z>16 ) d = 0;
-				accessor.setValue ( Coord(x,y,z), d );
-			}
-		}
-	}
-
-	// axis test
-	//for (int x=0; x < 6; x++ ) accessor.setValue ( Coord(x,0,0), 1.0 );	
-	//for (int y=0; y < 3; y++ ) accessor.setValue ( Coord(0,y,0), 1.0 );
-	//for (int z=0; z < 11; z++ ) accessor.setValue ( Coord(0,0,z), 1.0 ); 
-		
-	openvdb::io::File file ( "test2.vdb" );
-	openvdb::GridPtrVec grids;
-	grids.push_back ( grid );
-	file.write ( grids );
-	file.close ();
-
-	verbosef ( "Done\n" );
-
-#endif
-
 // Load a raw BRK file
 bool VolumeGVDB::LoadBRK ( std::string fname )
 {
@@ -2011,9 +1977,13 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	
 #ifdef BUILD_OPENVDB
 
-	openvdb::initialize ();	
-	FloatGrid34::registerGrid();	
-	//FloatGridVF34::registerGrid();
+	// Only initialize OpenVDB once
+	static bool openVDBInitialized = false;
+	if (!openVDBInitialized) {
+		openvdb::initialize();
+		FloatGrid34::registerGrid();
+		openVDBInitialized = true;
+	}
 
 	mOVDB = new OVDBGrid;
 
@@ -2351,14 +2321,14 @@ void VolumeGVDB::Initialize ()
 	PUSH_CTX
 
 	// Create Pool Allocator
-	gprintf("Starting GVDB Voxels. ver %d.%d\n", MAJOR_VERSION, MINOR_VERSION );
-	gprintf(" Creating Allocator..\n");
+	verbosef("Starting GVDB Voxels. ver %d.%d\n", MAJOR_VERSION, MINOR_VERSION );
+	verbosef(" Creating Allocator..\n");
 	mPool = new Allocator;	
 	mPool->SetStream(mStream);
 	mPool->SetDebug(mbDebug);
 
 	// Create Scene object
-	gprintf(" Creating Scene..\n");
+	verbosef(" Creating Scene..\n");
 	mScene = new Scene;		
 
 	// Create VDB object
