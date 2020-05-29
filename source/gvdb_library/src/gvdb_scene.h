@@ -78,9 +78,9 @@
 		Camera3D*	SetCamera ( Camera3D* cam );
 		Light*		SetLight ( int n, Light* light );
 		Model*		AddModel ();
-		int			AddModel ( std::string filename, float scale, float tx, float ty, float tz );
-		int			AddVolume ( std::string filename, Vector3DI res, char vtype, float scale=1.0 );
-		int			AddGround ( float hgt, float scale=1.0 );
+		size_t		AddModel ( std::string filename, float scale, float tx, float ty, float tz );
+		size_t		AddVolume ( std::string filename, Vector3DI res, char vtype, float scale=1.0 );
+		size_t		AddGround ( float hgt, float scale=1.0 );
 		void		SetAspect ( int w, int h );
 		void		ClearModel ( Model* m );
 		void		LoadModel ( Model* m, std::string filestr, float scale, float tx, float ty, float tz );
@@ -123,7 +123,6 @@
 		int			getNumLights()		{ return (int) mLights.size(); }
 		
 		// Loading scenes
-		void		Load ( const char *filename, float windowAspect );
 		static void	LoadPath ();		
 		static void	LoadModel ();
 		static void	LoadVolume ();
@@ -201,7 +200,6 @@
 		// Transfer function				
 		Vector3DF				mTransferVec;			// x=alpha, y=gain
 		std::string				mTransferName;			// transfer function filename
-		//nvImg					mTransferImg;			// transfer function image
 		Vector4DF*				mTransferFunc;
 
 		// Volume settings

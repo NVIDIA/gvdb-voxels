@@ -465,12 +465,10 @@
 			void PrepareVDB ();
 			void PrepareVDBPartially ();	// for activate brick use only, no atlas
 			void RetrieveVDB();
-			void PrepareRender ( int w, int h, char shading );
-			void SetVoxels ( VolumeGVDB* vdb, std::vector<Vector3DI> poslist, float val );			
+			void PrepareRender ( int w, int h, char shading );		
 			
 			void getUsage(Vector3DF& ext, Vector3DF& vox, Vector3DF& used, Vector3DF& free);	// Quick memory info
 			Vector3DF MemoryUsage(std::string name, std::vector<std::string>& outlist);			// Detailed info
-			void Measure (std::vector<std::string>& outlist);
 			void Measure ( bool bPrint );			
 			float MeasurePools ();
 
@@ -488,17 +486,18 @@
 
 			void Synchronize();
 			
-			// OpenGL Functions					
-			void PrepareScreenTexGL ();			
-			void RenderGetResultGL ();			
+			// OpenGL Functions							
 			void WriteDepthTexGL ( int chan, int glid );
 			void WriteRenderTexGL ( int chan, int glid );
 			void ReadRenderTexGL ( int chan, int glid );			
 			void ValidateOpenGL ();			
 			void UseOpenGLAtlas ( bool tf );
 			int  getAtlasGLID ( int chan )	{ return mPool->getAtlasGLID ( chan ); }
+
+			// Internal Data Accessors
 			int  getVDBSize ()				{ return sizeof(mVDBInfo); }
 			char* getVDBInfo ()				{ return (char*) &mVDBInfo; }
+			CUdeviceptr getCUVDBInfo()      { return cuVDBInfo; }
 			int  getScnSize()				{ return sizeof(mScnInfo); }
 			char* getScnInfo()				{ return (char*) &mScnInfo; }			
 
@@ -542,7 +541,6 @@
 			void GetMinMaxVel(int num_pnts);
 			void CopyChannel(int chanDst, int chanSrc);
 			char* GetTestPtr();
-			void PrintMemUsage();
 
 			// Write .OBJ 
 			void setupVerts ( int gv[], Vector3DI g, int r1, int r2 );

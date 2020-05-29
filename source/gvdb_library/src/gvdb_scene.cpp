@@ -38,12 +38,12 @@ Scene::Scene ()
 	mOutFrame = 0;
 	mOutCam = new Camera3D;
 	mOutLight = new Light;
-	mShadowParams.Set ( 0.8, 1.0, 0 );
+	mShadowParams.Set ( 0.8f, 1.0f, 0 );
 	mTransferFunc = 0x0;
 	mFrameSamples = 8;
 	mVClipMin.Set (  -1000000, -1000000, -1000000 );
 	mVClipMax.Set (   1000000,  1000000,  1000000 );
-	mVThreshold.Set ( 0.2, 1, 0 );
+	mVThreshold.Set ( 0.2f, 1, 0 );
 	mVLeaf.Set ( 0, 0, 0 );
 	mVFrames.Set ( 0, 0, 0 );
 	mVName = "density";
@@ -61,7 +61,7 @@ Scene::Scene ()
 	gParse = new CallbackParser;	
 
 	SetSteps ( 1.0f, 16.0f, 0.1f );
-	SetExtinct ( -1.1, 1.5f, 0.0f );
+	SetExtinct ( -1.1f, 1.5f, 0.0f );
 	SetVolumeRange ( 0.1f, 0.0f, 1.0f );
 	SetCutoff ( 0.005f, 0.01f, 0.0f );
 }
@@ -147,14 +147,14 @@ Model* Scene::AddModel ()
 }
 
 // backward compatibility function
-int Scene::AddModel ( std::string filestr, float scale, float tx, float ty, float tz)
+size_t Scene::AddModel ( std::string filestr, float scale, float tx, float ty, float tz)
 {
 	Model* m = AddModel ();	
 	LoadModel ( m, filestr, scale, tx, ty, tz );
 	return mModels.size()-1;
 }
 
-int Scene::AddVolume ( std::string filestr, Vector3DI res, char vtype, float scale)
+size_t Scene::AddVolume ( std::string filestr, Vector3DI res, char vtype, float scale)
 {
 	// volume model
 	Model* m = new Model;
@@ -173,7 +173,7 @@ int Scene::AddVolume ( std::string filestr, Vector3DI res, char vtype, float sca
 	return mModels.size()-1;
 }
 
-int	Scene::AddGround ( float hgt, float scale )
+size_t Scene::AddGround ( float hgt, float scale )
 {
 	Model* m = new Model;
 	mModels.push_back ( m );
@@ -441,10 +441,10 @@ void Scene::LoadModel ()
 	float scale;
 	Vector3DF trans;
 	gParse->GetToken( modelFile );
-	gParse->GetToken( val );	scale = atof(val);
-	gParse->GetToken( val );	trans.x = atof(val);	
-	gParse->GetToken( val );	trans.y = atof(val);	
-	gParse->GetToken( val );	trans.z = atof(val);
+	gParse->GetToken( val );	scale = strtof(val, nullptr);
+	gParse->GetToken( val );	trans.x = strtof(val, nullptr);
+	gParse->GetToken( val );	trans.y = strtof(val, nullptr);
+	gParse->GetToken( val );	trans.z = strtof(val, nullptr);
 	gScene->AddModel ( modelFile, scale, trans.x, trans.y, trans.z );
 }
 
@@ -455,9 +455,9 @@ void Scene::LoadVolume ()
 	Vector3DF threshold;
 	gParse->GetToken( volFile );									// volume filename
 	gParse->GetToken( val );	gScene->mVName = val;				// grid name
-	gParse->GetToken( val );	gScene->mVFrames.x = atof(val);
-	gParse->GetToken( val );	gScene->mVFrames.y = atof(val);
-	gParse->GetToken( val );	gScene->mVFrames.z = atof(val);		
+	gParse->GetToken( val );	gScene->mVFrames.x = strtof(val, nullptr);
+	gParse->GetToken( val );	gScene->mVFrames.y = strtof(val, nullptr);
+	gParse->GetToken( val );	gScene->mVFrames.z = strtof(val, nullptr);
 	if ( gScene->mVFrames.z == 0 ) gScene->mVFrames.z = 1;
  	gScene->AddVolume ( volFile, Vector3DI(1,1,1), 0, 1.0 );
 }
@@ -466,9 +466,9 @@ void Scene::VolumeThresh ()
 {
 	char val[512];
 	Vector3DF vec;
-	gParse->GetToken( val );	vec.x = atof(val);	
-	gParse->GetToken( val );	vec.y = atof(val);
-	gParse->GetToken( val );	vec.z = atof(val);	
+	gParse->GetToken( val );	vec.x = strtof(val, nullptr);
+	gParse->GetToken( val );	vec.y = strtof(val, nullptr);
+	gParse->GetToken( val );	vec.z = strtof(val, nullptr);
 	gScene->mVThreshold = vec;
 }
 
@@ -482,13 +482,13 @@ void Scene::VolumeClip ()
 {
 	char val[512];
 	Vector3DF vec;
-	gParse->GetToken( val );	vec.x = atof(val);	
-	gParse->GetToken( val );	vec.y = atof(val);
-	gParse->GetToken( val );	vec.z = atof(val);	
+	gParse->GetToken( val );	vec.x = strtof(val, nullptr);
+	gParse->GetToken( val );	vec.y = strtof(val, nullptr);
+	gParse->GetToken( val );	vec.z = strtof(val, nullptr);
 	gScene->mVClipMin = vec;
-	gParse->GetToken( val );	vec.x = atof(val);	
-	gParse->GetToken( val );	vec.y = atof(val);
-	gParse->GetToken( val );	vec.z = atof(val);	
+	gParse->GetToken( val );	vec.x = strtof(val, nullptr);
+	gParse->GetToken( val );	vec.y = strtof(val, nullptr);
+	gParse->GetToken( val );	vec.z = strtof(val, nullptr);
 	gScene->mVClipMax = vec;
 }
 

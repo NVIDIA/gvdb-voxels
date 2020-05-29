@@ -43,8 +43,6 @@
 	GVDB_API std::string strSplit ( std::string& str, std::string sep );
 	GVDB_API bool strSub ( std::string str, int first, int cnt, std::string cmp );
 	GVDB_API std::string strReplace ( std::string str, std::string delim, std::string ins );
-	GVDB_API std::string strLTrim ( std::string str );
-	GVDB_API std::string strRTrim ( std::string str );
 	GVDB_API std::string strTrim ( std::string str );
 	GVDB_API std::string strLeft ( std::string str, int n );
 	GVDB_API std::string strRight ( std::string str, int n );	

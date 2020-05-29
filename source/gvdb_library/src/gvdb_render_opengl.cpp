@@ -191,7 +191,7 @@
 		if ( scene->getParam(prog_id, UCAMPOS) != -1 ) {
 			glProgramUniform3fv ( prog, scene->getParam(prog_id, UCAMPOS), 1, &cam->getPos().x );	
 			Vector3DF cd;
-			cd.x = tan ( cam->getFov() * 0.5 * 3.141592/180.0f );
+			cd.x = tanf( cam->getFov() * 0.5f * 3.141592f/180.0f );
 			cd.y = cd.x / cam->getAspect();
 			cd.z = cam->getNear();
 			glProgramUniform3fv	( prog, scene->getParam(prog_id, UCAMDIMS), 1, &cd.x );	

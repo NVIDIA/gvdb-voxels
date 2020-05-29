@@ -144,7 +144,7 @@ void Volume3D::SurfaceVoxelizeFastGL ( Vector3DF vmin, Vector3DF vmax, Matrix4F*
 		Matrix4F mw;
 		mw.Translate ( -mObjMin.x, -mObjMin.y, -mObjMin.z );
 		mw *= (*model);
-		mw *= Vector3DF( 2.0/(mObjMax.x-mObjMin.x), 2.0/(mObjMax.y-mObjMin.y), 2.0/(mObjMax.z-mObjMin.z) );		
+		mw *= Vector3DF( 2.0f/(mObjMax.x-mObjMin.x), 2.0f/(mObjMax.y-mObjMin.y), 2.0f/(mObjMax.z-mObjMin.z) );		
 		renderSetUW ( getScene(), GLS_VOXELIZE, &mw, mVoxRes );
 
 		// Rasterize		
@@ -167,7 +167,7 @@ void Volume3D::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 		// See PrepareRaster and RasterizeFast above when using for staging.
 
 		// Configure model
-		model->ComputeBounds ( *xform, 0.05 );
+		model->ComputeBounds ( *xform, 0.05f );
 		mObjMin = model->objMin; mObjMax = model->objMax;
 		mVoxMin = mObjMin;
 		mVoxMax = mObjMax;
@@ -211,7 +211,7 @@ void Volume3D::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 		Matrix4F mw;
 		mw.Translate ( -mObjMin.x, -mObjMin.y, -mObjMin.z );
 		mw *= (*xform);
-		mw *= Vector3DF( 2.0/(mObjMax.x-mObjMin.x), 2.0/(mObjMax.y-mObjMin.y), 2.0/(mObjMax.z-mObjMin.z) );		
+		mw *= Vector3DF( 2.0f/(mObjMax.x-mObjMin.x), 2.0f/(mObjMax.y-mObjMin.y), 2.0f/(mObjMax.z-mObjMin.z) );		
 		renderSetUW ( getScene(), getScene()->getProgram(GLS_VOXELIZE), &mw, mVoxRes );		// this sets uTexRes in shader
 
 		renderSceneGL ( getScene(), getScene()->getProgram(GLS_VOXELIZE), false );
@@ -231,7 +231,7 @@ void Volume3D::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 void Volume3D::getMemory ( float& voxels, float& overhead, float& effective )
 {
 	// all measurements in MB
-	voxels = float(mVoxRes.x*mVoxRes.y*mVoxRes.z*4.0) / (1024.0*1024.0);
-	overhead = (float) 0.0;
-	effective = float(mVoxRes.x*mVoxRes.y*mVoxRes.z*4.0) / (1024.0*1024.0);
+	voxels = (mVoxRes.x*mVoxRes.y*mVoxRes.z*4.0f) / (1024.0f*1024.0f);
+	overhead = 0.0f;
+	effective = (mVoxRes.x*mVoxRes.y*mVoxRes.z*4.0f) / (1024.0f*1024.0f);
 }

@@ -109,11 +109,10 @@
 		VTYPE &X(void)				{return x;}
 		VTYPE &Y(void)				{return y;}
 		VTYPE &Z(void)				{return z;}
-		VTYPE W(void)					{return 0;}
+		VTYPE W(void) const			{return 0;}
 		const VTYPE &X(void) const	{return x;}
 		const VTYPE &Y(void) const	{return y;}
 		const VTYPE &Z(void) const	{return z;}
-		const VTYPE W(void) const		{return 0;}
 		VTYPE *Data (void)			{return &x;}
 	};
 	}
@@ -222,11 +221,10 @@
 		VTYPE &X()				{return x;}
 		VTYPE &Y()				{return y;}
 		VTYPE &Z()				{return z;}
-		VTYPE W()					{return 0;}
+		VTYPE W() const			{return 0;}
 		const VTYPE &X() const	{return x;}
 		const VTYPE &Y() const	{return y;}
 		const VTYPE &Z() const	{return z;}
-		const VTYPE W() const		{return 0;}
 		VTYPE *Data ()			{return &x;}
 	};
 	}
@@ -264,7 +262,6 @@
 		Vector4DF &operator= (const Vector4DF &op);
 
 		Vector4DF &operator+= (const int op);
-		Vector4DF &operator+= (const float op);
 		Vector4DF &operator+= (const double op);
 		Vector4DF &operator+= (const Vector3DI &op);
 		Vector4DF &operator+= (const Vector3DF &op);

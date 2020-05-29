@@ -2155,7 +2155,7 @@ bool VolumeGVDB::LoadVDB ( std::string fname )
 	float* src;
 	float* src2 = (float*) malloc ( res0*res0*res0*sizeof(float) );		// velocity field
 	float mValMin, mValMax;
-	mValMin = 1.0E35; mValMax = -1.0E35; 
+	mValMin = 1.0E35f; mValMax = -1.0E35f; 
 
 	// Fill atlas from leaf data
 	int percl = 0, perc = 0;
@@ -2258,14 +2258,14 @@ void VolumeGVDB::SaveVDB ( std::string fname )
 	Leaf34* leaf;
 	Value34* leafbuf;	
 	int res = getRes(0);
-	int sz = getVoxCnt(0) * sizeof(float);			// data per leaf = (res^3) floats
+	uint64 sz = getVoxCnt(0) * sizeof(float);			// data per leaf = (res^3) floats
 	
 	DataPtr p;
 	mPool->CreateMemLinear ( p, 0x0, 1, sz, true );	
 
-	int leafcnt = mPool->getPoolTotalCnt(0,0);			// leaf count
+	uint64 leafcnt = mPool->getPoolTotalCnt(0,0);		// leaf count
 	Node* node;
-	for (int n=0; n < leafcnt; n++ ) {
+	for (uint64 n=0; n < leafcnt; n++ ) {
 		node = getNode ( 0, 0, n );
 		pos = node->mPos;
 		leaf = tree->touchLeaf ( openvdb::Coord(pos.x, pos.y, pos.z) );
@@ -2337,8 +2337,8 @@ void VolumeGVDB::Initialize ()
 	// Default Camera & Light
 	mScene->SetCamera ( new Camera3D );		// Default camera
 	mScene->SetLight ( 0, new Light );		// Default light
-	mScene->SetVolumeRange ( 0.1, 0, 1 );	// Default transfer range
-	mScene->LinearTransferFunc ( 0, 1, Vector4DF(0,0,0,0), Vector4DF(1,1,1,0.1) );		// Default transfer function
+	mScene->SetVolumeRange ( 0.1f, 0, 1 );	// Default transfer range
+	mScene->LinearTransferFunc ( 0, 1, Vector4DF(0,0,0,0), Vector4DF(1,1,1,0.1f) );		// Default transfer function
 	
 	// Default transfer function
 	CommitTransferFunc ();	
@@ -2400,10 +2400,10 @@ void VolumeGVDB::Configure ( int levs, int* r, int* numcnt, bool use_masks )
 	mClrDim[5] = Vector3DF(0,1,1);		// aqua
 	mClrDim[6] = Vector3DF(1,0.5,0);	// orange
 	mClrDim[7] = Vector3DF(0,0.5,1);	// green-blue
-	mClrDim[8] = Vector3DF(0.7,0.7,0.7);  // grey
+	mClrDim[8] = Vector3DF(0.7f,0.7f,0.7f);  // grey
 
 	// Initialize memory pools
-	int hdr = sizeof(Node);
+	uint64 hdr = sizeof(Node);
 
 	mPool->PoolReleaseAll();
 
@@ -2412,7 +2412,7 @@ void VolumeGVDB::Configure ( int levs, int* r, int* numcnt, bool use_masks )
 	#endif
 
 	// node & mask list	
-	int nodesz;
+	uint64 nodesz;
 	for (int n = 0; n < levs; n++) {
 		nodesz = hdr;
 		if ( use_masks ) nodesz += getMaskSize(n);
@@ -2525,7 +2525,7 @@ void VolumeGVDB::UpdateNeighbors()
 {
 	PUSH_CTX
 
-	int brks = mPool->getPoolTotalCnt(0, 0);
+	uint64 brks = mPool->getPoolTotalCnt(0, 0);
 	
 	mPool->AllocateNeighbors( brks );
 
@@ -2536,7 +2536,7 @@ void VolumeGVDB::UpdateNeighbors()
 	int* nbr = (int*) ntable->cpu;
 	Node* node;
 
-	for (int n = 0; n < brks; n++) {
+	for (uint64 n = 0; n < brks; n++) {
 		node = getNode(0, 0, n);
 		ct = node->mPos + Vector3DF(d / 2, d / 2, d / 2);
 		*nbr++ = ElemNdx(getNodeAtPoint(mRoot, ct - Vector3DF(d, 0, 0)) );
@@ -2602,15 +2602,15 @@ float Mandelbulb ( Vector3DF s )
 
 		theta = asin(z.z/r) * pwr;
 		phi = atan2(z.y, z.x) * pwr;
-		zr = pow( (double) r, (float) pwr-1.0 );
-		dr = zr*pwr*dr + 1.0;
+		zr = powf(r, pwr - 1.0f );
+		dr = zr*pwr*dr + 1.0f;
 		zr *= r;		
 
 		z = Vector3DF( cos(theta)*cos(phi), cos(theta)*sin(phi), sin(theta) );
 		z *= zr;
 		z += s;
 	}
-	return -0.5*log(r)*r / dr;
+	return -0.5f*log(r)*r / dr;
 }
 
 void VolumeGVDB::CopyChannel(int chanDst, int chanSrc)
@@ -2632,13 +2632,13 @@ void VolumeGVDB::UpdateAtlas ()
 
 	Vector3DI brickpos;
 	Node* node;
-	int totalLeafcnt = mPool->getPoolTotalCnt(0,0);
-	int usedLeafcnt = mPool->getPoolUsedCnt(0,0);
+	uint64 totalLeafcnt = mPool->getPoolTotalCnt(0,0);
+	uint64 usedLeafcnt = mPool->getPoolUsedCnt(0,0);
 	
 	mPool->AtlasEmptyAll ();
 
 	// Resize atlas
-	int amax = mPool->getAtlas(0).max;
+	uint64 amax = mPool->getAtlas(0).max;
 	if ( usedLeafcnt > amax ) {
 		PERF_PUSH ( "Resize Atlas" );
 		for (int n=0; n < mPool->getNumAtlas(); n++ ) 
@@ -2649,7 +2649,7 @@ void VolumeGVDB::UpdateAtlas ()
 
 	// Assign new nodes to atlas
 	PERF_PUSH ( "Assign Atlas" );
-	for (int n=0; n < totalLeafcnt; n++ ) {
+	for (uint64 n=0; n < totalLeafcnt; n++ ) {
 		node = getNode ( 0, 0, n );
 		if (!node->mFlags) continue;
 			if ( mPool->AtlasAlloc ( 0, brickpos ) )	// assign to atlas brick
@@ -2675,7 +2675,7 @@ void VolumeGVDB::UpdateAtlas ()
 	int brickres = mPool->getAtlasBrickres(0);
 	Vector3DI atlasres = mPool->getAtlasRes(0);
 	Vector3DI atlasmax = atlasres - brickres + mPool->getAtlas(0).apron; 
-	for (int n=0; n < totalLeafcnt; n++ ) {
+	for (uint64 n=0; n < totalLeafcnt; n++ ) {
 		Node* node = getNode ( 0, 0, n );
 		if (!node->mFlags) continue;
 		if ( node->mValue.x > atlasmax.x || node->mValue.y > atlasmax.y || node->mValue.z > atlasmax.z ) {

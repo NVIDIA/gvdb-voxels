@@ -141,7 +141,7 @@
 
 		// Add a callback to the list of token / function pairs
 		//   -> Matching with 'token' is not case sensitive.
-		void SetCallback( const char *token, void(*func) () );
+		void SetCallback( const char *token, CallbackFunction func );
 
 		// Once the callbacks are setup, parse the file.
 		//  -> This also closes the file when done parsing

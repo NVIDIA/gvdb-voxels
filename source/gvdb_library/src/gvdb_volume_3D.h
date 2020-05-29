@@ -38,8 +38,7 @@
 		void Resize ( char typ, Vector3DI res, Matrix4F* xform, bool bGL );
 		void CommitFromCPU ( float* src );
 		void SetDomain ( Vector3DF vmin, Vector3DF vmax );
-		void Empty ();	
-		void PrepareFill ( char how, bool start );				
+		void Empty ();
 		void getMemory ( float& voxels, float& overhead, float& effective );
 		
 		// OpenGL Poly-to-Voxels

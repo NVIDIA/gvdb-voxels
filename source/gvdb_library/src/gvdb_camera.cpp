@@ -274,10 +274,10 @@ void Camera3D::setMatrices(const float* view_mtx, const float* proj_mtx, Vector3
 	invviewproj_matrix.InvertTRS();			
 
 	// Compute mFov, mAspect, mNear, mFar
-	mNear = double(proj_matrix(2, 3)) / double(proj_matrix(2, 2) - 1.0f );
-	mFar  = double(proj_matrix(2, 3)) / double(proj_matrix(2, 2) + 1.0f );
-	double sx = 2.0f * mNear / proj_matrix(0, 0);
-	double sy = 2.0f * mNear / proj_matrix(1, 1);
+	mNear = proj_matrix(2, 3) / (proj_matrix(2, 2) - 1.0f);
+	mFar  = proj_matrix(2, 3) / (proj_matrix(2, 2) + 1.0f);
+	float sx = 2.0f * mNear / proj_matrix(0, 0);
+	float sy = 2.0f * mNear / proj_matrix(1, 1);
 	mAspect = sx / sy;
 	mFov = 2.0f * atan(sx / mNear) / DEGtoRAD;
 

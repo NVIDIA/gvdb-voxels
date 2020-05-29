@@ -67,9 +67,6 @@ using namespace nvdb;
 		Vector3DF	scale;
 		Vector3DF	ang_euler;
 		Matrix4F	trans;
-		
-		//Quatern	ang_quat;
-		//Quatern	dang_quat;
 	};
 
 	}
@@ -91,8 +88,6 @@ using namespace nvdb;
 		};
 		Camera3D ();
 		void Copy ( Camera3D& op );
-
-		void draw_gl();
 
 		// Camera settings
 		void setAspect ( float asp )					{ mAspect = asp;			updateMatricies(); }
@@ -131,7 +126,6 @@ using namespace nvdb;
 		Vector4DF project ( Vector3DF& p, Matrix4F& vm );		// Project point - override view matrix
 
 		void getVectors ( Vector3DF& dir, Vector3DF& up, Vector3DF& side )	{ dir = dir_vec; up = up_vec; side = side_vec; }
-		void getBounds ( float dst, Vector3DF& min, Vector3DF& max );
 		float getNear ()				{ return mNear; }
 		float getFar ()					{ return mFar; }
 		float getFov ()					{ return mFov; }

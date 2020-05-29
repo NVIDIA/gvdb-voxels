@@ -38,7 +38,7 @@
 	#define MIN_COMPUTE_VERSION		0x20
 	extern void				StartCuda( int devsel, CUcontext ctxsel, CUdevice& dev, CUcontext& ctx, CUstream* strm, bool verbose );
 	extern GVDB_API bool	cudaCheck ( CUresult e, const char* obj, const char* method, const char* apicall, const char* arg, bool bDebug);
-	extern GVDB_API Vector3DF cudaGetMemUsage();
+	extern GVDB_API Vector3DF cudaGetMemUsage(); // Returns (used MBs, free MBs, total MBs) of GPU memory.
 
 	namespace nvdb {
 
@@ -104,7 +104,7 @@
 		uint64  getPoolSize ( uchar grp, uchar lev ) { return mPool[grp][lev].size; }
 		CUdeviceptr	getPoolGPU ( uchar grp, uchar lev )	{ return mPool[grp][lev].gpu; }
 		uint64	getPoolWidth ( uchar grp, uchar lev );					// get pool width		
-		int		getPoolMem ();		
+		uint64	getPoolMem ();
 		void	PoolWrite ( FILE* fp, uchar grp, uchar lev );
 		void	PoolRead ( FILE* fp, uchar grp, uchar lev, int cnt, int wid );
 		
@@ -134,13 +134,13 @@
 		void	AtlasRetrieveSlice ( uchar chan, int y, int sz, CUdeviceptr tempmem, uchar* dest );
 		void	AtlasWriteSlice ( uchar chan, int slice, int sz, CUdeviceptr gpu_buf, uchar* cpu_src );
 		void	AtlasRetrieveTexXYZ ( uchar chan, Vector3DI val, DataPtr& buf );		
-		int		getAtlasMem ();
+		uint64	getAtlasMem (); // Returns the number of megabytes of memory used by the atlas.
 		void	AtlasWrite ( FILE* fp, uchar chan );		
 		void	AtlasRead ( FILE* fp, uchar chan, uint64 asize );
 
 		//void	CreateImage ( DataPtr& p, nvImg& img );
 		void	CreateMemLinear ( DataPtr& p, char* dat, int sz );
-		void	CreateMemLinear ( DataPtr& p, char* dat, int stride, int cnt, bool bCPU, bool bAllocHost = false  );
+		void	CreateMemLinear ( DataPtr& p, char* dat, int stride, uint64 cnt, bool bCPU, bool bAllocHost = false  );
 		void    FreeMemLinear ( DataPtr& p );
 		void    RetrieveMem ( DataPtr& p);
 		void    CommitMem ( DataPtr& p);
@@ -174,7 +174,6 @@
 		int		getAtlasBrickwid ( uchar chan);
 		int		getNumLevels ()		{ return (int) mPool[0].size(); }
 		DataPtr* getPool(uchar grp, uchar lev);
-		uint32  getNodeAtPoint(uint32 nodeid, Vector3DF pos);
 
 		void CopyChannel(int chanDst, int chanSrc);
 

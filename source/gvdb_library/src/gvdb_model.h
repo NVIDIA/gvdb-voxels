@@ -47,7 +47,6 @@
 		bool	isVolume ()		{ return modelType==1; }
 		void	Transform ( Vector3DF move, Vector3DF scale );
 		void	UniqueNormals ();
-		void	UpdateVBO ();
 		void	ComputeBounds ( Matrix4F& xform, float margin );
 
 		int		getNumVert ()		{ return vertCount; }

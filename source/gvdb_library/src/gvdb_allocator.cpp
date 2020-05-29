@@ -211,13 +211,13 @@ void Allocator::PoolEmptyAll ()
 		}
 }
 
-int	Allocator::getPoolMem ()
+uint64 Allocator::getPoolMem ()
 {
-	slong sz = 0;
+	uint64 sz = 0;
 	for (int grp=0; grp < MAX_POOL; grp++) 
 		for (int lev=0; lev < mPool[grp].size(); lev++ ) 
 			sz += mPool[grp][lev].size;
-	return sz / slong(1024*1024);
+	return sz / uint64(1024*1024);
 }
 
 char* Allocator::PoolData ( uint64 elem )
@@ -269,7 +269,7 @@ void Allocator::CreateMemLinear ( DataPtr& p, char* dat, int sz )
 	CreateMemLinear ( p, dat, 1, sz, false );
 }
 
-void Allocator::CreateMemLinear ( DataPtr& p, char* dat, int stride, int cnt, bool bCPU, bool bAllocHost )
+void Allocator::CreateMemLinear ( DataPtr& p, char* dat, int stride, uint64 cnt, bool bCPU, bool bAllocHost )
 {
 	//std::cout << p.lastEle << std::endl;
 	p.alloc = this;
@@ -976,7 +976,7 @@ int Allocator::getAtlasBrickwid (uchar chan)
 	return mAtlas[chan].stride;
 }
 
-int	Allocator::getAtlasMem ()
+uint64 Allocator::getAtlasMem ()
 {
 	Vector3DI res = getAtlasRes(0);
 	uint64 mem = getSize(mAtlas[0].type)*res.x*res.y*res.z / uint64(1024*1024); 
@@ -1125,11 +1125,11 @@ Vector3DF cudaGetMemUsage ()
 	Vector3DF mem;
 	size_t free, total;	
 	cuMemGetInfo ( &free, &total );
-	free /= (1024.0f*1024.0f);		// MB
-	total /= (1024.0f*1024.0f);
-	mem.x = total - free;	// used
-	mem.y = free;
-	mem.z = total;
+	free /= 1024ULL * 1024ULL;		// MB
+	total /= 1024ULL * 1024ULL;
+	mem.x = static_cast<float>(total - free);	// used
+	mem.y = static_cast<float>(free);
+	mem.z = static_cast<float>(total);
 	return mem;
 }
 
