@@ -158,79 +158,80 @@ extern "C" __global__ void gvdbUpdateApronC4 ( VDBInfo* gvdb, uchar chan, int br
 	UpdateApron<uchar4>(gvdb, chan, brickcnt, brickres, make_uchar4(boundval, boundval, boundval, boundval));
 }
 
-#define GVDB_COPY_SMEM_F																	\
-	float3 vox;																				\
-	uint3 ndx;																				\
-	__shared__ float  svox[10][10][10]; 													\
-	ndx = threadIdx + make_uint3(1,1,1);													\
-	vox = make_float3(blockIdx) * make_float3(blockDim.x, blockDim.y, blockDim.z) + make_float3(ndx) + make_float3(0.5f,0.5f,0.5f); \
-	if ( vox.x >= res.x || vox.y >= res.y || vox.z >= res.z ) return;						\
-	svox[ndx.x][ndx.y][ndx.z] = tex3D<float> ( gvdb->volIn[chan], vox.x, vox.y, vox.z );	\
-	if ( ndx.x==1 ) {																		\
-		svox[0][ndx.y][ndx.z] = tex3D<float> ( gvdb->volIn[chan], vox.x-1, vox.y, vox.z );	\
-		svox[9][ndx.y][ndx.z] = tex3D<float> ( gvdb->volIn[chan], vox.x+8, vox.y, vox.z );	\
-	}																						\
-	if ( ndx.y==1 ) {																		\
-		svox[ndx.x][0][ndx.z] = tex3D<float> ( gvdb->volIn[chan], vox.x, vox.y-1, vox.z );	\
-		svox[ndx.x][9][ndx.z] = tex3D<float> ( gvdb->volIn[chan], vox.x, vox.y+8, vox.z );	\
-	}																						\
-	if ( ndx.z==1 ) {																		\
-		svox[ndx.x][ndx.y][0] = tex3D<float> ( gvdb->volIn[chan], vox.x, vox.y, vox.z-1 );	\
-		svox[ndx.x][ndx.y][9] = tex3D<float> ( gvdb->volIn[chan], vox.x, vox.y, vox.z+8 );	\
-	}																						\
-	vox -= make_float3(0.5f,0.5f,0.5f);														\
-	__syncthreads ();
+// Loads the shared memory for this CUDA block, given the index of this thread in the
+// shared memory, and its location in the atlas. This should be called for values of
+// ndx in the range [1,8]^3; this function will make additional loads as needed to
+// fill in the voxels adjacent along an axis to [1,8]^3.
+// This assumes that the function is being called with a block size of (8, 8, 8).
+template<class T>
+__device__ void LoadSharedMemory(VDBInfo* gvdb, uchar channel, T sharedVoxels[10][10][10], uint3 ndx, uint3 voxI) {
+	// Offset the atlas location by half a voxel so that linear interpolation
+	// doesn't blend between adjacent voxels.
+	float3 vox = make_float3(voxI) + make_float3(0.5f, 0.5f, 0.5f);
 
-#define GVDB_COPY_SMEM_UC4																	\
-	uint3 vox, ndx;																			\
-	__shared__ uchar4 svox[10][10][10]; 													\
-	ndx = threadIdx + make_uint3(1,1,1);													\
-	vox = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + ndx;					\
-	if ( vox.x >= res.x || vox.y >= res.y || vox.z >= res.z ) return;						\
-	svox[ndx.x][ndx.y][ndx.z] = tex3D<uchar4> ( gvdb->volIn[chan], vox.x, vox.y, vox.z );	\
-	if ( ndx.x==1 ) {																		\
-		svox[0][ndx.y][ndx.z] = tex3D<uchar4> ( gvdb->volIn[chan], vox.x-1, vox.y, vox.z );	\
-		svox[9][ndx.y][ndx.z] = tex3D<uchar4> ( gvdb->volIn[chan], vox.x+8, vox.y, vox.z );	\
-	}																						\
-	if ( ndx.y==1 ) {																		\
-		svox[ndx.x][0][ndx.z] = tex3D<uchar4> ( gvdb->volIn[chan], vox.x, vox.y-1, vox.z );	\
-		svox[ndx.x][9][ndx.z] = tex3D<uchar4> ( gvdb->volIn[chan], vox.x, vox.y+8, vox.z );	\
-	}																						\
-	if ( ndx.z==1 ) {																		\
-		svox[ndx.x][ndx.y][0] = tex3D<uchar4> ( gvdb->volIn[chan], vox.x, vox.y, vox.z-1 );	\
-		svox[ndx.x][ndx.y][9]  = tex3D<uchar4> ( gvdb->volIn[chan], vox.x, vox.y, vox.z+1 );\
-	}																						\
-	__syncthreads ();
+	// Copy the atlas voxel at voxI into sharedVoxels[ndx].
+	sharedVoxels[ndx.x][ndx.y][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y, vox.z);
 
-#define GVDB_COPY_SMEM_UC																	\
-	uint3 vox, ndx;																			\
-	__shared__ uchar svox[10][10][10]; 														\
-	ndx = threadIdx + make_uint3(1,1,1);													\
-	vox = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + ndx;					\
-	if ( vox.x >= res.x || vox.y >= res.y || vox.z >= res.z ) return;						\
-	svox[ndx.x][ndx.y][ndx.z] = tex3D<uchar> ( gvdb->volIn[chan], vox.x, vox.y, vox.z );	\
-	if ( ndx.x==1 ) {																		\
-		svox[0][ndx.y][ndx.z] = tex3D<uchar> ( gvdb->volIn[chan], vox.x-1, vox.y, vox.z );	\
-		svox[9][ndx.y][ndx.z] = tex3D<uchar> ( gvdb->volIn[chan], vox.x+8, vox.y, vox.z );	\
-	}																						\
-	if ( ndx.y==1 ) {																		\
-		svox[ndx.x][0][ndx.z] = tex3D<uchar> ( gvdb->volIn[chan], vox.x, vox.y-1, vox.z );	\
-		svox[ndx.x][9][ndx.z] = tex3D<uchar> ( gvdb->volIn[chan], vox.x, vox.y+8, vox.z );	\
-	}																						\
-	if ( ndx.z==1 ) {																		\
-		svox[ndx.x][ndx.y][0] = tex3D<uchar> ( gvdb->volIn[chan], vox.x, vox.y, vox.z-1 );	\
-		svox[ndx.x][ndx.y][9]  = tex3D<uchar> ( gvdb->volIn[chan], vox.x, vox.y, vox.z+1 );	\
-	}																						\
-	__syncthreads ();
+	// Load voxels adjacent to [1,9]^3.
+	if (ndx.x == 1) {
+		sharedVoxels[0][ndx.y][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x - 1, vox.y, vox.z);
+	}
+	else if (ndx.x == 8) {
+		sharedVoxels[9][ndx.y][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x + 1, vox.y, vox.z);
+	}
 
-#define GVDB_VOX																								\
-	uint3 vox = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx + make_uint3(1,1,1);		\
-	if ( vox.x >= res.x|| vox.y >= res.y || vox.z >= res.z ) return;
+	if (ndx.y == 1) {
+		sharedVoxels[ndx.x][0][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y - 1, vox.z);
+	}
+	else if (ndx.y == 8) {
+		sharedVoxels[ndx.x][9][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y + 1, vox.z);
+	}
 
+	if (ndx.z == 1) {
+		sharedVoxels[ndx.x][ndx.y][0] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y, vox.z - 1);
+	}
+	else if (ndx.z == 8) {
+		sharedVoxels[ndx.x][ndx.y][9] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y, vox.z + 1);
+	}
 
-extern "C" __global__ void gvdbOpGrow ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
+	// Make sure all loads from the block have completed.
+	__syncthreads();
+}
+
+// Suppose you're running a kernel with a block size of (8, 8, 8). This function
+// will take each thread's indices and return:
+// localIdx: threadIdx + 1
+// atlasIdx: The corresponding voxel in the atlas, skipping over aprons.
+// For instance, for the brick starting at (0,0,0), atlasIdx will be equal to
+// localIdx. But this will not be the case for other bricks.
+__device__ void GetVoxelIndicesPacked(VDBInfo* gvdb, uint3& localIdx, uint3& atlasIdx) {
+	localIdx = threadIdx + make_uint3(1, 1, 1);
+
+	// What atlasIdx would be if atlas_apron were 0
+	const uint3 packedVox = blockIdx * blockDim + threadIdx;
+
+	// Find the 3D index of the brick atlasIdx corresponds to
+	const int brickResNoApron = gvdb->brick_res - gvdb->atlas_apron * 2;
+	const uint3 brick = packedVox / brickResNoApron;
+
+	// Convert to a position in the full atlas
+	atlasIdx = packedVox + brick * gvdb->atlas_apron * 2 + gvdb->atlas_apron;
+}
+
+// A helper macro that sets up local and atlas coordinates, checks to see if
+// they're inside the atlas bounds, and returns if not. Skips over atlas
+// boundaries, which means that it can use a smaller computation grid than
+// the older GVDB_VOX.
+#define GVDB_VOXPACK \
+	uint3 localIdx, atlasIdx; \
+	GetVoxelIndicesPacked(gvdb, localIdx, atlasIdx); \
+	if (atlasIdx.x >= atlasRes.x || atlasIdx.y >= atlasRes.y || atlasIdx.z >= atlasRes.z) return;
+
+extern "C" __global__ void gvdbOpGrow ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_COPY_SMEM_F
+	__shared__ float sharedVoxels[10][10][10];
+	GVDB_VOXPACK
+	LoadSharedMemory<float>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 	
 	/*float nl;	
 	float3 n;
@@ -241,37 +242,29 @@ extern "C" __global__ void gvdbOpGrow ( VDBInfo* gvdb, int3 res, uchar chan, flo
 	float v = svox[ndx.x][ndx.y][ndx.z];
 	if ( nl > 0.2 ) v += amt;*/ 
 
-	float v = svox[ndx.x][ndx.y][ndx.z];
+	float v = sharedVoxels[localIdx.x][localIdx.y][localIdx.z];
 	if ( v != 0.0) v += p1 * 10.0; //*0.1;
 	if ( v < 0.01) v = 0.0;
 	
-	surf3Dwrite ( v, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );		
+	surf3Dwrite(v, gvdb->volOut[channel], atlasIdx.x * sizeof(float), atlasIdx.y, atlasIdx.z);
 }
 
-extern "C" __global__ void gvdbOpCut ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
+extern "C" __global__ void gvdbOpCut ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_COPY_SMEM_F			
+	__shared__ float sharedVoxels[10][10][10];
+	GVDB_VOXPACK
+	LoadSharedMemory<float>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	// Determine block and index position	
 	float3 wpos;
-	if ( !getAtlasToWorld ( gvdb, make_uint3(vox), wpos )) return;
+	if (!getAtlasToWorld(gvdb, atlasIdx, wpos)) return;
 
-	float v = svox[ndx.x][ndx.y][ndx.z];
-	if ( wpos.x < 50 && v > 0 && v < 2 ) {
+	float v = sharedVoxels[localIdx.x][localIdx.y][localIdx.z];
+	if (wpos.x < 50 && v > 0 && v < 2) {
 		v = 0.02;
-		surf3Dwrite ( v, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );		
-	}	
+		surf3Dwrite(v, gvdb->volOut[channel], atlasIdx.x * sizeof(float), atlasIdx.y, atlasIdx.z);
+	}
 }
-
-//-- smooth
-	/*float v = 6.0*svox[ndx.x][ndx.y][ndx.z];
-	v += svox[ndx.x-1][ndx.y][ndx.z];
-	v += svox[ndx.x+1][ndx.y][ndx.z];
-	v += svox[ndx.x][ndx.y-1][ndx.z];
-	v += svox[ndx.x][ndx.y+1][ndx.z];
-	v += svox[ndx.x][ndx.y][ndx.z-1];
-	v += svox[ndx.x][ndx.y][ndx.z+1];
-	v /= 12.0;*/
 
 extern "C" __global__ void gvdbReduction( VDBInfo* gvdb, int3 res, uchar chan, int3 packres, float* outbuf)
 {
@@ -295,12 +288,12 @@ extern "C" __global__ void gvdbReduction( VDBInfo* gvdb, int3 res, uchar chan, i
 }
 
 
-extern "C" __global__ void gvdbResample ( VDBInfo* gvdb, int3 res, uchar chan, int3 srcres, float* src, float* xform, float3 inr, float3 outr )
+extern "C" __global__ void gvdbResample ( VDBInfo* gvdb, int3 atlasRes, uchar chan, int3 srcres, float* src, float* xform, float3 inr, float3 outr )
 {
-	GVDB_VOX
+	GVDB_VOXPACK
 
 	float3 wpos;
-	if ( !getAtlasToWorld ( gvdb, vox, wpos )) return;
+	if (!getAtlasToWorld(gvdb, atlasIdx, wpos)) return;
 	wpos -= make_float3(.5, .5, .5);
 	
 	// transform to src index
@@ -317,7 +310,7 @@ extern "C" __global__ void gvdbResample ( VDBInfo* gvdb, int3 res, uchar chan, i
 	float v = src[ (ndx.z*srcres.y + ndx.y)*srcres.x + ndx.x ];
 	v = outr.x + (v-inr.x)*(outr.y-outr.x)/(inr.y-inr.x);    // remap value
 
-	surf3Dwrite ( v, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
+	surf3Dwrite(v, gvdb->volOut[chan], atlasIdx.x * sizeof(float), atlasIdx.y, atlasIdx.z);
 }
 
 
@@ -362,99 +355,106 @@ extern "C" __global__ void gvdbDownsample(int3 srcres, float* src, int3 destres,
 	dest[(vox.z*destres.y + vox.y)*destres.x + vox.x] = v;
 }
 
-extern "C" __global__ void gvdbOpFillF  ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
+extern "C" __global__ void gvdbOpFillF  ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_VOX	
+	GVDB_VOXPACK
 
 	if ( p3 < 0 ) {
 		//float v = vox.y; // + (vox.z*30 + vox.x)/900.0;
-		float v = sinf( vox.x*12/(3.141592*30.0) );
-		v += sinf( vox.y*12/(3.141592*30.0) );
-		v += sinf( vox.z*12/(3.141592*30.0) );
-		surf3Dwrite ( v, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
+		float v = sinf(atlasIdx.x * 12 / (3.141592 * 30.0));
+		v += sinf(atlasIdx.y * 12 / (3.141592 * 30.0));
+		v += sinf(atlasIdx.z * 12 / (3.141592 * 30.0));
+		surf3Dwrite(v, gvdb->volOut[channel], atlasIdx.x * sizeof(float), atlasIdx.y, atlasIdx.z);
 	} else {
-		surf3Dwrite ( p1, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
+		surf3Dwrite(p1, gvdb->volOut[channel], atlasIdx.x * sizeof(float), atlasIdx.y, atlasIdx.z);
 	}
 }
-extern "C" __global__ void gvdbOpFillC4 ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
-{
-	GVDB_VOX
 
-	surf3Dwrite ( CLR2INT(make_float4(p1,p2,p3,1.0)), gvdb->volOut[chan], vox.x*sizeof(uchar4), vox.y, vox.z );
-}
-extern "C" __global__ void gvdbOpFillC ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
+extern "C" __global__ void gvdbOpFillC4 ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_VOX	
+	GVDB_VOXPACK
 
-	uchar c = p1;
-	surf3Dwrite ( c, gvdb->volOut[chan], vox.x*sizeof(uchar), vox.y, vox.z );
+	surf3Dwrite ( CLR2INT(make_float4(p1,p2,p3,1.0)), gvdb->volOut[channel], atlasIdx.x*sizeof(uchar4), atlasIdx.y, atlasIdx.z );
 }
 
-extern "C" __global__ void gvdbOpSmooth ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
+extern "C" __global__ void gvdbOpFillC ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_COPY_SMEM_F
+	GVDB_VOXPACK
+
+	const uchar c = static_cast<uchar>(p1);
+	surf3Dwrite(c, gvdb->volOut[channel], atlasIdx.x * sizeof(uchar), atlasIdx.y, atlasIdx.z);
+}
+
+extern "C" __global__ void gvdbOpSmooth ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
+{
+	__shared__ float sharedVoxels[10][10][10];
+	GVDB_VOXPACK
+	LoadSharedMemory<float>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	//-- smooth
-	float v = p1 * svox[ndx.x][ndx.y][ndx.z];
-	v += svox[ndx.x-1][ndx.y][ndx.z];
-	v += svox[ndx.x+1][ndx.y][ndx.z];
-	v += svox[ndx.x][ndx.y-1][ndx.z];
-	v += svox[ndx.x][ndx.y+1][ndx.z];
-	v += svox[ndx.x][ndx.y][ndx.z-1];
-	v += svox[ndx.x][ndx.y][ndx.z+1];
+	float v = p1 * sharedVoxels[localIdx.x][localIdx.y][localIdx.z];
+	v += sharedVoxels[localIdx.x-1][localIdx.y][localIdx.z];
+	v += sharedVoxels[localIdx.x+1][localIdx.y][localIdx.z];
+	v += sharedVoxels[localIdx.x][localIdx.y-1][localIdx.z];
+	v += sharedVoxels[localIdx.x][localIdx.y+1][localIdx.z];
+	v += sharedVoxels[localIdx.x][localIdx.y][localIdx.z-1];
+	v += sharedVoxels[localIdx.x][localIdx.y][localIdx.z+1];
 	v = v / (p1 + 6.0) + p2;
 
-	surf3Dwrite ( v, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
+	surf3Dwrite(v, gvdb->volOut[channel], atlasIdx.x * sizeof(float), atlasIdx.y, atlasIdx.z);
 }
 
-extern "C" __global__ void gvdbOpClrExpand ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
+extern "C" __global__ void gvdbOpClrExpand ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_COPY_SMEM_UC4
+	__shared__ uchar4 sharedVoxels[10][10][10];
+	GVDB_VOXPACK
+	LoadSharedMemory<uchar4>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	int3 c, cs;
 	int cp;
-	c = make_int3( svox[ndx.x][ndx.y][ndx.z] );   cs =  c*p1;
-	c = make_int3( svox[ndx.x-1][ndx.y][ndx.z] ); cs += c*p2;	
-	c = make_int3( svox[ndx.x+1][ndx.y][ndx.z] ); cs += c*p2;
-	c = make_int3( svox[ndx.x][ndx.y-1][ndx.z] ); cs += c*p2;
-	c = make_int3( svox[ndx.x][ndx.y+1][ndx.z] ); cs += c*p2;
-	c = make_int3( svox[ndx.x][ndx.y][ndx.z-1] ); cs += c*p2;
-	c = make_int3( svox[ndx.x][ndx.y][ndx.z+1] ); cs += c*p2;
+	c = make_int3(sharedVoxels[localIdx.x][localIdx.y][localIdx.z]);   cs = c * p1;
+	c = make_int3(sharedVoxels[localIdx.x - 1][localIdx.y][localIdx.z]); cs += c * p2;
+	c = make_int3(sharedVoxels[localIdx.x + 1][localIdx.y][localIdx.z]); cs += c * p2;
+	c = make_int3(sharedVoxels[localIdx.x][localIdx.y - 1][localIdx.z]); cs += c * p2;
+	c = make_int3(sharedVoxels[localIdx.x][localIdx.y + 1][localIdx.z]); cs += c * p2;
+	c = make_int3(sharedVoxels[localIdx.x][localIdx.y][localIdx.z - 1]); cs += c * p2;
+	c = make_int3(sharedVoxels[localIdx.x][localIdx.y][localIdx.z + 1]); cs += c * p2;
 	cp = max(cs.x, max(cs.y,cs.z) );
 	cs = (cp > 255) ? make_int3(cs.x*255/cp, cs.y*255/cp, cs.z*255/cp) : cs;
 
-	surf3Dwrite ( make_uchar4(cs.x, cs.y, cs.z, 1), gvdb->volOut[chan], vox.x*sizeof(uchar4), vox.y, vox.z );
+	surf3Dwrite ( make_uchar4(cs.x, cs.y, cs.z, 1), gvdb->volOut[channel], atlasIdx.x*sizeof(uchar4), atlasIdx.y, atlasIdx.z );
 }
 
-extern "C" __global__ void gvdbOpExpandC ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
+extern "C" __global__ void gvdbOpExpandC ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_COPY_SMEM_UC
+	__shared__ uchar sharedVoxels[10][10][10];
+	GVDB_VOXPACK
+	LoadSharedMemory<uchar>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	uchar c = 0;
-	c = (svox[ndx.x-1][ndx.y][ndx.z] == (uchar) p1 ) ? 1 : c;
-	c = (svox[ndx.x+1][ndx.y][ndx.z] == (uchar) p1 ) ? 1 : c;
-	c = (svox[ndx.x][ndx.y-1][ndx.z] == (uchar) p1 ) ? 1 : c;
-	c = (svox[ndx.x][ndx.y+1][ndx.z] == (uchar) p1 ) ? 1 : c;
-	c = (svox[ndx.x][ndx.y][ndx.z-1] == (uchar) p1 ) ? 1 : c;
-	c = (svox[ndx.x][ndx.y][ndx.z+1] == (uchar) p1 ) ? 1 : c;
+	c = (sharedVoxels[localIdx.x - 1][localIdx.y][localIdx.z] == (uchar)p1) ? 1 : c;
+	c = (sharedVoxels[localIdx.x + 1][localIdx.y][localIdx.z] == (uchar)p1) ? 1 : c;
+	c = (sharedVoxels[localIdx.x][localIdx.y - 1][localIdx.z] == (uchar)p1) ? 1 : c;
+	c = (sharedVoxels[localIdx.x][localIdx.y + 1][localIdx.z] == (uchar)p1) ? 1 : c;
+	c = (sharedVoxels[localIdx.x][localIdx.y][localIdx.z - 1] == (uchar)p1) ? 1 : c;
+	c = (sharedVoxels[localIdx.x][localIdx.y][localIdx.z + 1] == (uchar)p1) ? 1 : c;
 	
-	uchar v = svox[ndx.x][ndx.y][ndx.z];
+	uchar v = sharedVoxels[localIdx.x][localIdx.y][localIdx.z];
 	if ( v == 0 && c == 1 ) {
-		c = p2;
-		surf3Dwrite ( c, gvdb->volOut[chan], vox.x*sizeof(uchar), vox.y, vox.z );
+		c = static_cast<uchar>(p2);
+		surf3Dwrite(c, gvdb->volOut[channel], atlasIdx.x * sizeof(uchar), atlasIdx.y, atlasIdx.z);
 	}
 }
 
-
-extern "C" __global__ void gvdbOpNoise ( VDBInfo* gvdb, int3 res, uchar chan, float p1, float p2, float p3 )
+extern "C" __global__ void gvdbOpNoise ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_COPY_SMEM_F
+	__shared__ float sharedVoxels[10][10][10];
+	GVDB_VOXPACK
+	LoadSharedMemory<float>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	//-- noise
-	float v = svox[ndx.x][ndx.y][ndx.z];
-	if ( v > 0.01 ) v += random(make_float3(vox.x,vox.y,vox.z)) * p1;
+	float v = sharedVoxels[localIdx.x][localIdx.y][localIdx.z];
+	if (v > 0.01) v += random(make_float3(atlasIdx.x, atlasIdx.y, atlasIdx.z)) * p1;
 
-	surf3Dwrite ( v, gvdb->volOut[chan], vox.x*sizeof(float), vox.y, vox.z );
-
+	surf3Dwrite(v, gvdb->volOut[channel], atlasIdx.x * sizeof(float), atlasIdx.y, atlasIdx.z);
 }
-

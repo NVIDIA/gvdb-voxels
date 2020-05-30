@@ -2460,9 +2460,9 @@ void VolumeGVDB::FillChannel ( uchar chan, Vector4DF val )
 		ClearChannel(chan);
 	} else {
 		switch (mPool->getAtlas(chan).type) {
-		case T_FLOAT:	Compute ( FUNC_FILL_F, chan, 1, val, false);	break;	
-		case T_UCHAR:	Compute ( FUNC_FILL_C, chan, 1, val, false );	break;
-		case T_UCHAR4:	Compute ( FUNC_FILL_C4, chan, 1, val, false );	break;	
+		case T_FLOAT:	Compute ( FUNC_FILL_F, chan, 1, val, false, true);	break;	
+		case T_UCHAR:	Compute ( FUNC_FILL_C, chan, 1, val, false, true);	break;
+		case T_UCHAR4:	Compute ( FUNC_FILL_C4, chan, 1, val, false, true);	break;
 		};
 	}
 
@@ -4485,8 +4485,7 @@ void VolumeGVDB::UpdateApronFaces (uchar chan)
 }
 
 
-// Run a custom user compute kernel
-void VolumeGVDB::ComputeKernel ( CUmodule user_module, CUfunction user_kernel, uchar chan, bool bUpdateApron )
+void VolumeGVDB::ComputeKernel (CUmodule user_module, CUfunction user_kernel, uchar channel, bool bUpdateApron, bool skipOverAprons)
 {
 	PERF_PUSH ("ComputeKernel");
 
@@ -4499,10 +4498,10 @@ void VolumeGVDB::ComputeKernel ( CUmodule user_module, CUfunction user_kernel, u
 
 	// Determine grid and block dims (must match atlas bricks)	
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI res = mPool->getAtlasRes( chan );
-	Vector3DI grid ( int(res.x/block.x)+1, int(res.y/block.y)+1, int(res.z/block.z)+1 );	
+	Vector3DI res = mPool->getAtlasRes( channel );
+	Vector3DI grid = (res + block - Vector3DI(1, 1, 1)) / block;
 
-	void* args[3] = { &cuVDBInfo, &res, &chan };
+	void* args[3] = { &cuVDBInfo, &res, &channel };
 	cudaCheck ( cuLaunchKernel ( user_kernel, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), 
 					"VolumeGVDB", "ComputeKernel", "cuLaunch", "(user kernel)", mbDebug);
 	
@@ -4518,8 +4517,7 @@ void VolumeGVDB::ComputeKernel ( CUmodule user_module, CUfunction user_kernel, u
 	PERF_POP();
 }
 
-// Run a native compute kernel
-void VolumeGVDB::Compute ( int effect, uchar chan, int iter, Vector3DF parm, bool bUpdateApron, float boundval)
+void VolumeGVDB::Compute (int effect, uchar channel, int num_iterations, Vector3DF parameters, bool bUpdateApron, bool skipOverAprons, float boundval)
 { 
 	PERF_PUSH ("Compute");
 
@@ -4530,16 +4528,16 @@ void VolumeGVDB::Compute ( int effect, uchar chan, int iter, Vector3DF parm, boo
 
 	// Determine grid and block dims (must match atlas bricks)	
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI res = mPool->getAtlasRes( chan );
-	Vector3DI grid ( int(res.x/block.x)+1, int(res.y/block.y)+1, int(res.z/block.z)+1 );	
+	Vector3DI res = (skipOverAprons ? mPool->getAtlasPackres(channel) : mPool->getAtlasRes(channel));
+	Vector3DI grid = (res + block - Vector3DI(1, 1, 1)) / block;
 
-	void* args[6] = { &cuVDBInfo, &res, &chan, &parm.x, &parm.y, &parm.z };
+	void* args[6] = { &cuVDBInfo, &res, &channel, &parameters.x, &parameters.y, &parameters.z };
 	
-	for (int n=0; n < iter; n++ ) {
+	for (int n=0; n < num_iterations; n++ ) {
 		cudaCheck ( cuLaunchKernel ( cuFunc[effect], grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, mStream, args, NULL ),
 						"VolumeGVDB", "Compute", "cuLaunch", "", mbDebug);
 			
-		if ( bUpdateApron ) UpdateApron ( chan, boundval );		// update the apron
+		if (bUpdateApron) UpdateApron(channel, boundval); // update the apron
 	}
 	POP_CTX
 		
