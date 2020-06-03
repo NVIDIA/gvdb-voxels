@@ -26,7 +26,9 @@ macro(_check_version_on_folder checkdir bestver bestpath)
   if ( "${result}" STREQUAL "${checkdir}" )
     # found a path with versioning 
     SET ( ver "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}" )
-    if ( ver VERSION_GREATER bestver )
+	# GVDB 1.1.1's samples haven't been ported to OptiX 7.0 yet. But GVDB itself
+	# (not the samples) should be compatible with all versions of OptiX.
+    if ( (ver VERSION_GREATER bestver) AND (ver VERSION_LESS "7.0.0") )
       SET ( bestver ${ver} )
       SET ( bestpath "${basedir}/${checkdir}" )
     endif ()
@@ -109,13 +111,18 @@ if ( NOT OPTIX_ROOT_DIR )
      set (OPTIX_ROOT_DIR "/usr/local/optix" CACHE PATH "" FORCE)
      set (OPTIX_VERSION "4.0.0" )
   endif()
-endif()
-
-if(WIN32)
-  _find_version_path ( OPTIX_VERSION OPTIX_ROOT_DIR "${SEARCH_PATHS}" )
-  message(STATUS "OptiX version string: : ${OPTIX_VERSION}")
+  
+  if(WIN32)
+    _find_version_path ( OPTIX_VERSION OPTIX_ROOT_DIR "${SEARCH_PATHS}" )
+    message(STATUS "OptiX version string: : ${OPTIX_VERSION}")
+  else()
+	message(STATUS "OptiX root directory (Linux) : ${OPTIX_ROOT_DIR}")
+  endif()
 else()
-  message(STATUS "OptiX root directory (Linux) : ${OPTIX_ROOT_DIR}")
+  message(STATUS "OPTIX_ROOT_DIR was set to ${OPTIX_ROOT_DIR}. Detecting version number.")
+  string ( REGEX MATCH "OptiX SDK.*([0-9]+).([0-9]+).([0-9]+)" _RESULT "${OPTIX_ROOT_DIR}" )
+  set(OPTIX_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+  message(STATUS "Detected OptiX version (OPTIX_VERSION): ${OPTIX_VERSION}")
 endif()
 
 #-------- Locate Libs
