@@ -200,37 +200,49 @@ __device__ void LoadSharedMemory(VDBInfo* gvdb, uchar channel, T sharedVoxels[10
 
 // Suppose you're running a kernel with a block size of (8, 8, 8). This function
 // will take each thread's indices and return:
-// localIdx: threadIdx + 1
+// localIdx: threadIdx + gvdb->atlas_apron
 // atlasIdx: The corresponding voxel in the atlas, skipping over aprons.
 // For instance, for the brick starting at (0,0,0), atlasIdx will be equal to
 // localIdx. But this will not be the case for other bricks.
 __device__ void GetVoxelIndicesPacked(VDBInfo* gvdb, uint3& localIdx, uint3& atlasIdx) {
-	localIdx = threadIdx + make_uint3(1, 1, 1);
+	const uint3 atlasApron = make_uint3(gvdb->atlas_apron);
+	localIdx = threadIdx + atlasApron;
 
 	// What atlasIdx would be if atlas_apron were 0
 	const uint3 packedVox = blockIdx * blockDim + threadIdx;
 
 	// Find the 3D index of the brick atlasIdx corresponds to
-	const int brickResNoApron = gvdb->brick_res - gvdb->atlas_apron * 2;
-	const uint3 brick = packedVox / brickResNoApron;
+	const int brickResNoApron = gvdb->brick_res - 2 * gvdb->atlas_apron;
+	const uint3 brick = make_uint3(
+		packedVox.x / brickResNoApron,
+		packedVox.y / brickResNoApron,
+		packedVox.z / brickResNoApron);
 
 	// Convert to a position in the full atlas
-	atlasIdx = packedVox + brick * gvdb->atlas_apron * 2 + gvdb->atlas_apron;
+	atlasIdx = packedVox + brick * atlasApron * 2 + atlasApron;
 }
 
 // A helper macro that sets up local and atlas coordinates, checks to see if
 // they're inside the atlas bounds, and returns if not. Skips over atlas
 // boundaries, which means that it can use a smaller computation grid than
-// the older GVDB_VOX.
-#define GVDB_VOXPACK \
+// the older GVDB_VOX. Assumes a block size of (8,8,8).
+#define GVDB_VOXPACKED \
 	uint3 localIdx, atlasIdx; \
 	GetVoxelIndicesPacked(gvdb, localIdx, atlasIdx); \
+	if (atlasIdx.x >= atlasRes.x || atlasIdx.y >= atlasRes.y || atlasIdx.z >= atlasRes.z) return;
+
+// A helper macro that sets up unpacked local and atlas coordinates, checks to
+// see if they're inside the atlas bounds, and returns if not. Does not skip
+// over atlas boundaries, so this covers the entire atlas. This used to be GVDB_VOX.
+#define GVDB_VOXUNPACKED \
+	uint3 localIdx = threadIdx + make_uint3(1, 1, 1); \
+	uint3 atlasIdx = blockIdx * blockDim + localIdx; \
 	if (atlasIdx.x >= atlasRes.x || atlasIdx.y >= atlasRes.y || atlasIdx.z >= atlasRes.z) return;
 
 extern "C" __global__ void gvdbOpGrow ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
 	__shared__ float sharedVoxels[10][10][10];
-	GVDB_VOXPACK
+	GVDB_VOXPACKED
 	LoadSharedMemory<float>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 	
 	/*float nl;	
@@ -252,7 +264,7 @@ extern "C" __global__ void gvdbOpGrow ( VDBInfo* gvdb, int3 atlasRes, uchar chan
 extern "C" __global__ void gvdbOpCut ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
 	__shared__ float sharedVoxels[10][10][10];
-	GVDB_VOXPACK
+	GVDB_VOXPACKED
 	LoadSharedMemory<float>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	// Determine block and index position	
@@ -290,7 +302,7 @@ extern "C" __global__ void gvdbReduction( VDBInfo* gvdb, int3 res, uchar chan, i
 
 extern "C" __global__ void gvdbResample ( VDBInfo* gvdb, int3 atlasRes, uchar chan, int3 srcres, float* src, float* xform, float3 inr, float3 outr )
 {
-	GVDB_VOXPACK
+	GVDB_VOXUNPACKED
 
 	float3 wpos;
 	if (!getAtlasToWorld(gvdb, atlasIdx, wpos)) return;
@@ -357,7 +369,7 @@ extern "C" __global__ void gvdbDownsample(int3 srcres, float* src, int3 destres,
 
 extern "C" __global__ void gvdbOpFillF  ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_VOXPACK
+	GVDB_VOXUNPACKED
 
 	if ( p3 < 0 ) {
 		//float v = vox.y; // + (vox.z*30 + vox.x)/900.0;
@@ -372,14 +384,14 @@ extern "C" __global__ void gvdbOpFillF  ( VDBInfo* gvdb, int3 atlasRes, uchar ch
 
 extern "C" __global__ void gvdbOpFillC4 ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_VOXPACK
+	GVDB_VOXUNPACKED
 
 	surf3Dwrite ( CLR2INT(make_float4(p1,p2,p3,1.0)), gvdb->volOut[channel], atlasIdx.x*sizeof(uchar4), atlasIdx.y, atlasIdx.z );
 }
 
 extern "C" __global__ void gvdbOpFillC ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
-	GVDB_VOXPACK
+	GVDB_VOXUNPACKED
 
 	const uchar c = static_cast<uchar>(p1);
 	surf3Dwrite(c, gvdb->volOut[channel], atlasIdx.x * sizeof(uchar), atlasIdx.y, atlasIdx.z);
@@ -388,17 +400,17 @@ extern "C" __global__ void gvdbOpFillC ( VDBInfo* gvdb, int3 atlasRes, uchar cha
 extern "C" __global__ void gvdbOpSmooth ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
 	__shared__ float sharedVoxels[10][10][10];
-	GVDB_VOXPACK
+	GVDB_VOXPACKED
 	LoadSharedMemory<float>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	//-- smooth
 	float v = p1 * sharedVoxels[localIdx.x][localIdx.y][localIdx.z];
-	v += sharedVoxels[localIdx.x-1][localIdx.y][localIdx.z];
-	v += sharedVoxels[localIdx.x+1][localIdx.y][localIdx.z];
-	v += sharedVoxels[localIdx.x][localIdx.y-1][localIdx.z];
-	v += sharedVoxels[localIdx.x][localIdx.y+1][localIdx.z];
-	v += sharedVoxels[localIdx.x][localIdx.y][localIdx.z-1];
-	v += sharedVoxels[localIdx.x][localIdx.y][localIdx.z+1];
+	v += sharedVoxels[localIdx.x - 1][localIdx.y][localIdx.z];
+	v += sharedVoxels[localIdx.x + 1][localIdx.y][localIdx.z];
+	v += sharedVoxels[localIdx.x][localIdx.y - 1][localIdx.z];
+	v += sharedVoxels[localIdx.x][localIdx.y + 1][localIdx.z];
+	v += sharedVoxels[localIdx.x][localIdx.y][localIdx.z - 1];
+	v += sharedVoxels[localIdx.x][localIdx.y][localIdx.z + 1];
 	v = v / (p1 + 6.0) + p2;
 
 	surf3Dwrite(v, gvdb->volOut[channel], atlasIdx.x * sizeof(float), atlasIdx.y, atlasIdx.z);
@@ -407,7 +419,7 @@ extern "C" __global__ void gvdbOpSmooth ( VDBInfo* gvdb, int3 atlasRes, uchar ch
 extern "C" __global__ void gvdbOpClrExpand ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
 	__shared__ uchar4 sharedVoxels[10][10][10];
-	GVDB_VOXPACK
+	GVDB_VOXPACKED
 	LoadSharedMemory<uchar4>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	int3 c, cs;
@@ -428,7 +440,7 @@ extern "C" __global__ void gvdbOpClrExpand ( VDBInfo* gvdb, int3 atlasRes, uchar
 extern "C" __global__ void gvdbOpExpandC ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
 	__shared__ uchar sharedVoxels[10][10][10];
-	GVDB_VOXPACK
+	GVDB_VOXPACKED
 	LoadSharedMemory<uchar>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	uchar c = 0;
@@ -449,7 +461,7 @@ extern "C" __global__ void gvdbOpExpandC ( VDBInfo* gvdb, int3 atlasRes, uchar c
 extern "C" __global__ void gvdbOpNoise ( VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3 )
 {
 	__shared__ float sharedVoxels[10][10][10];
-	GVDB_VOXPACK
+	GVDB_VOXPACKED
 	LoadSharedMemory<float>(gvdb, channel, sharedVoxels, localIdx, atlasIdx);
 
 	//-- noise

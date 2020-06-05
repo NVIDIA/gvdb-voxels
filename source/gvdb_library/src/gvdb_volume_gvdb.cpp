@@ -2460,9 +2460,9 @@ void VolumeGVDB::FillChannel ( uchar chan, Vector4DF val )
 		ClearChannel(chan);
 	} else {
 		switch (mPool->getAtlas(chan).type) {
-		case T_FLOAT:	Compute ( FUNC_FILL_F, chan, 1, val, false, true);	break;	
-		case T_UCHAR:	Compute ( FUNC_FILL_C, chan, 1, val, false, true);	break;
-		case T_UCHAR4:	Compute ( FUNC_FILL_C4, chan, 1, val, false, true);	break;
+		case T_FLOAT:	Compute(FUNC_FILL_F, chan, 1, val, false, false);	break;
+		case T_UCHAR:	Compute(FUNC_FILL_C, chan, 1, val, false, false);	break;
+		case T_UCHAR4:	Compute(FUNC_FILL_C4, chan, 1, val, false, false);	break;
 		};
 	}
 
@@ -4528,10 +4528,11 @@ void VolumeGVDB::Compute (int effect, uchar channel, int num_iterations, Vector3
 
 	// Determine grid and block dims (must match atlas bricks)	
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI res = (skipOverAprons ? mPool->getAtlasPackres(channel) : mPool->getAtlasRes(channel));
-	Vector3DI grid = (res + block - Vector3DI(1, 1, 1)) / block;
+	Vector3DI atlasRes = mPool->getAtlasRes(channel);
+	Vector3DI threadCount = (skipOverAprons ? mPool->getAtlasPackres(channel) : atlasRes);
+	Vector3DI grid = (threadCount + block - 1) / block;
 
-	void* args[6] = { &cuVDBInfo, &res, &channel, &parameters.x, &parameters.y, &parameters.z };
+	void* args[6] = { &cuVDBInfo, &atlasRes, &channel, &parameters.x, &parameters.y, &parameters.z };
 	
 	for (int n=0; n < num_iterations; n++ ) {
 		cudaCheck ( cuLaunchKernel ( cuFunc[effect], grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, mStream, args, NULL ),
@@ -4618,7 +4619,7 @@ void VolumeGVDB::Resample ( uchar chan, Matrix4F xform, Vector3DI in_res, char i
 	// Determine grid and block dims (must match atlas bricks)	
 	Vector3DI block ( 8, 8, 8 );
 	Vector3DI res = mPool->getAtlasRes( chan );
-	Vector3DI grid ( int(res.x/block.x)+1, int(res.y/block.y)+1, int(res.z/block.z)+1 );	
+	Vector3DI grid = (res + block - 1) / block;
 
 	// Send transform matrix to cuda
 	PrepareAux ( AUX_MATRIX4F, 16, sizeof(float), true, true );

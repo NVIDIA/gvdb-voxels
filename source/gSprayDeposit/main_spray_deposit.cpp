@@ -312,7 +312,7 @@ void Sample::simulate()
 	// Smooth the volume
 	// A smoothing effect simulates gradual erosion
 	if ( int(m_time) % 20 == 0 ) {
-		gvdb.Compute ( FUNC_SMOOTH, 0, 1, Vector3DF(4,0,0), true, true ); 	
+		gvdb.Compute(FUNC_SMOOTH, 0, 1, Vector3DF(4, 0, 0), true, false);
 	}
 	
 }
