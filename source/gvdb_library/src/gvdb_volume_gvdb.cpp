@@ -4498,10 +4498,11 @@ void VolumeGVDB::ComputeKernel (CUmodule user_module, CUfunction user_kernel, uc
 
 	// Determine grid and block dims (must match atlas bricks)	
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI res = mPool->getAtlasRes( channel );
-	Vector3DI grid = (res + block - Vector3DI(1, 1, 1)) / block;
+	Vector3DI atlasRes = mPool->getAtlasRes(channel);
+	Vector3DI threadCount = (skipOverAprons ? mPool->getAtlasPackres(channel) : atlasRes);
+	Vector3DI grid = (threadCount + block - 1) / block;
 
-	void* args[3] = { &cuVDBInfo, &res, &channel };
+	void* args[3] = { &cuVDBInfo, &atlasRes, &channel };
 	cudaCheck ( cuLaunchKernel ( user_kernel, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), 
 					"VolumeGVDB", "ComputeKernel", "cuLaunch", "(user kernel)", mbDebug);
 	
