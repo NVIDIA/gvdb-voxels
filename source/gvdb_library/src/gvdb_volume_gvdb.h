@@ -362,8 +362,22 @@
 			char* getDataPtr ( int i, DataPtr dat )		{ return (dat.cpu + (i*dat.stride)); }			
 			
 			// Compute
-			void Compute ( int effect, uchar chan, int iter, Vector3DF parm, bool bUpdateApron, float boundval = 0.0f  );
-			void ComputeKernel ( CUmodule user_module, CUfunction user_kernel, uchar chan, bool bUpdateApron );
+			// For numIterations iterations, runs the native compute kernel with index
+			// `effect`, assuming it has the signature
+			// `effect(VDBInfo* gvdb, int3 atlasRes, uchar channel, float p1, float p2, float p3)`,
+			// then if `bUpdateApron` is true, updates the apron after each iteration
+			// with boundary value `boundval`.
+			// If `skipOverAprons` is true, it uses a grid of size `mPool->getAtlasResPacked(...)`;
+			// otherwise, it uses a grid of size `mPool->getAtlasRes(...)`.
+			// Passes the elements of `parameters` to the kernel as p1, p2, and p3.
+			void Compute ( int effect, uchar channel, int num_iterations, Vector3DF parameters, bool bUpdateApron, bool skipOverAprons, float boundval = 0.0f );
+			// Runs a custom user compute kernel, `user_kernel`, in the module `user_module`,
+			// passing in argument `channel`. This must have the function signature
+			// `func(VDBInfo* gvdb, int3 atlasRes, uchar channel)`
+			// If `bUpdateApron` is true, it updates all apron channels
+			// afterwards. If `skipOverAprons` is true, it uses a grid of size
+			// `mPool->getAtlasResPacked(...)`; otherwise, it uses a grid of size `mPool->getAtlasRes(...)`.
+			void ComputeKernel ( CUmodule user_module, CUfunction user_kernel, uchar channel, bool bUpdateApron, bool skipOverAprons);
 			void Resample ( uchar chan, Matrix4F xform, Vector3DI in_res, char in_aux, Vector3DF inr, Vector3DF outr );			
 			Vector3DF Reduction(uchar chan);
 			void DownsampleCPU(Matrix4F xform, Vector3DI in_res, char in_aux, Vector3DI out_res, Vector3DF out_max, char out_aux, Vector3DF inr, Vector3DF outr);

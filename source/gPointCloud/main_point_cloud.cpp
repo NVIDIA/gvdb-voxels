@@ -740,7 +740,7 @@ void Sample::render_update()
 	if (m_smooth > 0) {
 		PERF_PUSH("Smooth");
 		nvprintf("Smooth: %d, %f %f %f\n", m_smooth, m_smoothp.x, m_smoothp.y, m_smoothp.z);
-		gvdb.Compute( FUNC_SMOOTH, 0, m_smooth, m_smoothp, true, 3.0f);		// 8x smooth iterations	
+		gvdb.Compute( FUNC_SMOOTH, 0, m_smooth, m_smoothp, true, true, 3.0f);		// 8x smooth iterations	
 		PERF_POP();
 	}
 

@@ -192,7 +192,7 @@ bool Sample::init()
 
 	// Fill color channel	
 	gvdb.FillChannel ( 1, Vector4DF(0.7f, 0.7f, 0.7f, 1) );
-	gvdb.Compute ( FUNC_SMOOTH, 0, 2, Vector3DF(4,0,0), true );
+	gvdb.Compute ( FUNC_SMOOTH, 0, 2, Vector3DF(4,0,0), true, true );
 	gvdb.UpdateApron ();
 
 	// Create opengl texture for display
@@ -312,7 +312,7 @@ void Sample::simulate()
 	// Smooth the volume
 	// A smoothing effect simulates gradual erosion
 	if ( int(m_time) % 20 == 0 ) {
-		gvdb.Compute ( FUNC_SMOOTH, 0, 1, Vector3DF(4,0,0), true ); 	
+		gvdb.Compute(FUNC_SMOOTH, 0, 1, Vector3DF(4, 0, 0), true, false);
 	}
 	
 }
