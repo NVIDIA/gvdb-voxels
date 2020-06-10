@@ -84,12 +84,12 @@ extern "C" __global__ void kernelCopyTexZYX (  int3 offs, int3 res, CUtexObject 
 }
 
 // Retrieve 3D texture into linear memory (float)
-extern "C" __global__ void kernelRetrieveTexXYZ ( int3 offs, int3 src_res, int3 res, float* buf, CUtexObject volTexInF )
+extern "C" __global__ void kernelRetrieveTexXYZ ( int3 offs, int3 brickRes, float* buf, CUtexObject volTexInF )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
-	if ( t.x >= src_res.x || t.y >= src_res.y || t.z >= src_res.z ) return;
+	if ( t.x >= brickRes.x || t.y >= brickRes.y || t.z >= brickRes.z ) return;
 	float val = tex3D<float> ( volTexInF, t.x+offs.x, t.y+offs.y, t.z+offs.z );
-	buf[ (t.x*res.y + t.y)*res.x + t.z ] = val;
+	buf[ (t.x*brickRes.y + t.y)*brickRes.x + t.z ] = val;
 }
 
 // Copy 2D slice of 3D texture into 2D linear buffer

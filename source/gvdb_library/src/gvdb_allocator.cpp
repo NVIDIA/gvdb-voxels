@@ -767,12 +767,13 @@ void Allocator::AtlasCopyLinear ( uchar chan, Vector3DI offset, CUdeviceptr gpu_
 void Allocator::AtlasRetrieveTexXYZ ( uchar chan, Vector3DI val, DataPtr& dest )
 {
 	Vector3DI atlasres = getAtlasRes(chan);
-	Vector3DI brickres = mAtlas[chan].subdim;
+	int br = mAtlas[chan].stride;
 	
+	Vector3DI brickres = Vector3DI(br, br, br);
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI grid ( int(brickres.x/block.x)+1, int(brickres.y/block.y)+1, int(brickres.z/block.z)+1 );
+	Vector3DI grid = (brickres + block - Vector3DI(1, 1, 1)) / block;
 
-	void* args[5] = { &val, &atlasres, &brickres, &dest.gpu, &mAtlas[chan].tex_obj };
+	void* args[4] = { &val, &brickres, &dest.gpu, &mAtlas[chan].tex_obj };
 	cudaCheck ( cuLaunchKernel ( cuRetrieveTexXYZ, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasRetrieveXYZ", "cuLaunch", "cuRetrieveTexXYZ", mbDebug);
 
 	RetrieveMem ( dest );
@@ -787,7 +788,7 @@ void Allocator::AtlasCopyTexZYX ( uchar chan, Vector3DI val, const DataPtr& src 
 	Vector3DI brickres = src.subdim;
 
 	Vector3DI block ( 8, 8, 8 );
-	Vector3DI grid ( int(brickres.x/block.x), int(brickres.y/block.y), int(brickres.z/block.z) );
+	Vector3DI grid = (brickres + block - Vector3DI(1, 1, 1)) / block;
 
 	void* args[4] = { &val, &brickres, (void*)&src.tex_obj, &mAtlas[chan].surf_obj };
 	cudaCheck(cuLaunchKernel(cuCopyTexZYX, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL), "Allocator", "AtlasCopyTexZYX", "cuLaunch", "cuCopyTexZYX", mbDebug);

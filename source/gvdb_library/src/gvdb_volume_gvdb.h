@@ -34,26 +34,24 @@
 		#include <openvdb/openvdb.h>
 
 		// OpenVDB <3,3,3,4> support
-		typedef openvdb::tree::Tree<openvdb::tree::RootNode<openvdb::tree::InternalNode<openvdb::tree::InternalNode<openvdb::tree::InternalNode<openvdb::tree::LeafNode<float,4>,3>,3>,3>>> FloatTree34; 
-		typedef openvdb::tree::Tree<openvdb::tree::RootNode<openvdb::tree::InternalNode<openvdb::tree::InternalNode<openvdb::tree::InternalNode<openvdb::tree::LeafNode<openvdb::Vec3f,4>,3>,3>,3>>> Vec3fTree34; 
-		typedef openvdb::Grid<FloatTree34>		FloatGrid34; 
-		typedef openvdb::Grid<Vec3fTree34>		Vec3fGrid34; 
-		typedef FloatGrid34						GridType34;
-		typedef FloatGrid34::TreeType			TreeType34F;
-		typedef Vec3fGrid34::TreeType			TreeType34VF;
+		using FloatTree34 = openvdb::tree::Tree5<float, 3, 3, 3, 4>::Type;
+		using Vec3fTree34 = openvdb::tree::Tree5<openvdb::Vec3f, 3, 3, 3, 4>::Type;
+		using FloatGrid34 = openvdb::Grid<FloatTree34>;
+		using Vec3fGrid34 = openvdb::Grid<Vec3fTree34>;
+		using GridType34 = FloatGrid34;
+		using TreeType34F = FloatGrid34::TreeType;
+		using TreeType34VF = Vec3fGrid34::TreeType;
 	
 		// OpenVDB <5,4,3> support
-		typedef openvdb::FloatGrid				FloatGrid543;
-		typedef openvdb::Vec3fGrid				Vec3fGrid543;
-		typedef FloatGrid543					GridType543;
-		typedef FloatGrid543::TreeType			TreeType543F;
-		typedef Vec3fGrid543::TreeType			TreeType543VF;
-
+		using FloatGrid543 = openvdb::FloatGrid;
+		using Vec3fGrid543 = openvdb::Vec3fGrid;
+		using GridType543 = FloatGrid543;
+		using TreeType543F = FloatGrid543::TreeType;
+		using TreeType543VF = Vec3fGrid543::TreeType;
 	#endif
 
 	#define MAXLEV			10
 
-	class OVDBGrid;
 	class Volume3D;
 
 	namespace nvdb {
@@ -372,9 +370,16 @@
 			
 			// File I/O
 			bool LoadBRK ( std::string fname );
+			// Configures and loads a GVDB volume from a VDB file.
+			// Supports <5, 4, 3> and <3, 3, 3, 4> floating-point grids.
+			// This can also read Vec3 grids, but vectors are converted
+			// to their magnitudes and stored as floats.
 			bool LoadVDB ( std::string fname );
 			bool LoadVBX ( const std::string fname, int force_maj=0, int force_min=0 );
 			void SaveVBX ( const std::string fname );
+			// Saves channel 0 of the current volume as an OpenVDB file, which must have
+			// the T_FLOAT format. Supports <5, 4, 3> and <3, 3, 3, 4> grids, which are
+			// chosen automatically. 
 			void SaveVDB ( std::string fname );
 			bool ImportVTK ( std::string fname, std::string field, Vector3DI& res );
 			void WriteObj ( char* fname );
@@ -802,8 +807,7 @@
 			// Auxiliary buffers
 			DataPtr			mAux[MAX_AUX];		// Auxiliary
 			std::string		mAuxName[MAX_AUX];
-			
-			OVDBGrid*		mOVDB;			// OpenVDB grid	
+
 			Volume3D*		mV3D;			// Volume 3D
 
 			// Dummy frame buffer
@@ -831,6 +835,20 @@
 			const char*		mRendName[SHADE_MAX];
 
 			float			m_bias;
+
+#ifdef BUILD_OPENVDB
+			// Internal function for loading bricks from an OpenVDB grid into
+			// a GVDB grid. Reads OpenVDB <5, 4, 3> and <3, 3, 3, 4> grids,
+			// and converts grids with float3 values into grids containing
+			// their lengths. GridType is e.g. FloatGrid34.
+			template<class GridType>
+			bool LoadVDBInternal(openvdb::GridBase::Ptr& baseGrid);
+
+			// Internal function for saving the GVDB grid as an OpenVDB file
+			// with filename `fname`. TreeType is e.g. FloatTree34.
+			template<class TreeType>
+			void SaveVDBInternal(std::string& fname);
+#endif // #ifdef BUILD_OPENVDB
 		};
 
 	}
