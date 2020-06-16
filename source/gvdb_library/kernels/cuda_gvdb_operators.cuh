@@ -65,9 +65,9 @@ extern "C" __global__ void gvdbUpdateApronFacesF ( VDBInfo* gvdb, uchar chan, in
 	node = getNode(gvdb, 0, nbr);
 	vnbr += make_int3(node->mValue);								// neighbor atlas start
 
-	// Update self and neighbor
-	float v1 = tex3D<float>(gvdb->volIn[chan], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f);		// get self voxel
-	float v2 = tex3D<float>(gvdb->volIn[chan], vnbr.x + 0.5f, vnbr.y + 0.5f, vnbr.z + 0.5f);	// get neighbor voxel
+	// Update self and neighbor (gvdb->volOut[chan] is the surface object for the atlas)
+	float v1 = surf3Dread<float>(gvdb->volOut[chan], vox.x * sizeof(float), vox.y, vox.z);    // get self voxel
+	float v2 = surf3Dread<float>(gvdb->volOut[chan], vnbr.x * sizeof(float), vnbr.y, vnbr.z); // get neighbor voxel
 	
 	surf3Dwrite(v1, gvdb->volOut[chan], (vnbr.x + vinc.x) * sizeof(float), (vnbr.y + vinc.y), (vnbr.z + vinc.z) );   // neighbor apron
 	surf3Dwrite(v2, gvdb->volOut[chan], (vox.x - vinc.x) * sizeof(float), (vox.y - vinc.y), (vox.z - vinc.z));		// self apron
@@ -130,7 +130,7 @@ __device__ void UpdateApron(VDBInfo* gvdb, const uchar channel, const int brickC
 		}
 		else {
 			offs += (worldPos - vmin) / vdel; // Get the atlas position
-			value = tex3D<T>(gvdb->volIn[channel], offs.x, offs.y, offs.z);
+			value = surf3Dread<T>(gvdb->volOut[channel], uint(offs.x) * sizeof(T), uint(offs.y), uint(offs.z));
 		}
 	}
 
@@ -165,33 +165,29 @@ extern "C" __global__ void gvdbUpdateApronC4 ( VDBInfo* gvdb, uchar chan, int br
 // This assumes that the function is being called with a block size of (8, 8, 8).
 template<class T>
 __device__ void LoadSharedMemory(VDBInfo* gvdb, uchar channel, T sharedVoxels[10][10][10], uint3 ndx, uint3 voxI) {
-	// Offset the atlas location by half a voxel so that linear interpolation
-	// doesn't blend between adjacent voxels.
-	float3 vox = make_float3(voxI) + make_float3(0.5f, 0.5f, 0.5f);
-
 	// Copy the atlas voxel at voxI into sharedVoxels[ndx].
-	sharedVoxels[ndx.x][ndx.y][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y, vox.z);
+	sharedVoxels[ndx.x][ndx.y][ndx.z] = surf3Dread<T>(gvdb->volOut[channel], voxI.x * sizeof(T), voxI.y, voxI.z);
 
 	// Load voxels adjacent to [1,9]^3.
 	if (ndx.x == 1) {
-		sharedVoxels[0][ndx.y][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x - 1, vox.y, vox.z);
+		sharedVoxels[0][ndx.y][ndx.z] = surf3Dread<T>(gvdb->volOut[channel], (voxI.x - 1) * sizeof(T), voxI.y, voxI.z);
 	}
 	else if (ndx.x == 8) {
-		sharedVoxels[9][ndx.y][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x + 1, vox.y, vox.z);
+		sharedVoxels[9][ndx.y][ndx.z] = surf3Dread<T>(gvdb->volOut[channel], (voxI.x + 1) * sizeof(T), voxI.y, voxI.z);
 	}
 
 	if (ndx.y == 1) {
-		sharedVoxels[ndx.x][0][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y - 1, vox.z);
+		sharedVoxels[ndx.x][0][ndx.z] = surf3Dread<T>(gvdb->volOut[channel], voxI.x * sizeof(T), voxI.y - 1, voxI.z);
 	}
 	else if (ndx.y == 8) {
-		sharedVoxels[ndx.x][9][ndx.z] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y + 1, vox.z);
+		sharedVoxels[ndx.x][9][ndx.z] = surf3Dread<T>(gvdb->volOut[channel], voxI.x * sizeof(T), voxI.y + 1, voxI.z);
 	}
 
 	if (ndx.z == 1) {
-		sharedVoxels[ndx.x][ndx.y][0] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y, vox.z - 1);
+		sharedVoxels[ndx.x][ndx.y][0] = surf3Dread<T>(gvdb->volOut[channel], voxI.x * sizeof(T), voxI.y, voxI.z - 1);
 	}
 	else if (ndx.z == 8) {
-		sharedVoxels[ndx.x][ndx.y][9] = tex3D<T>(gvdb->volIn[channel], vox.x, vox.y, vox.z + 1);
+		sharedVoxels[ndx.x][ndx.y][9] = surf3Dread<T>(gvdb->volOut[channel], voxI.x * sizeof(T), voxI.y, voxI.z + 1);
 	}
 
 	// Make sure all loads from the block have completed.
@@ -292,7 +288,7 @@ extern "C" __global__ void gvdbReduction( VDBInfo* gvdb, int3 res, uchar chan, i
 	float v;
 	for (int z = 0; z < packres.z; z++) {
 		vox.z = (int(z / bres)*gvdb->brick_res) + (z % bres) + 1;
-		v = tex3D<float> ( gvdb->volIn[chan], vox.x, vox.y, vox.z);
+		v = surf3Dread<float>(gvdb->volOut[chan], vox.x * sizeof(float), vox.y, vox.z);
 		sum += v;   // (v > gvdb->thresh.x) ? 1.0 : 0.0;
 	}
 

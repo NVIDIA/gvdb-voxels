@@ -201,10 +201,6 @@
 		CUfunction					cuCopyBufToTexF;
 		CUfunction					cuCopyTexZYX;
 		CUfunction					cuRetrieveTexXYZ;
-		CUfunction					cuSliceTexToBufF;
-		CUfunction					cuSliceTexToBufC;
-		CUfunction					cuSliceBufToTexF;		
-		CUfunction					cuSliceBufToTexC;
 
 		CUsurfref					cuSurfWrite;
 		CUtexref					cuSurfReadC;

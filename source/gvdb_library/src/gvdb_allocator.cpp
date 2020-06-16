@@ -54,10 +54,6 @@ Allocator::Allocator ()
 	cudaCheck ( cuModuleGetFunction ( &cuCopyBufToTexF,	cuAllocatorModule, "kernelCopyBufToTexF" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuCopyBufToTexF", mbDebug);
 	cudaCheck ( cuModuleGetFunction ( &cuCopyTexZYX,	cuAllocatorModule, "kernelCopyTexZYX" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuCopTexZYX", mbDebug);
 	cudaCheck ( cuModuleGetFunction ( &cuRetrieveTexXYZ, cuAllocatorModule, "kernelRetrieveTexXYZ" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuRetrieveTexXYZ", mbDebug);
-	cudaCheck ( cuModuleGetFunction ( &cuSliceTexToBufF, cuAllocatorModule, "kernelSliceTexToBufF" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuSliceTexToBufF", mbDebug);
-	cudaCheck ( cuModuleGetFunction ( &cuSliceTexToBufC, cuAllocatorModule, "kernelSliceTexToBufC" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuSliceTexToBufC", mbDebug);
-	cudaCheck ( cuModuleGetFunction ( &cuSliceBufToTexF, cuAllocatorModule, "kernelSliceBufToTexF" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuSliceBufToTexF", mbDebug);
-	cudaCheck ( cuModuleGetFunction ( &cuSliceBufToTexC, cuAllocatorModule, "kernelSliceBufToTexC" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuSliceBufToTexC", mbDebug);
 }
 
 
@@ -773,7 +769,7 @@ void Allocator::AtlasRetrieveTexXYZ ( uchar chan, Vector3DI val, DataPtr& dest )
 	Vector3DI block ( 8, 8, 8 );
 	Vector3DI grid = (brickres + block - Vector3DI(1, 1, 1)) / block;
 
-	void* args[4] = { &val, &brickres, &dest.gpu, &mAtlas[chan].tex_obj };
+	void* args[4] = { &val, &brickres, &dest.gpu, &mAtlas[chan].surf_obj };
 	cudaCheck ( cuLaunchKernel ( cuRetrieveTexXYZ, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasRetrieveXYZ", "cuLaunch", "cuRetrieveTexXYZ", mbDebug);
 
 	RetrieveMem ( dest );

@@ -449,9 +449,6 @@ extern "C" __global__ void gvdbCalcIncreExtraBrickId (VDBInfo* gvdb, float radiu
 
 	int3 ndPos;
 	int pnodeId, idx;
-	VDBNode* node;
-	//unsigned short levxyx[40];
-	//int ndCnt = 0;
 
 	for (unsigned short lev = 0; lev < lev_depth; lev++) 
 	{
@@ -462,7 +459,6 @@ extern "C" __global__ void gvdbCalcIncreExtraBrickId (VDBInfo* gvdb, float radiu
 			{
 				for (ndPos.z = bmin.z / rres * rres; ndPos.z <= bmax.z / rres * rres; ndPos.z += rres)
 				{
-					//ndPos = make_int3(ndx, ndy, ndz);
 					pnodeId = getPosParent(gvdb, ndPos, lev);
 					
 
@@ -473,11 +469,6 @@ extern "C" __global__ void gvdbCalcIncreExtraBrickId (VDBInfo* gvdb, float radiu
 						pout[idx * 4 + 1 ] = (unsigned short) (ndPos.y / rres); 
 						pout[idx * 4 + 2 ] = (unsigned short) (ndPos.x / rres); 
 						pout[idx * 4 + 3 ] = lev; 
-						//levxyx[ndCnt * 4 + 0 ] = (ndPos.z / rres); 
-						//levxyx[ndCnt * 4 + 1 ] = (ndPos.y / rres); 
-						//levxyx[ndCnt * 4 + 2 ] = (ndPos.x / rres); 
-						//levxyx[ndCnt * 4 + 3 ] = lev; 
-						//ndCnt++;
 					} else {						
 						if(lev == 0) atomicOr ( &node_markers[pnodeId], true );
 					}
@@ -485,34 +476,6 @@ extern "C" __global__ void gvdbCalcIncreExtraBrickId (VDBInfo* gvdb, float radiu
 			}
 		}
 	}
-
-	//idx = atomicAdd ( &exBrick_cnt[0], (uint) ndCnt);
-	//for (int pi = 0; pi < ndCnt * 4; pi++) pout[idx * 4 + pi] = levxyx[pi]; 
-	//ndCnt = 0;
-	//for (unsigned short lev = 0; lev < lev_depth; lev++) 
-	//{
-	//	int rres = range_res[lev];
-	//	for (ndPos.x = bmin.x / rres * rres; ndPos.x <= bmax.x / rres * rres; ndPos.x += rres)
-	//	{
-	//		for (ndPos.y = bmin.y / rres * rres; ndPos.y <= bmax.y / rres * rres; ndPos.y += rres)
-	//		{
-	//			for (ndPos.z = bmin.z / rres * rres; ndPos.z <= bmax.z / rres * rres; ndPos.z += rres)
-	//			{
-	//				//ndPos = make_int3(ndx, ndy, ndz);
-	//				pnodeId = getPosParent(ndPos, lev);
-	//				if (pnodeId == ID_UNDEFL) 
-	//				{
-	//					//idx = atomicAdd ( &exBrick_cnt[0], (uint) 1 );
-	//					pout[idx * 4 + 0 + ndCnt ] = (unsigned short) (ndPos.z / rres); 
-	//					pout[idx * 4 + 1 + ndCnt ] = (unsigned short) (ndPos.y / rres); 
-	//					pout[idx * 4 + 2 + ndCnt ] = (unsigned short) (ndPos.x / rres); 
-	//					pout[idx * 4 + 3 + ndCnt ] = lev; 
-	//					ndCnt += 4; 
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
 }
 
 extern "C" __global__ void gvdbCalcExtraBrickId (VDBInfo* gvdb, float radius, int num_pnts, int lev_depth, int* range_res,
@@ -591,15 +554,15 @@ extern "C" __global__ void gvdbScatterPointDensity (VDBInfo* gvdb, int num_pnts,
 	if ( pi.x < 0 || pi.y < 0 || pi.z < 0 || pi.x >= gvdb->res[0] || pi.y >= gvdb->res[0] || pi.z >= gvdb->res[0] ) return;
 	uint3 q = make_uint3(pi.x,pi.y,pi.z) + make_uint3( node->mValue );	
 
-	w = tex3D<float>( gvdb->volIn[0], q.x,q.y,q.z ) + distFunc(p, pi.x, pi.y,pi.z, radius) ;				surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, q.z );
+	w = surf3Dread<float>(gvdb->volOut[0], q.x * sizeof(float), q.y, q.z) + distFunc(p, pi.x, pi.y, pi.z, radius);					surf3Dwrite(w, gvdb->volOut[0], q.x * sizeof(float), q.y, q.z);
 
 	if ( expand ) {		
-		w = tex3D<float> (gvdb->volIn[0], q.x-1,q.y,q.z) + distFunc(p, pi.x-1, pi.y, pi.z, radius);		surf3Dwrite ( w, gvdb->volOut[0], (q.x-1)*sizeof(float), q.y, q.z );
-		w = tex3D<float> (gvdb->volIn[0], q.x+1,q.y,q.z) + distFunc(p, pi.x+1, pi.y, pi.z, radius);		surf3Dwrite ( w, gvdb->volOut[0], (q.x+1)*sizeof(float), q.y, q.z );
-		w = tex3D<float> (gvdb->volIn[0], q.x,q.y-1,q.z) + distFunc(p, pi.x, pi.y-1, pi.z, radius);		surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), (q.y-1), q.z );
-		w = tex3D<float> (gvdb->volIn[0], q.x,q.y+1,q.z) + distFunc(p, pi.x, pi.y+1, pi.z, radius); 		surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), (q.y+1), q.z );
-		w = tex3D<float> (gvdb->volIn[0], q.x,q.y,q.z-1) + distFunc(p, pi.x, pi.y, pi.z-1, radius);		surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, (q.z-1) );
-		w = tex3D<float> (gvdb->volIn[0], q.x,q.y,q.z+1) + distFunc(p, pi.x, pi.y, pi.z+1, radius);		surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, (q.z+1) );
+		w = surf3Dread<float>(gvdb->volOut[0], (q.x - 1) * sizeof(float), q.y, q.z) + distFunc(p, pi.x - 1, pi.y, pi.z, radius);	surf3Dwrite(w, gvdb->volOut[0], (q.x - 1) * sizeof(float), q.y, q.z);
+		w = surf3Dread<float>(gvdb->volOut[0], (q.x + 1) * sizeof(float), q.y, q.z) + distFunc(p, pi.x + 1, pi.y, pi.z, radius);	surf3Dwrite(w, gvdb->volOut[0], (q.x + 1) * sizeof(float), q.y, q.z);
+		w = surf3Dread<float>(gvdb->volOut[0], (q.x) * sizeof(float), q.y - 1, q.z) + distFunc(p, pi.x, pi.y - 1, pi.z, radius);	surf3Dwrite(w, gvdb->volOut[0], q.x * sizeof(float), (q.y - 1), q.z);
+		w = surf3Dread<float>(gvdb->volOut[0], (q.x) * sizeof(float), q.y + 1, q.z) + distFunc(p, pi.x, pi.y + 1, pi.z, radius); 	surf3Dwrite(w, gvdb->volOut[0], q.x * sizeof(float), (q.y + 1), q.z);
+		w = surf3Dread<float>(gvdb->volOut[0], (q.x) * sizeof(float), q.y, q.z - 1) + distFunc(p, pi.x, pi.y, pi.z - 1, radius);	surf3Dwrite(w, gvdb->volOut[0], q.x * sizeof(float), q.y, (q.z - 1));
+		w = surf3Dread<float>(gvdb->volOut[0], (q.x) * sizeof(float), q.y, q.z + 1) + distFunc(p, pi.x, pi.y, pi.z + 1, radius);	surf3Dwrite(w, gvdb->volOut[0], q.x * sizeof(float), q.y, (q.z + 1));
 	}
 
 	if ( pclr != 0 ) {
@@ -646,52 +609,16 @@ extern "C" __global__ void gvdbAddSupportVoxel (VDBInfo* gvdb, int num_pnts,  fl
 
 	// -- should be ok that pi.x,pi.y,pi.z = 0 
 	if ( pi.x <= -1 || pi.y <= -1 || pi.z <= -1 || pi.x >= gvdb->res[0] || pi.y >= gvdb->res[0] || pi.z >= gvdb->res[0] ) return;
-	uint3 q = make_uint3(pi.x,pi.y,pi.z) + make_uint3( node->mValue );	
+	uint3 q = make_uint3(pi.x,pi.y,pi.z) + make_uint3( node->mValue );
 
-	w = tex3D<float>(gvdb->volIn[0], q.x, q.y, q.z ) + distFunc(p, pi.x, pi.y,pi.z, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, q.z );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], q.x*sizeof(uchar), q.y, q.z );
-	//surf3Dwrite ( 1.0f, volOut[2], q.x*sizeof(float), q.y, q.z );	
-
-#if 1
-	// expand to 3x3 square, write to both volume and material channels
-	w = tex3D<float> (gvdb->volIn[0], q.x-1,q.y,q.z) + distFunc(p, pi.x-1, pi.y, pi.z, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], (q.x-1)*sizeof(float), q.y, q.z );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x-1)*sizeof(uchar), q.y, q.z );
-	//surf3Dwrite ( 1.0f, volOut[2], (q.x-1)*sizeof(float), q.y, q.z );
-
-	w = tex3D<float> (gvdb->volIn[0], q.x+1,q.y,q.z) + distFunc(p, pi.x+1, pi.y, pi.z, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], (q.x+1)*sizeof(float), q.y, q.z );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x+1)*sizeof(uchar), q.y, q.z );
-	//surf3Dwrite ( 1.0f, volOut[2], (q.x+1)*sizeof(float), q.y, q.z );
-
-	w = tex3D<float> (gvdb->volIn[0], q.x,q.y,q.z-1) + distFunc(p, pi.x, pi.y, pi.z-1, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, (q.z-1) );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], q.x*sizeof(uchar), q.y, (q.z-1) );
-	//surf3Dwrite ( 1.0f, volOut[2], q.x*sizeof(float), q.y, (q.z-1) );
-
-	w = tex3D<float> (gvdb->volIn[0], q.x,q.y,q.z+1) + distFunc(p, pi.x, pi.y, pi.z+1, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], q.x*sizeof(float), q.y, (q.z+1) );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], q.x*sizeof(uchar), q.y, (q.z+1) );
-	//surf3Dwrite ( 1.0f, volOut[2], q.x*sizeof(float), q.y, (q.z+1) );
-
-	w = tex3D<float> (gvdb->volIn[0], q.x-1,q.y,q.z-1) + distFunc(p, pi.x-1, pi.y, pi.z-1, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], (q.x-1)*sizeof(float), q.y, (q.z-1) );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x-1)*sizeof(uchar), q.y, (q.z-1) );
-	//surf3Dwrite ( 1.0f, volOut[2], (q.x-1)*sizeof(float), q.y, (q.z-1) );
-	w = tex3D<float> (gvdb->volIn[0], q.x+1,q.y,q.z+1) + distFunc(p, pi.x+1, pi.y, pi.z+1, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], (q.x+1)*sizeof(float), q.y, (q.z+1) );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x+1)*sizeof(uchar), q.y, (q.z+1) );
-	//surf3Dwrite ( 1.0f, volOut[2], (q.x+1)*sizeof(float), q.y, (q.z+1) );
-	w = tex3D<float> (gvdb->volIn[0], q.x+1,q.y,q.z-1) + distFunc(p, pi.x+1, pi.y, pi.z-1, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], (q.x+1)*sizeof(float), q.y, (q.z-1) );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x+1)*sizeof(uchar), q.y, (q.z-1) );
-	//surf3Dwrite ( 1.0f, volOut[2], (q.x+1)*sizeof(float), q.y, (q.z-1) );
-	w = tex3D<float> (gvdb->volIn[0], q.x-1,q.y,q.z+1) + distFunc(p, pi.x-1, pi.y, pi.z+1, radius);
-	surf3Dwrite ( w, gvdb->volOut[0], (q.x-1)*sizeof(float), q.y, (q.z+1) );
-	surf3Dwrite ( (uchar)1, gvdb->volOut[1], (q.x-1)*sizeof(uchar), q.y, (q.z+1) );
-	//surf3Dwrite ( 1.0f, volOut[2], (q.x-1)*sizeof(float), q.y, (q.z+1) );
-#endif
+	// Run in a 3x3 square in the xz plane, writing to both volume and material channels.
+	for (int dx = -1; dx <= 1; dx++) {
+		for (int dz = -1; dz <= 1; dz++) {
+			w = surf3Dread<float>(gvdb->volOut[0], (q.x + dx) * sizeof(float), q.y, (q.z + dz)) + distFunc(p, pi.x + dx, pi.y, pi.z + dz, radius);
+			surf3Dwrite(w, gvdb->volOut[0], (q.x + dx) * sizeof(float), q.y, (q.z + dz));
+			surf3Dwrite((uchar)1, gvdb->volOut[1], (q.x + dx) * sizeof(uchar), q.y, (q.z + dz));
+		}
+	}
 }
 
 extern "C" __global__ void gvdbScatterPointAvgCol (VDBInfo* gvdb, int num_voxels, uint* colorBuf)
@@ -739,12 +666,9 @@ extern "C" __global__ void gvdbReadGridVel (VDBInfo* gvdb, int cell_num, int3* c
 	VDBNode* node = getleafNodeAtPoint ( gvdb, wpos, &vmin, &vdel);	
 	if ( node == 0x0 ) { cell_vel[cid] = 0.0f; return; }
 
-	//cell_vel[cid] = -1.0f;
-
 	int3 vox = node->mValue + make_int3((wpos.x - vmin.x)/vdel.x, (wpos.y - vmin.y)/vdel.y, (wpos.z - vmin.z)/vdel.z);
 
-	cell_vel[cid] = (tex3D<float> ( gvdb->volIn[3], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f));
-	//cell_vel[cid] = (tex3D<float> ( volIn[9], vox.x, vox.y, vox.z));
+	cell_vel[cid] = surf3Dread<float>(gvdb->volOut[3], vox.x * sizeof(float), vox.y, vox.z);
 }
 
 extern "C" __global__ void gvdbMapExtraGVDB (VDBInfo* gvdb, int numBricks, int sc_dim, int sc_per_brick, int subcell_size, int* sc_mapping, VDBInfo* obs, int* sc_obs_nid)
@@ -804,8 +728,10 @@ extern "C" __global__ void gvdbGatherDensity (VDBInfo* gvdb, int num_pnts, int n
 	float val = 0, c = 0.0f;
 
 	if ( bAccumulate ) {
-		val = tex3D<float> ( gvdb->volIn[chanDensity], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f );
-		if ( sc_pnt_clr != 0x0 ) clr = CHAR2CLR(tex3D<uchar4>(gvdb->volIn[chanClr], vox.x+ 0.5f, vox.y + 0.5f, vox.z + 0.5f) );
+		val = surf3Dread<float>(gvdb->volOut[chanDensity], vox.x * sizeof(float), vox.y, vox.z);
+		if (sc_pnt_clr != 0x0) {
+			clr = CHAR2CLR(surf3Dread<uchar4>(gvdb->volOut[chanClr], vox.x * sizeof(uchar4), vox.y, vox.z));
+		}
 	}
 	for (int j = 0; j < sc_cnt[sc_id]; j++) {
 		jpos = sc_pnt_pos[sc_off[sc_id] + j] - make_float3(wpos);
@@ -843,8 +769,10 @@ extern "C" __global__ void gvdbGatherLevelSet (VDBInfo* gvdb, int num_pnts, int 
 	float dist = 3.0f, c = 0.0f;
 
 	if ( bAccumulate ) {
-		dist = tex3D<float> ( gvdb->volIn[chanLevelset ], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f );
-		if ( sc_pnt_clr != 0x0 ) clr = CHAR2CLR(tex3D<uchar4>(gvdb->volIn[chanClr], vox.x + 0.5f, vox.y + 0.5f, vox.z + 0.5f) );
+		dist = surf3Dread<float>(gvdb->volOut[chanLevelset], vox.x * sizeof(float), vox.y, vox.z);
+		if (sc_pnt_clr != 0x0) {
+			clr = CHAR2CLR(surf3Dread<uchar4>(gvdb->volOut[chanClr], vox.x * sizeof(uchar4), vox.y, vox.z));
+		}
 	}
 	for (int j = 0; j < sc_cnt[sc_id]; j++) {
 		jpos = sc_pnt_pos[sc_off[sc_id] + j] - make_float3(wpos);
@@ -926,14 +854,14 @@ extern "C" __global__ void gvdbCheckVal (VDBInfo* gvdb, float slice, int3 res, i
 			for (int kk = 0; kk < 2; kk++) {
 				int3 vox_pos = make_int3(fi+ii, pj+jj, fk+kk);
 				int3 tmp_vox = node->mValue + make_int3((vox_pos.x - vmin.x)/vdel.x, (vox_pos.y - vmin.y)/vdel.y, (vox_pos.z - vmin.z)/vdel.z);
-				float tmp_vel = tex3D<float> ( gvdb->volIn[chanVy], tmp_vox.x, tmp_vox.y, tmp_vox.z);
+				float tmp_vel = surf3Dread<float>(gvdb->volOut[chanVy], tmp_vox.x * sizeof(float), tmp_vox.y, tmp_vox.z);
 				vel_y += tmp_vel * (1.0f - fabs(fi + ii + 0.5f - wpos.x)) * (1.0f - fabs(pj + jj - wpos.y)) * (1.0f - fabs(fk + kk + 0.5f - wpos.z));	
 			}
 		}
 	} 
 
 	float3 sp	= make_float3(node->mValue) + p + make_float3(-0.5f, 0.0f, -0.5f);
-	vel_y2		= tex3D<float> ( gvdb->volIn[chanVy], sp.x, sp.y, sp.z );
+	vel_y2		= surf3Dread<float>(gvdb->volOut[chanVy], sp.x * sizeof(float), sp.y, sp.z);
 
 	outbuf1[ vox.z*res.x + vox.x ] = vel_y;
 	outbuf2[ vox.z*res.x + vox.x ] = vel_y2;
