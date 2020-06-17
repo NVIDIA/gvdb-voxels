@@ -286,10 +286,10 @@ nvVert* nvDraw::allocGeom ( int cnt, int grp, nvSet* s, int& ndx )
 	if ( s->mNum[grp] + cnt >= s->mMax[grp] ) {		
 		xlong new_max = s->mMax[grp] * 8 + cnt;		
 		//	nvprintf  ( "allocGeom: expand, %lu\n", new_max );
-		nvVert* new_data = (nvVert*) malloc ( new_max*sizeof(nvVert) );
+		nvVert* new_data = new nvVert[new_max];
 		if ( s->mGeom[grp] != 0x0 ) {
 			memcpy ( new_data, s->mGeom[grp], s->mNum[grp]*sizeof(nvVert) );
-			free ( s->mGeom[grp] );
+			delete[] s->mGeom[grp];
 		}
 		s->mGeom[grp] = new_data;
 		s->mMax[grp] = new_max;
@@ -306,13 +306,13 @@ nvVert* nvDraw::allocGeom ( nvImg* img, int grp, nvSet* s, int& ndx )
 	
 	if ( s->mNum[grp] + cnt >= s->mMax[grp] ) {
 		xlong new_max = s->mMax[grp] * 8 + cnt;		
-		nvImg** new_imgs = (nvImg**) malloc ( new_max*sizeof(nvImg*) );
-		nvVert* new_data = (nvVert*) malloc ( new_max*sizeof(nvVert) );
+		nvImg** new_imgs = new nvImg * [new_max];
+		nvVert* new_data = new nvVert[new_max];
 		if ( s->mGeom[grp] != 0x0 ) {
 			memcpy ( new_data, s->mGeom[grp], s->mNum[grp]*sizeof(nvVert) );
 			memcpy ( new_imgs, s->mImgs, s->mNum[grp]*sizeof(nvImg*) );
-			free ( s->mGeom[grp] );
-			free ( s->mImgs );
+			delete[] s->mGeom[grp];
+			delete[] s->mImgs;
 		}
 		s->mGeom[grp] = new_data;		
 		s->mMax[grp] = new_max;
@@ -330,10 +330,10 @@ uint* nvDraw::allocIdx ( int cnt, int grp, nvSet* s )
 	if ( s->mNumI[grp] + cnt >= s->mMaxI[grp] ) {		
 		xlong new_max = s->mMaxI[grp] * 8 + cnt;
 		// nvprintf  ( "allocIdx: expand, %lu\n", new_max );
-		uint* new_data = (uint*) malloc ( new_max*sizeof(uint) );
+		uint* new_data = new uint[new_max];
 		if ( s->mIdx[grp] != 0x0 ) {
 			memcpy ( new_data, s->mIdx[grp], s->mNumI[grp]*sizeof(uint) );
-			delete s->mIdx[grp];
+			delete[] s->mIdx[grp];
 		}
 		s->mIdx[grp] = new_data;
 		s->mMaxI[grp] = new_max;
@@ -1073,7 +1073,7 @@ void nvDraw::drawSet2D ( nvSet& s )
 
 	// images
 	// * Note: Must be drawn individually unless we use bindless
-	int pos=0;
+	char* pos=0;
 	nvImg* img;
 	
 	for (int n=0; n < s.mNum[GRP_IMG] / 4 ; n++ ) {
@@ -1081,13 +1081,13 @@ void nvDraw::drawSet2D ( nvSet& s )
 		glBindTexture ( GL_TEXTURE_2D, img->getTex());										
 		glBindBuffer ( GL_ARRAY_BUFFER, s.mVBO[ GRP_IMG ] );	
 		glEnableVertexAttribArray ( localPos );
-		glVertexAttribPointer( localPos, 3, GL_FLOAT, GL_FALSE, sizeof(nvVert), (void*) (pos + 0) );
+		glVertexAttribPointer( localPos, 3, GL_FLOAT, GL_FALSE, sizeof(nvVert), pos + 0 );
 		
 		glEnableVertexAttribArray ( localClr );
-		glVertexAttribPointer( localClr, 4, GL_FLOAT, GL_FALSE, sizeof(nvVert), (void*) (pos + 12) );
+		glVertexAttribPointer( localClr, 4, GL_FLOAT, GL_FALSE, sizeof(nvVert), pos + 12 );
 
 		glEnableVertexAttribArray ( localUV );
-		glVertexAttribPointer( localUV,  2, GL_FLOAT, GL_FALSE, sizeof(nvVert), (void*) (pos + 28) );
+		glVertexAttribPointer( localUV,  2, GL_FLOAT, GL_FALSE, sizeof(nvVert), pos + 28 );
 
 		glDrawArrays (GL_TRIANGLE_STRIP, 0, 4 );			
 		pos += sizeof(nvVert)*4;
@@ -1652,7 +1652,7 @@ nvImg::nvImg ()
 {
 	mXres = 0;
 	mYres = 0;
-	mData = 0;
+	mData = nullptr;
 	mTex = UINT_NULL;
 }
 
@@ -1669,8 +1669,8 @@ void nvImg::Create ( int x, int y, int fmt )
 	case IMG_GREY16:	mSize *= 2; break;	
 	}
 
-    if ( mData != 0x0 ) free ( mData );
-    mData = (unsigned char*) malloc ( mSize );
+	if (mData != nullptr) delete[] mData;
+	mData = new unsigned char[mSize];
 	 
 	memset ( mData, 0, mSize );
     
@@ -1691,12 +1691,13 @@ void nvImg::Fill ( float r, float g, float b, float a )
 void nvImg::FlipY ()
 {
 	int pitch = mSize / mYres;
-	unsigned char* buf = (unsigned char*) malloc ( pitch );
+	unsigned char* buf = new unsigned char[pitch];
 	for (int y=0; y < mYres/2; y++ ) {
 		memcpy ( buf, mData + (y*pitch), pitch );		
 		memcpy ( mData + (y*pitch), mData + ((mYres-y-1)*pitch), pitch );		
 		memcpy ( mData + ((mYres-y-1)*pitch), buf, pitch );
 	}
+	delete[] buf;
 	UpdateTex ();
 }
 
@@ -1751,8 +1752,8 @@ bool nvImg::LoadTga ( char* fname )
 		return false;
 	}
 
-    if ( mData != 0x0 ) free ( mData );
-    mData = (unsigned char*) malloc ( mSize );
+	if (mData != nullptr) delete[] mData;
+	mData = new unsigned char[mSize];
 	 
 	memcpy ( mData, fontTGA->m_nImageData, mSize );
     

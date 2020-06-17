@@ -118,7 +118,7 @@ void Sample::reconfigure ()
 void handle_gui ( int gui, float val )
 {
 	switch ( gui ) {	
-	case 3:								// Color GUI changed
+	case 4:								// Color GUI changed
 		sample_obj.reconfigure ();		// Reconfigure GVDB volume to add/remove a color channel		
 		break;
 	}
@@ -147,7 +147,7 @@ void Sample::RebuildOptixGraph ()
 
 	m_mat_surf1 = optx.AddMaterial("optix_trace_surface", "trace_surface", "trace_shadow");		
 	MaterialParams* matp = optx.getMaterialParams( m_mat_surf1 );
-	matp->light_width = 1.2;
+	matp->light_width = 1.2f;
 	matp->shadow_width = 0.1f;
 	matp->shadow_bias = 0.5f;
 	matp->amb_color = Vector3DF(.05f, .05f, .05f);
@@ -242,7 +242,7 @@ bool Sample::init()
 	gvdb.AddPath ( ASSET_PATH );
 	
 	// Set volume params
-	gvdb.getScene()->SetSteps ( 0.2, 16, 0.2 );				// Set raycasting steps
+	gvdb.getScene()->SetSteps ( 0.2f, 16, 0.2f );			// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.0f, 3.0f, -1.0f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );
@@ -348,7 +348,7 @@ void Sample::simulate()
 
 	if (m_rebuild_gpu) {
 		// GPU rebuild
-		gvdb.RebuildTopology( m_numpnts, m_radius*2.0, m_origin);
+		gvdb.RebuildTopology( m_numpnts, m_radius*2.0f, m_origin);
 		gvdb.FinishTopology( false, true );
 
 	} else {
@@ -369,7 +369,7 @@ void Sample::simulate()
 
 	// Insert and Gather Points-to-Voxels
 	int scPntLen = 0, subcell_size = 4;
-	gvdb.InsertPointsSubcell (subcell_size, m_numpnts, m_radius*2.0, m_origin, scPntLen );
+	gvdb.InsertPointsSubcell (subcell_size, m_numpnts, m_radius*2.0f, m_origin, scPntLen );
 	gvdb.GatherLevelSet (subcell_size, m_numpnts, m_radius, m_origin, scPntLen, 0, 1 );
 	gvdb.UpdateApron(0, 3.0f);
 	if (m_use_color) gvdb.UpdateApron(1, 0.0f);
@@ -466,12 +466,12 @@ void Sample::display()
 		PERF_POP();
 	}
 	renderScreenQuadGL ( gl_screen_tex );			// Render screen-space quad with texture 
-
-	if ( m_show_fluid ) draw_fluid ();				// Draw fluid system
-
-	if ( m_show_topo ) draw_topology ();			// Draw GVDB topology 
 	
 	if ( m_show_gui ) {
+
+		if (m_show_fluid) draw_fluid();				// Draw fluid system
+
+		if (m_show_topo) draw_topology();			// Draw GVDB topology 
 
 		draw3D ();									// Render the 3D drawing groups
 

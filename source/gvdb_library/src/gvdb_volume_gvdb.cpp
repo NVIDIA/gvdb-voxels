@@ -1040,10 +1040,10 @@ void VolumeGVDB::ActivateIncreBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 	RadixSortByByte(extraNodeNum[0], pRootLev);
 	FindUniqueBrick(extraNodeNum[0], pRootLev, numUniqueExtraBrick);
 
-	int* extraLevCnt = (int*) malloc ( pRootLev * sizeof(int) );
+	int* extraLevCnt = new int[pRootLev];
 	cudaCheck ( cuMemcpyDtoH ( extraLevCnt, mAux[AUX_LEVEL_CNT].gpu, pRootLev * sizeof(int) ), "VolumeGVDB", "ActivateIncreBricksGPU", "cuMemcpyDtoH", "AUX_LEVEL_CNT", mbDebug);
 
-	unsigned short* extraUniBricks = (unsigned short*) malloc ( numUniqueExtraBrick * 4 * sizeof(unsigned short) );
+	unsigned short* extraUniBricks = new unsigned short[numUniqueExtraBrick * 4];
 	cudaCheck ( cuMemcpyDtoH ( extraUniBricks, mAux[AUX_UNIQUE_LEVXYZ].gpu, numUniqueExtraBrick * 4 * sizeof(unsigned short) ), "VolumeGVDB", "ActivateIncreBricksGPU", "cuMemcpyDtoH", "AUX_UNIQUE_LEVXYZ", mbDebug);
 
 	PERF_PUSH ( "Update markers (CPU)");
@@ -1118,8 +1118,8 @@ void VolumeGVDB::ActivateIncreBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 	mPool->SetPoolUsedCnt(0,0,usedNum);
 	PERF_POP();
 
-	delete extraLevCnt;
-	delete extraUniBricks;
+	delete[] extraLevCnt;
+	delete[] extraUniBricks;
 
 	PERF_POP();
 
@@ -1270,10 +1270,10 @@ void VolumeGVDB::ActivateBricksGPU(int pNumPnts, float pRadius, Vector3DF pOrig,
 		memset(clist, 0xFF, sizeof(uint64) * childlistLen);
 	}
 	
-	int* levCnt = (int*) malloc ( pRootLev * sizeof(int) );
+	int* levCnt = new int[pRootLev];
 	cudaCheck ( cuMemcpyDtoH ( levCnt, mAux[AUX_LEVEL_CNT].gpu, pRootLev * sizeof(int) ), "VolumeGVDB", "ActivateBricksGPU", "cuMemcpyDtoH", "AUX_LEVEL_CNT", mbDebug);
 
-	unsigned short* uniBricks = (unsigned short*) malloc ( numUniqueBrick * 4 * sizeof(unsigned short) );
+	unsigned short* uniBricks = new unsigned short[numUniqueBrick * 4];
 	cudaCheck ( cuMemcpyDtoH ( uniBricks, mAux[AUX_UNIQUE_LEVXYZ].gpu, numUniqueBrick * 4 * sizeof(unsigned short) ), "VolumeGVDB", "ActivateBricksGPU", "cuMemcpyDtoH", "AUX_UNIQUE_LEVXYZ", mbDebug);
 
 	int levPrefixSum = 0;
@@ -1379,8 +1379,8 @@ void VolumeGVDB::ActivateBricksGPU(int pNumPnts, float pRadius, Vector3DF pOrig,
 	
 	POP_CTX
 
-	delete levCnt;
-	delete uniBricks;
+	delete[] levCnt;
+	delete[] uniBricks;
 }
 
 void VolumeGVDB::FindActivBricks(int pLev,  int pRootlev,  int pNumPnts, Vector3DF pOrig, Vector3DI pRootPos)

@@ -1009,13 +1009,13 @@ void NVPWindow::save_frame ( char* fname )
 	int h = getHeight();
 
 	// Read back pixels
-	unsigned char* pixbuf = (unsigned char*) malloc ( w*h*3 );
+    unsigned char* pixbuf = new unsigned char[w * h * 3];
 
 	glReadPixels ( 0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixbuf );
 
 	// Flip Y
 	int pitch = w*3;
-	unsigned char* buf = (unsigned char*) malloc ( pitch );
+    unsigned char* buf = new unsigned char[pitch];
 	for (int y=0; y < h/2; y++ ) {
 		memcpy ( buf, pixbuf + (y*pitch), pitch );		
 		memcpy ( pixbuf + (y*pitch), pixbuf + ((h-y-1)*pitch), pitch );		
@@ -1025,8 +1025,8 @@ void NVPWindow::save_frame ( char* fname )
 	// Save png
 	save_png ( fname, pixbuf, w, h, 3 );
 
-	free ( pixbuf );
-	free ( buf );
+    delete[] pixbuf;
+    delete[] buf;
 }
 
 int NVPWindow::run ( const std::string& title, const std::string& shortname, int argc, const char** argv, int width, int height, int Major, int Minor, int GoldenFrame )
@@ -1390,7 +1390,7 @@ void NVPWindow::sysVisibleConsole()
   if (s_isConsole) return;
 
   int hConHandle;
-  long lStdHandle;
+  intptr_t pStdHandle;
 
   CONSOLE_SCREEN_BUFFER_INFO coninfo;
 
@@ -1408,24 +1408,24 @@ void NVPWindow::sysVisibleConsole()
     coninfo.dwSize);
 
   // redirect unbuffered STDOUT to the console
-  lStdHandle = (long)GetStdHandle(STD_OUTPUT_HANDLE);
-  hConHandle = _open_osfhandle(lStdHandle, _O_TEXT);
+  pStdHandle = reinterpret_cast<intptr_t>(GetStdHandle(STD_OUTPUT_HANDLE));
+  hConHandle = _open_osfhandle(pStdHandle, _O_TEXT);
   fp = _fdopen( hConHandle, "w" );
 
   *stdout = *fp;
 
   setvbuf( stdout, NULL, _IONBF, 0 );
   // redirect unbuffered STDIN to the console
-  lStdHandle = (long)GetStdHandle(STD_INPUT_HANDLE);
-  hConHandle = _open_osfhandle(lStdHandle, _O_TEXT);
+  pStdHandle = reinterpret_cast<intptr_t>(GetStdHandle(STD_INPUT_HANDLE));
+  hConHandle = _open_osfhandle(pStdHandle, _O_TEXT);
   fp = _fdopen( hConHandle, "r" );
 
   *stdin = *fp;
 
   setvbuf( stdin, NULL, _IONBF, 0 );
   // redirect unbuffered STDERR to the console
-  lStdHandle = (long)GetStdHandle(STD_ERROR_HANDLE);
-  hConHandle = _open_osfhandle(lStdHandle, _O_TEXT);
+  pStdHandle = reinterpret_cast<intptr_t>(GetStdHandle(STD_ERROR_HANDLE));
+  hConHandle = _open_osfhandle(pStdHandle, _O_TEXT);
   fp = _fdopen( hConHandle, "w" );
 
   *stderr = *fp;

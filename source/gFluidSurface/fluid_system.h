@@ -268,12 +268,6 @@
 		void ComputePressureGrid ();			// O(kn) - spatial grid
 		void ComputeForceGrid ();				// O(kn) - spatial grid
 		void ComputeForceGridNC ();				// O(cn) - neighbor table		
-		
-
-		// GPU Support functions
-		void AllocatePackBuf ();
-		void PackParticles ();
-		void UnpackParticles ();
 
 		void FluidSetupCUDA (  int num, int gsrch, int3 res, float3 size, float3 delta, float3 gmin, float3 gmax, int total, int chk );
 		void FluidParamCUDA ( float ss, float sr, float pr, float mass, float rest, float3 bmin, float3 bmax, float estiff, float istiff, float visc, float damp, float fmin, float fmax, float ffreq, float gslope, float gx, float gy, float gz, float al, float vl, int emit );
@@ -391,9 +385,6 @@
 		int						m_NeighborMax;
 		int*					m_NeighborTable;
 		float*					m_NeighborDist;
-
-		char*					mPackBuf;
-		int*					mPackGrid;
 
 		int						mVBO[3];
 

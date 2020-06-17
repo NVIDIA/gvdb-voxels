@@ -43,6 +43,7 @@ DataPtr::DataPtr() {
 
 Allocator::Allocator ()
 {
+	mbDebug = false;
 	mVFBO[0] = -1;
 
 	cudaCheck ( cuModuleLoad ( &cuAllocatorModule, CUDA_GVDB_COPYDATA_PTX ), "Allocator", "Allocator", "cuModuleLoad", CUDA_GVDB_COPYDATA_PTX, mbDebug);

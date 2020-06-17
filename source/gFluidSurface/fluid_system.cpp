@@ -83,8 +83,6 @@ FluidSystem::FluidSystem ()
 {
 	mNumPoints = 0;
 	mMaxPoints = 0;
-	mPackBuf = 0x0;
-	mPackGrid = 0x0;
 	mbRecord = false;
 	mbRecordBricks = false;
 	mSelected = -1;
@@ -163,8 +161,6 @@ void FluidSystem::Start ( int num )
 	m_Param [PGRIDSIZE] = 2*m_Param[PSMOOTHRADIUS] / m_Param[PGRID_DENSITY];	
 
 	// Setup stuff
-	AllocatePackBuf ();
-	
 	SetupKernels ();
 	
 	SetupSpacing ();
@@ -566,78 +562,6 @@ void FluidSystem::AdvanceTime ()
 	}
 }
 
-void FluidSystem::AllocatePackBuf ()
-{
-	if ( mPackBuf != 0x0 ) free ( mPackBuf );	
-	mPackBuf = (char*) malloc ( sizeof(Fluid) * mMaxPoints );
-}
-
-//------- NOT CURRENTLY USED
-void FluidSystem::PackParticles ()
-{
-	// Bin particles in memory according to grid cells.
-	// This is equivalent to a partial bucket sort, as a GPU radix sort is not necessary.
-
-	int j;	
-	char* dat = mPackBuf;
-	int cnt = 0;
-	uint* m_Grid = m_Fluid.bufI(FGRID);
-
-	for (int c=0; c < m_GridTotal; c++) {
-		j = m_Grid[c];
-		mPackGrid[c] = cnt;
-		while ( j != -1 ) {
-			*(Vector3DF*) dat = *(m_Fluid.bufV3(FPOS)+j);		dat += sizeof(Vector3DF);
-			*(Vector3DF*) dat = *(m_Fluid.bufV3(FVEL)+j);		dat += sizeof(Vector3DF);
-			*(Vector3DF*) dat = *(m_Fluid.bufV3(FVEVAL)+j);		dat += sizeof(Vector3DF);
-			*(Vector3DF*) dat = *(m_Fluid.bufV3(FFORCE)+j);		dat += sizeof(Vector3DF);
-			*(float*) dat =		*(m_Fluid.bufF(FPRESS)+j);		dat += sizeof(float);
-			*(float*) dat =		*(m_Fluid.bufF(FDENSITY)+j);	dat += sizeof(float);
-			*(int*) dat =		*(m_Fluid.bufI(FCLUSTER)+j);	dat += sizeof(int);					// search cell
-			*(int*) dat =		c;								dat += sizeof(int);					// container cell
-			*(uint*) dat =		*(m_Fluid.bufI(FCLR)+j);		dat += sizeof(uint);
-			dat += sizeof(int);
-			j = *(m_Fluid.bufI(FGNEXT)+j);
-			cnt++;
-		}
-	}
-	mGoodPoints = cnt;
-
-	//--- Debugging - Print packed particles
-	/*printf ( "\nPACKED\n" );
-	for (int n=cnt-30; n < cnt; n++ ) {
-		dat = mPackBuf + n*sizeof(Fluid);
-		printf ( " %d: %d, %d\n", n, *((int*) (dat+56)), *((int*) (dat+60)) );
-	}*/	
-}
-
-//------- NOT CURRENTLY USED
-void FluidSystem::UnpackParticles ()
-{
-	char* dat = mPackBuf;
-
-	Vector3DF*  ppos =		m_Fluid.bufV3(FPOS);
-	Vector3DF*  pforce =	m_Fluid.bufV3(FFORCE);
-	Vector3DF*  pvel =		m_Fluid.bufV3(FVEL);
-	Vector3DF*  pveleval =	m_Fluid.bufV3(FVEVAL);
-	float*		ppress =	m_Fluid.bufF(FPRESS);
-	float*		pdens =		m_Fluid.bufF(FDENSITY);
-	uint*		pclr =		m_Fluid.bufI(FCLR);
-
-	for (int n=0; n < mGoodPoints; n++ ) {
-		*ppos++ =		*(Vector3DF*) dat;		dat += sizeof(Vector3DF);
-		*pvel++ =		*(Vector3DF*) dat;		dat += sizeof(Vector3DF);
-		*pveleval++ =	*(Vector3DF*) dat;		dat += sizeof(Vector3DF);
-		*pforce++ =		*(Vector3DF*) dat;		dat += sizeof(Vector3DF);
-		*ppress++ =		*(float*) dat;			dat += sizeof(float);
-		*pdens++ =		*(float*) dat;			dat += sizeof(float);		
-		dat += sizeof(int);
-		dat += sizeof(int);
-		*pclr++ =		*(uint*) dat;			dat += sizeof(uint);
-		dat += sizeof(int);
-	}
-}
-
 void FluidSystem::DebugPrintMemory ()
 {
 	int psize = 4*sizeof(Vector3DF) + sizeof(uint) + sizeof(unsigned short) + 2*sizeof(float) + sizeof(int) + sizeof(int)+sizeof(int);
@@ -978,11 +902,6 @@ void FluidSystem::SetupGrid ( Vector3DF min, Vector3DF max, float sim_scale, flo
 	for (int n=0; n < m_GridAdjCnt; n++ ) {
 		nvprintf ( "  ADJ: %d, %d\n", n, m_GridAdj[n] );
 	}*/
-
-	if ( mPackGrid != 0x0 ) free ( mPackGrid );
-	mPackGrid = (int*) malloc ( sizeof(int) * m_GridTotal );
-
-	
 }
 
 int FluidSystem::getGridCell ( int p, Vector3DI& gc )
@@ -2107,7 +2026,7 @@ std::string FluidSystem::getResolvedName ( bool bIn, int frame )
 	if ( lpos != std::string::npos  ) {			// data sequence 		
 		size_t rpos = datastr.find_last_of ( '#' );
 		if ( rpos != std::string::npos ) {			
-			sprintf ( dataname, "%0*d", (int) rpos-lpos+1, frame );
+			sprintf ( dataname, "%0*d", (int)(rpos-lpos+1), frame );
 			datastr = datastr.substr ( 0, lpos ) + std::string(dataname) + datastr.substr ( rpos+1 );			
 		}
 	}
@@ -2144,8 +2063,6 @@ void FluidSystem::RunPlayback ()
 		// Quick setup		
 		m_Param [PNUM] = (float) mNumPoints;
 		AllocateParticles ( mNumPoints );
-		AllocatePackBuf ();
-		//Sleep ( 500 );
 		FluidSetupCUDA ( NumPoints(), m_GridSrch, *(int3*)& m_GridRes, *(float3*)& m_GridSize, *(float3*)& m_GridDelta, *(float3*)& m_GridMin, *(float3*)& m_GridMax, m_GridTotal, (int) m_Vec[PEMIT_RATE].x );		
 	}	
 				
@@ -2399,7 +2316,7 @@ void FluidSystem::SetupExampleParams ()
 		m_Vec [ PVOLMIN ].Set (   0,   0,   0 );
 		m_Vec [ PVOLMAX ].Set (  256, 128, 256 );
 		m_Vec [ PINITMIN ].Set (  5,   5,  5 );
-		m_Vec [ PINITMAX ].Set ( 256*0.3, 128*0.9, 256*0.3 );		
+		m_Vec [ PINITMAX ].Set ( 256*0.3f, 128*0.9f, 256*0.3f );		
 		break;
 	case 2:		// Wave pool
 		m_Vec [ PVOLMIN ].Set (   0,   0,   0 );

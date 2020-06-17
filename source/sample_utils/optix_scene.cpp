@@ -305,7 +305,7 @@ OptixModel* OptixScene::AddPolygons ( Model* model, int mat_id, Matrix4F& xform 
 	om->m_tform->setChild ( geomgroup );
 
 	// Add model root (Transform) to the Main Group
-	int id = m_OptixModels.size() - 1 + m_OptixVolumes.size();
+	unsigned int id = static_cast<unsigned int>(m_OptixModels.size() - 1 + m_OptixVolumes.size());
 	m_OptixMainGroup->setChildCount ( id+1 );
 	m_OptixMainGroup->setChild ( id, om->m_tform );
 
@@ -594,13 +594,14 @@ void OptixScene::CreateEnvmap (char* fpath)
 	optix::Buffer buffer = m_OptixContext->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT4, nx, ny);
 	float* buf_data = static_cast<float*>(buffer->map());
 	float* buf_pix = buf_data;
-	for (int y = 0; y < ny; y++)
-		for (int x = 0; x < nx; x++) {
+	for (unsigned int y = 0; y < ny; y++) {
+		for (unsigned int x = 0; x < nx; x++) {
 			*buf_pix++ = float(*ipx++) / 255.0f;
 			*buf_pix++ = float(*ipx++) / 255.0f;
 			*buf_pix++ = float(*ipx++) / 255.0f;
 			*buf_pix++ = float(*ipx++) / 255.0f;
 		}
+	}
 	buffer->unmap();
 
 	m_OptixEnvmap->setBuffer(0u, 0u, buffer);
@@ -644,12 +645,12 @@ void OptixScene::UpdatePolygons ()
 
 void OptixScene::Render ( VolumeGVDB* gvdb, char shading, char chan )
 {
-	// Get buffer dims	
-	RTsize bw, bh;	
-	m_OptixBuffer->getSize ( bw, bh );		
+	// Get buffer dims
+	RTsize bw, bh;
+	m_OptixBuffer->getSize(bw, bh);
 
 	// Prepare ScnInfo for GVDB
-	gvdb->PrepareRender(bw, bh, shading);
+	gvdb->PrepareRender(static_cast<int>(bw), static_cast<int>(bh), shading);
 
 	// Transfer ScnInfo to OptiX variable
 	size_t sz = gvdb->getScnSize();
@@ -661,7 +662,7 @@ void OptixScene::Render ( VolumeGVDB* gvdb, char shading, char chan )
 	UpdateScene(gvdb->getScene());
 	
 	try {
-		m_OptixContext->launch ( 0, (int) bw, (int) bh );	
+		m_OptixContext->launch(0, bw, bh);
 	} catch (const optix::Exception& e) {
 		std::string msg = m_OptixContext->getErrorString ( e.getErrorCode() );		
 		nvprintf  ( "OPTIX ERROR:\n%s\n", msg.c_str() );
@@ -683,21 +684,22 @@ void OptixScene::SaveOutput(char* fname)
 	float vmax = 1.2f;	
 	
 	// remap to 8-bit RGB
-	unsigned char* pix_buf = (unsigned char*) malloc(bw*bh * 3);
+	unsigned char* pix_buf = new unsigned char[bw * bh * 3];
 	unsigned char* pix = pix_buf;	
-	for (int y=0; y < bh; y++)
-		for (int x = 0; x < bw; x++) {
-			v = (*dat++)*255.0f / vmax; *pix++ = (unsigned char) ((v > 255) ? 255 : v);
-			v = (*dat++)*255.0f / vmax; *pix++ = (unsigned char) ((v > 255) ? 255 : v);
-			v = (*dat++)*255.0f / vmax; *pix++ = (unsigned char) ((v > 255) ? 255 : v);
+	for (RTsize y = 0; y < bh; y++) {
+		for (RTsize x = 0; x < bw; x++) {
+			v = (*dat++) * 255.0f / vmax; *pix++ = (unsigned char)((v > 255) ? 255 : v);
+			v = (*dat++) * 255.0f / vmax; *pix++ = (unsigned char)((v > 255) ? 255 : v);
+			v = (*dat++) * 255.0f / vmax; *pix++ = (unsigned char)((v > 255) ? 255 : v);
 		}
+	}
 			
 	// save to png file
-	save_png(fname, pix_buf, bw, bh, 3);
+	save_png(fname, pix_buf, static_cast<int>(bw), static_cast<int>(bh), 3);
 
 	m_OptixBuffer->unmap();
 
-	free(pix_buf);
+	delete[] pix_buf;
 }
 
 void OptixScene::ReadOutputTex ( int out_tex )
