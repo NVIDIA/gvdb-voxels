@@ -39,7 +39,7 @@ Scene::Scene ()
 	mOutCam = new Camera3D;
 	mOutLight = new Light;
 	mShadowParams.Set ( 0.8f, 1.0f, 0 );
-	mTransferFunc = 0x0;
+	mTransferFunc = nullptr;
 	mFrameSamples = 8;
 	mVClipMin.Set (  -1000000, -1000000, -1000000 );
 	mVClipMax.Set (   1000000,  1000000,  1000000 );
@@ -79,19 +79,22 @@ int Scene::getShaderProgram (int i)
 void Scene::LinearTransferFunc ( float t0, float t1, Vector4DF a, Vector4DF b )
 {
 	Vector4DF clr;
-	
-	int n0 = t0 * 16384;
-	int n1 = t1 * 16384;
-	float x;
 
-	int sz = 16384*sizeof(Vector4DF);
-	if ( mTransferFunc == 0x0 ) {
-		mTransferFunc = (Vector4DF*) malloc ( sz );
-		memset ( mTransferFunc, 0, sz );
+	const int sz = 16384;
+	
+	int n0 = static_cast<int>(t0 * static_cast<float>(sz));
+	int n1 = static_cast<int>(t1 * static_cast<float>(sz));
+	
+	if ( mTransferFunc == nullptr ) {
+		// Initialize mTransferFunc and set all elements to 0
+		// This has to be done using malloc/free, since VolumeGVDB currently recreates it
+		// using CreateMemLinear. Hopefully we'll change everything to use new/delete in
+		// the future.
+		mTransferFunc = (Vector4DF*)calloc(sz, sizeof(Vector4DF));
 	}
 	
 	for (int n=n0; n < n1; n++ ) {
-		x = float(n-n0) / float(n1-n0);
+		float x = float(n-n0) / float(n1-n0);
 		clr = lerp4 ( a, b, x );
 		mTransferFunc[n].Set ( clr.x, clr.y, clr.z, clr.w );
 	}
@@ -99,7 +102,34 @@ void Scene::LinearTransferFunc ( float t0, float t1, Vector4DF a, Vector4DF b )
 
 Scene::~Scene ()
 {
-	
+	// Delete all pointers to objects that we own
+	if (mCamera != nullptr) {
+		delete mCamera;
+	}
+
+	for (int i = 0; i < mModels.size(); i++) {
+		if (mModels[i] != nullptr) {
+			delete mModels[i];
+		}
+	}
+
+	for (int i = 0; i < mLights.size(); i++) {
+		if (mLights[i] != nullptr) {
+			delete mLights[i];
+		}
+	}
+
+	if (mOutCam != nullptr) {
+		delete mOutCam;
+	}
+
+	if (mTransferFunc != nullptr) {
+		free(mTransferFunc); // See notes on mTransferFunc above
+	}
+
+	if (mOutLight != nullptr) {
+		delete mOutLight;
+	}
 }
 
 

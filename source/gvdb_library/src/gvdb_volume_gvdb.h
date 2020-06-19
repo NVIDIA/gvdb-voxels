@@ -337,7 +337,8 @@
 	
 	class GVDB_API VolumeGVDB : public VolumeBase {
 	public:
-			VolumeGVDB ();			
+			VolumeGVDB ();
+			~VolumeGVDB ();
 			
 			// Setup
 			void SetCudaDevice ( int devid, CUcontext ctx=NULL );
@@ -793,27 +794,15 @@
 			CUdeviceptr		cuVDBInfo;
 
 			bool			mHasObstacle;
-			CUdeviceptr		cuOBSVDBInfo;
+			CUdeviceptr		cuOBSVDBInfo; // Non-owning pointer to VDBInfo used for collision
 
 			// CUDA kernels
 			CUmodule		cuModule[5];
 			CUfunction		cuFunc[ MAX_FUNC ];
 
-			// CUDA pointers
-			CUtexref		cuSurfReadTransfer;
-			CUtexref		cuSurfRead;
-			CUsurfref		cuSurfWrite;
-			CUdeviceptr		cuOutBuf;			
+			// CUDA pointers		
 			CUdeviceptr		cuXform;
 			CUdeviceptr		cuDebug;
-
-			
-			CUdeviceptr		cuTexIn;
-			CUdeviceptr		cuTexOut;
-
-			float			mTreeMem;
-
-			int				mTime;
 
 			std::vector< Vector3DF >	leaf_pos;
 			std::vector< uint64 >		leaf_ptr;

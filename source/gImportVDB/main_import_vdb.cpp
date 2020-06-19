@@ -106,8 +106,6 @@ int main (int argc, char* argv)
 	save_png ( "img_importvdb.png", buf, w, h, 4 );		// Save image as png
 
 	free ( buf );
-	delete cam;
-	delete lgt;
 
 	gprintf ( "Done.\n" );	
 }

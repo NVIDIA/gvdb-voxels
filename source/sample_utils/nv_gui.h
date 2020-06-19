@@ -127,7 +127,8 @@
 	
 	class nvImg {
 	public:
-		nvImg();
+		nvImg() {}
+		~nvImg();
 		void	Create ( int x, int y, int fmt );
 		void	Fill ( float r, float g, float b, float a );
 		bool	LoadPng ( char* fname, bool bGray=false );		// Load PNG
@@ -143,11 +144,11 @@
 		unsigned char* getData()	{ return mData;}
 
 	private:
-		int						mXres, mYres;
-		int						mSize, mFmt;
-		unsigned char*			mData;
+		int						mXres = 0, mYres = 0;
+		int						mSize = 0, mFmt = IMG_RGB;
+		unsigned char*			mData = nullptr;
 
-		TEX						mTex;
+		TEX						mTex = UINT_NULL;
 		#ifdef USE_DX
 			ID3D11ShaderResourceView*	mTexIV;
 		#endif

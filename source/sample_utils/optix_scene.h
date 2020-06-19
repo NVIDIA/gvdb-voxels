@@ -82,6 +82,7 @@
 	class OptixScene {
 	public:
 		OptixScene ();
+		~OptixScene ();
 
 		enum OptixParam {
 			uView = 0,

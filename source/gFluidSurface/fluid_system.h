@@ -172,6 +172,7 @@
 	class FluidSystem {
 	public:
 		FluidSystem ();
+		~FluidSystem();
 		
 		void LoadKernel ( int id, std::string kname );
 		void Initialize ();

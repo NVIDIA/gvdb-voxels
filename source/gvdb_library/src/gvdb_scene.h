@@ -75,7 +75,9 @@
 		void		LoadFile ( std::string filename );				
 		void		AddPath ( std::string path );
 		bool		FindFile ( std::string fname, char* path );
+		// Destroys the current camera if it exists, and sets an owning pointer to the current camera.
 		Camera3D*	SetCamera ( Camera3D* cam );
+		// Destroys light n if it exists, and sets light n to an owning pointer to the given light.
 		Light*		SetLight ( int n, Light* light );
 		Model*		AddModel ();
 		size_t		AddModel ( std::string filename, float scale, float tx, float ty, float tz );
@@ -185,7 +187,7 @@
 		std::string				mOutFile;
 		int						mOutFrame;
 		Camera3D*				mOutCam;
-		Light*					mOutLight;	
+		Light*					mOutLight;
 		std::string				mOutModel;
 
 		// Shadow parameters (independent of method used)

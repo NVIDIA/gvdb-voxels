@@ -89,8 +89,6 @@ int main (int argc, char* argv)
 	save_png ( "out_rendtofile.png", buf, w, h, 4 );				// Save as png
 
 	free ( buf );
-	delete cam;
-	delete lgt;
 
 	printf ( "Done.\n" );	
 

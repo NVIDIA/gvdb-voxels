@@ -57,6 +57,13 @@ Allocator::Allocator ()
 	cudaCheck ( cuModuleGetFunction ( &cuRetrieveTexXYZ, cuAllocatorModule, "kernelRetrieveTexXYZ" ), "Allocator", "Allocator", "cuModuleGetFunction", "cuRetrieveTexXYZ", mbDebug);
 }
 
+Allocator::~Allocator() {
+	AtlasReleaseAll();
+	PoolReleaseAll();
+
+	cudaCheck(cuModuleUnload(cuAllocatorModule), "Allocator", "~Allocator", "cuModuleUnload", "cuAllocatorModule", false);
+}
+
 
 void Allocator::PoolCreate ( uchar grp, uchar lev, uint64 width, uint64 initmax, bool bGPU )
 {

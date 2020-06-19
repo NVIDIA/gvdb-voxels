@@ -105,8 +105,6 @@ int main (int argc, char* argv)
 	save_png ( "out_rendkernel.png", buf, w, h, 4 );
 
 	free ( buf );
-	delete cam;
-	delete lgt;
 
 	printf ( "Done.\n" );
 

@@ -80,6 +80,7 @@
 	class Allocator {
 	public:
 		Allocator();
+		~Allocator();
 		
 		// Pool functions
 		void	PoolCreate ( uchar grp, uchar lev, uint64 width, uint64 initmax, bool bGPU );		// create a pool		
@@ -201,10 +202,6 @@
 		CUfunction					cuCopyBufToTexF;
 		CUfunction					cuCopyTexZYX;
 		CUfunction					cuRetrieveTexXYZ;
-
-		CUsurfref					cuSurfWrite;
-		CUtexref					cuSurfReadC;
-		CUtexref					cuSurfReadF;
 	};
 
 	}

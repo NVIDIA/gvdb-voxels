@@ -27,6 +27,26 @@
 
 using namespace nvdb;
 
+VolumeBase::~VolumeBase() {
+	// Free `DataPtr`s
+	mPool->FreeMemLinear(mTransferPtr);
+	// Tell mScene that its transfer function has been destroyed to avoid
+	// free-after-free
+	mScene->mTransferFunc = nullptr;
+	// Don't destroy the mRenderBuf elements, because the application might have added them
+
+	// Delete pool and scene
+	if (mPool != 0) {
+		delete mPool;
+		mPool = 0;
+	}
+
+	if (mScene != 0) {
+		delete mScene;
+		mScene = 0;
+	}
+}
+
 void VolumeBase::getDimensions ( Vector3DF& objmin, Vector3DF& objmax, Vector3DF& voxmin, Vector3DF& voxmax, Vector3DF& voxres )
 {
 	objmin = mObjMin;

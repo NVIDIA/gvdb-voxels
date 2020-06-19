@@ -87,6 +87,7 @@ FluidSystem::FluidSystem ()
 	mbRecordBricks = false;
 	mSelected = -1;
 	m_Frame = 0;
+	m_Module = 0;
 	m_Thresh = 0;	
 	m_NeighborTable = 0x0;
 	m_NeighborDist = 0x0;		
@@ -95,6 +96,17 @@ FluidSystem::FluidSystem ()
 	m_Toggle [ PUSE_GRID ]	=	false;
 	m_Toggle [ PPROFILE ]	=	false;
 	m_Toggle [ PCAPTURE ]   =	false;
+}
+
+FluidSystem::~FluidSystem() {
+	ClearNeighborTable();
+	if (mSaveNdx != 0x0) free(mSaveNdx);
+	if (mSaveCnt != 0x0) free(mSaveCnt);
+	if (mSaveNeighbors != 0x0)	free(mSaveNeighbors);
+
+	if (m_Module != 0) {
+		cuCheck(cuModuleUnload(m_Module), "~FluidSystem()", "cuModuleUnload", "m_Module", mbDebug);
+	}
 }
 
 void FluidSystem::LoadKernel ( int fid, std::string func )

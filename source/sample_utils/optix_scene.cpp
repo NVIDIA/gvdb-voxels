@@ -47,6 +47,10 @@ OptixScene::OptixScene ()
 	m_OptixEnvmap = 0;
 }
 
+OptixScene::~OptixScene() {
+	ClearGraph();
+}
+
 // InitializeOptiX
 // Creates the optix context, loads all mesh and volume intersection programs,
 // and prepares the scene graph root.
@@ -195,7 +199,8 @@ void OptixScene::ClearGraph ()
 		optix::Geometry			geom		= (optix::Geometry) geominst->getGeometry ();
 		geom->destroy();
 		geominst->destroy();
-		geomgroup->destroy();		
+		geomgroup->destroy();
+		delete m_OptixModels[n];
 	}
 	if ( m_OptixModels.size() > 0 ) m_OptixModels.clear ();
 

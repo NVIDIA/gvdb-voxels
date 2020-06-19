@@ -90,7 +90,6 @@ VolumeGVDB::VolumeGVDB ()
 	SetTransform(Vector3DF(0, 0, 0), Vector3DF(1, 1, 1), Vector3DF(0, 0, 0), Vector3DF(0, 0, 0));
 
 	mRoot = ID_UNDEFL;
-	mTime = 0;	
 	mbUseGLAtlas = false;
 
 	mVDBInfo.update = true;	
@@ -183,6 +182,33 @@ VolumeGVDB::VolumeGVDB ()
 	mAuxName[AUX_SUBCELL_NID] = "SUBCELL_NID";
 	mAuxName[AUX_SUBCELL_OBS_NID] = "SUBCELL_OBS_ND";
 
+}
+
+VolumeGVDB::~VolumeGVDB()
+{
+	// Free the atlas
+	DestroyChannels();
+
+	// Free all auxiliary memory
+	CleanAux();
+
+	// Delete CUDA objects
+	if (cuVDBInfo != 0) {
+		cudaCheck(cuMemFree(cuVDBInfo), "VolumeGVDB", "~VolumeGVDB", "cuMemFree", "cuVDBInfo", mbDebug);
+	}
+
+	for (int n = 0; n < sizeof(cuModule)/sizeof(cuModule[0]); n++) {
+		if (cuModule[n] != (CUmodule)(-1)) {
+			cudaCheck(cuModuleUnload(cuModule[n]), "VolumeGVDB", "~VolumeGVDB", "cuModuleUnload", "cuModule[n]", mbDebug);
+		}
+	}
+
+	if (mV3D != 0) {
+		delete mV3D;
+		mV3D = 0;
+	}
+
+	// VolumeBase destructor called here
 }
 
 void VolumeGVDB::SetProfile ( bool bCPU, bool bGPU ) 
@@ -3832,7 +3858,6 @@ void VolumeGVDB::Measure ( bool bPrint )
 	Vector3DI axisres, axiscnt;
 	int leafdim;
 	uint64 atlas_sz = 0;	
-	mTreeMem = 0;
 
 	int levs = mPool->getNumLevels ();	
 

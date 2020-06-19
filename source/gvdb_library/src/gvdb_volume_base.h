@@ -48,7 +48,9 @@
 	};
 
 	class GVDB_API VolumeBase {
-	public:		
+	public:
+		// Destructor
+		~VolumeBase();
 
 		// Commit model geometry to GPU
 		void CommitGeometry ( int model_id );
@@ -77,7 +79,7 @@
 		bool			mbVerbose;
 
 		DataPtr			mTransferPtr;				// Transfer function
-		std::vector<DataPtr	>	mRenderBuf;		// Render buffers
+		std::vector<DataPtr	>	mRenderBuf;			// Non-owning list of render buffers (since apps can add their own render buffers)
 
 		Allocator*		mPool;						// Allocator
 

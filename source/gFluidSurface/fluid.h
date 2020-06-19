@@ -83,6 +83,26 @@
 
 	// Particle & Grid Buffers
 	struct FBufs {
+#ifndef CUDA_KERNEL
+		inline ~FBufs() {
+			for (int i = 0; i < MAX_BUF; i++) {
+				if (mcpu[i] != nullptr) {
+					free(mcpu[i]);
+				}
+				if (mgpu[i] != 0) {
+					cuMemFree(mgpu[i]);
+				}
+			}
+		}
+#endif
+
+		inline CALLFUNC void setBuf(int n, char* buf) {
+			if (mcpu[n] != nullptr) {
+				free(mcpu[n]);
+			}
+			mcpu[n] = buf;
+		}
+
 		#ifdef CUDA_KERNEL
 			// on device, access data via gpu pointers 
 			inline CALLFUNC Vector3DF* bufV3(int n)		{ return (Vector3DF*) mgpu[n]; }
@@ -97,43 +117,18 @@
 			inline CALLFUNC float*  bufF (int n)		{ return (float*)  mcpu[n]; }
 			inline CALLFUNC uint*   bufI (int n)		{ return (uint*)   mcpu[n]; }
 			inline CALLFUNC char*   bufC (int n)		{ return (char*)   mcpu[n]; }				
-		#endif
-		inline CALLFUNC void    setBuf (int n, char* buf )	{ mcpu[n] = buf; }			
+		#endif	
 
-		char*				mcpu[ MAX_BUF ];
+		char* mcpu[MAX_BUF] = { nullptr };
 
 		#ifdef CUDA_KERNEL
-			char*			mgpu[ MAX_BUF ];		// on device, pointer is local 
+			char* mgpu[MAX_BUF] = { nullptr };		// on device, pointer is local 
 		#else			
-			CUdeviceptr		mgpu[ MAX_BUF ];		// on host, gpu is a device pointer
+			CUdeviceptr		mgpu[MAX_BUF] = { 0 };		// on host, gpu is a device pointer
 			CUdeviceptr		gpu (int n )	{ return mgpu[n]; }
 			CUdeviceptr*	gpuptr (int n )	{ return &mgpu[n]; }		
 		#endif			
 	};
-
-/*			float3*			mpos;			// particle buffers
-		float3*			mvel;
-		float3*			mveleval;
-		float3*			mforce;
-		float*			mpress;
-		float*			mdensity;
-		ushort*			mage;
-		uint*			mclr;			
-		uint*			mgcell;
-		uint*			mgnext;		
-		uint*			mnbrndx;
-		uint*			mnbrcnt;
-		uint*			mcluster;
-		char*			msortbuf;		// sorting buffer
-		
-		uint*			mgrid;			// grid buffers
-		int*			mgridcnt;
-		int*			mgridoff;
-		int*			mgridactive;
-
-		char*			mstate;			// state buffer
-		float*			mbrick;*/
-
 
 	// Temporary sort buffer offsets
 	#define BUF_POS			0

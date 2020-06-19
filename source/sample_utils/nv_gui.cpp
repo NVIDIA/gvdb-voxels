@@ -1648,12 +1648,10 @@ bool readword ( char *line, char *word, char delim )
 	if (error) printf ( "png write error: %s\n", lodepng_error_text(error) );
 }*/
 
-nvImg::nvImg ()
-{
-	mXres = 0;
-	mYres = 0;
-	mData = nullptr;
-	mTex = UINT_NULL;
+nvImg::~nvImg() {
+	if (mData != nullptr) {
+		delete[] mData;
+	}
 }
 
 void nvImg::Create ( int x, int y, int fmt )
