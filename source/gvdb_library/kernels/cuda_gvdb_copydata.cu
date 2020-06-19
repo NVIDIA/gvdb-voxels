@@ -40,7 +40,7 @@ extern "C" __global__ void kernelFillTex ( int3 res, int dsize, CUsurfObject vol
 }
 
 // Copy 3D texture into sub-volume of another 3D texture (char)
-extern "C" __global__ void kernelCopyTexC ( int3 offs, int3 res, CUtexObject volTexInC, CUsurfObject volTexOut )
+extern "C" __global__ void kernelCopyTexC ( int3 offs, int3 res, CUsurfObject volTexOut )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;
@@ -49,7 +49,7 @@ extern "C" __global__ void kernelCopyTexC ( int3 offs, int3 res, CUtexObject vol
 }
 
 // Copy 3D texture into sub-volume of another 3D texture (float)
-extern "C" __global__ void kernelCopyTexF ( int3 offs, int3 res, CUtexObject volTexInF, CUsurfObject volTexOut )
+extern "C" __global__ void kernelCopyTexF ( int3 offs, int3 res, CUsurfObject volTexOut )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;	
@@ -75,11 +75,11 @@ extern "C" __global__ void kernelCopyBufToTexF ( int3 offs, int3 res, float* inb
 }
 
 // Copy 3D texture into sub-volume of another 3D texture with ZYX swizzle (float)
-extern "C" __global__ void kernelCopyTexZYX (  int3 offs, int3 res, CUtexObject volTexInF, CUsurfObject volTexOut )
+extern "C" __global__ void kernelCopyTexZYX (  int3 offs, int3 res, CUsurfObject volTexInF, CUsurfObject volTexOut )
 {
 	uint3 t = blockIdx * make_uint3(blockDim.x, blockDim.y, blockDim.z) + threadIdx;	
 	if ( t.x >= res.x || t.y >= res.y || t.z >= res.z ) return;
-	float val = surf3Dread<float>(volTexOut, t.z * sizeof(float), t.y, t.x);
+	float val = surf3Dread<float>(volTexInF, t.z * sizeof(float), t.y, t.x);
 	surf3Dwrite ( val, volTexOut, (t.x+offs.x)*sizeof(float), (t.y+offs.y), (t.z+offs.z) );
 }
 

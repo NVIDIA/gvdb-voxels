@@ -738,7 +738,7 @@ void Allocator::AtlasCopyTex ( uchar chan, Vector3DI val, const DataPtr& src )
 	Vector3DI block ( 8, 8, 8 );
 	Vector3DI grid ( int(brickres.x/block.x)+1, int(brickres.y/block.y)+1, int(brickres.z/block.z)+1 );	
 
-	void* args[4] = { &val, &brickres,(void*)&src.tex_obj, (void*)&src.surf_obj };
+	void* args[3] = { &val, &brickres, (void*)&src.surf_obj };
 	switch ( mAtlas[chan].type ) {
 	case T_UCHAR:	cudaCheck ( cuLaunchKernel ( cuCopyTexC, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasCopyTex", "cuLaunch", "cuCopyTexC", mbDebug); break;
 	case T_FLOAT:	cudaCheck ( cuLaunchKernel ( cuCopyTexF, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL ), "Allocator", "AtlasCopyTex", "cuLaunch", "cuCopyTexF", mbDebug); break;
@@ -787,7 +787,7 @@ void Allocator::AtlasCopyTexZYX ( uchar chan, Vector3DI val, const DataPtr& src 
 	Vector3DI block ( 8, 8, 8 );
 	Vector3DI grid = (brickres + block - Vector3DI(1, 1, 1)) / block;
 
-	void* args[4] = { &val, &brickres, (void*)&src.tex_obj, &mAtlas[chan].surf_obj };
+	void* args[4] = { &val, &brickres, (void*)&src.surf_obj, &mAtlas[chan].surf_obj };
 	cudaCheck(cuLaunchKernel(cuCopyTexZYX, grid.x, grid.y, grid.z, block.x, block.y, block.z, 0, NULL, args, NULL), "Allocator", "AtlasCopyTexZYX", "cuLaunch", "cuCopyTexZYX", mbDebug);
 
 	cuCtxSynchronize();
