@@ -81,9 +81,9 @@
 		DataPtr			mTransferPtr;				// Transfer function
 		std::vector<DataPtr	>	mRenderBuf;			// Non-owning list of render buffers (since apps can add their own render buffers)
 
-		Allocator*		mPool;						// Allocator
+		Allocator*		mPool = nullptr;			// Allocator
 
-		Scene*			mScene;		
+		Scene*			mScene = nullptr;			// Scene (non-owning pointer)
 	};
 
 	}

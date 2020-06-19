@@ -39,14 +39,9 @@ using namespace nvdb;
 #include "vec.h"
 #include <GL/glew.h>
 
-VolumeGVDB	gvdb;
-
-FluidSystem fluid;
-
 #ifdef USE_OPTIX
 	// OptiX scene
 	#include "optix_scene.h"
-	OptixScene  optx;
 #endif
 
 //#define USE_CPU_COPY		// by default use data already on GPU (no CPU copy)
@@ -66,6 +61,7 @@ public:
 	virtual void motion(int x, int y, int dx, int dy);
 	virtual void keyboardchar(unsigned char key, int mods, int x, int y);
 	virtual void mouse (NVPWindow::MouseButton button, NVPWindow::ButtonAction state, int mods, int x, int y);
+	virtual void shutdown() override;
 
 	void		info(int id);
 	void		draw_fluid ();		// draw fluid system
@@ -74,6 +70,12 @@ public:
 	void		start_guis (int w, int h);	
 	void		reconfigure ();
 	void		RebuildOptixGraph ();
+
+	VolumeGVDB	gvdb;
+	FluidSystem fluid;
+#ifdef USE_OPTIX
+	OptixScene  optx;
+#endif
 
 	Vector3DF	m_origin;
 	float		m_radius;
@@ -548,6 +550,13 @@ void Sample::mouse ( NVPWindow::MouseButton button, NVPWindow::ButtonAction stat
 
 	// Track when we are in a mouse drag
 	mouse_down = (state == NVPWindow::BUTTON_PRESS) ? button : -1;	
+}
+
+void Sample::shutdown() {
+	// Because of the way NVPWindow works, we have to explicitly destroy its objects:
+	gvdb.~VolumeGVDB();
+	fluid.~FluidSystem();
+	optx.~OptixScene();
 }
 
 int sample_main ( int argc, const char** argv ) 

@@ -77,8 +77,8 @@ VolumeGVDB::VolumeGVDB ()
 	mDevice = NULL;
 	mContext = NULL;
 	mStream = NULL;
-	mPool = 0x0;
-	mScene = 0x0;
+	mPool = nullptr;
+	mScene = nullptr;
 	mV3D = 0x0;
 	mAtlasResize.Set ( 0, 20, 0 );
 	mEpsilon = 0.001f;				// default epsilon
@@ -206,6 +206,21 @@ VolumeGVDB::~VolumeGVDB()
 	if (mV3D != 0) {
 		delete mV3D;
 		mV3D = 0;
+	}
+
+	// Free mTransferPtr
+	if (mPool != nullptr) {
+		mPool->FreeMemLinear(mTransferPtr);
+		// Tell mScene that its transfer function has been destroyed to avoid
+		// free-after-free
+		if (mScene != nullptr) {
+			mScene->mTransferFunc = nullptr;
+		}
+	}
+
+	if (mScene != nullptr) {
+		delete mScene;
+		mScene = 0;
 	}
 
 	// VolumeBase destructor called here
