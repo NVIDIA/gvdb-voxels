@@ -156,7 +156,7 @@
 		CUdeviceptr getAtlasMapGPU(uchar chan) { return (mAtlasMap.size()==0) ? NULL : mAtlasMap[chan].gpu; }
 
 		// Neighbor Table
-		void	AllocateNeighbors(int cnt);		
+		void	AllocateNeighbors(uint64 cnt);		
 		void	CommitNeighbors();
 		DataPtr* getNeighborTable()				{ return &mNeighbors; }		
 

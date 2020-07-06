@@ -94,7 +94,7 @@ void Volume3D::PrepareRasterGL ( bool start )
 			gchkGL ( "glUseProgram(VOX) (PrepareRaster)" );
 
 			// Set raster sampling to major axis						
-			int smax = max3(mVoxRes.x, mVoxRes.y, mVoxRes.z);
+			int smax = static_cast<int>(max3(mVoxRes.x, mVoxRes.y, mVoxRes.z));
 			glViewport(0, 0, smax, smax );
 
 			// Bind texture
@@ -189,7 +189,7 @@ void Volume3D::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 		glBindFramebuffer (GL_FRAMEBUFFER, 0);		
 
 		// Set raster sampling to major axis
-		int s = max3( mVoxRes.x, mVoxRes.y, mVoxRes.z );
+		int s = static_cast<int>(max3( mVoxRes.x, mVoxRes.y, mVoxRes.z ));
 		glViewport(0, 0, s , s );
 
 		// Not using ROP to write to FB maks out all color/depth

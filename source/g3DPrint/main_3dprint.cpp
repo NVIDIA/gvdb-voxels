@@ -116,10 +116,10 @@ void Sample::revoxelize()
 	// allows the application to setup rendering to convert from unit voxel grid to world coordinates.
 	// To apply voxel size for 3D printing, we include it in the xform matrix for SolidVoxelize.
 	switch (m_voxelsize_select) {
-	case 0:	m_voxel_size = 0.5;		break;
-	case 1:	m_voxel_size = 0.4;		break;
-	case 2:	m_voxel_size = 0.3;		break;
-	case 3:	m_voxel_size = 0.2;		break;
+	case 0:	m_voxel_size = 0.5f; break;
+	case 1:	m_voxel_size = 0.4f; break;
+	case 2:	m_voxel_size = 0.3f; break;
+	case 3:	m_voxel_size = 0.2f; break;
 	};
 
 	// Create a transform	
@@ -283,14 +283,15 @@ void Sample::render_section ()
 	float h = (float) getHeight();
 	Vector3DF world;
 	world = m_pivot * m_part_size / m_voxel_size;	// GVDB voxel grid to world coordinates
-	world.y *= 1.0 - getCurY() / h;					// Select cross-section on world y-axis 
+	world.y *= 1.0f - getCurY() / h;				// Select cross-section on world y-axis 
 	gvdb1.getScene()->SetCrossSection ( world, Vector3DF(world.x, 1.f, world.z) );
 
 	gvdb1.Render ( SHADE_SECTION2D, 0, 1 );		
 
 	gvdb1.ReadRenderTexGL ( 1, gl_section_tex );
 	
-	renderScreenQuadGL ( gl_section_tex, -1, 0, 0, getWidth()/4, getHeight()/4, 0 );
+	renderScreenQuadGL ( gl_section_tex, -1, 0, 0,
+		static_cast<float>(getWidth())/4, static_cast<float>(getHeight())/4, 0 );
 }
 
 void Sample::display()
@@ -357,7 +358,7 @@ void Sample::draw_topology ( VolumeGVDB* gvdb )
 	Vector3DF bmin, bmax;
 	Node* node;
 	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = gvdb->getNumNodes(lev);
+		int node_cnt = static_cast<int>(gvdb->getNumNodes(lev));
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb->getNodeAtLevel ( n, lev );
 			bmin = gvdb->getWorldMin ( node ) * vs; // get node bounding box

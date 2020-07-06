@@ -204,8 +204,8 @@ void PERF_INIT ( int buildbits, bool cpu, bool gpu, bool cons, int lev, const ch
 		// Console window for CPU timings
 		if ( g_perfCPU ) {
 			AllocConsole ();
-			long lStdHandle = (long) GetStdHandle( STD_OUTPUT_HANDLE );
-			int hConHandle = _open_osfhandle(lStdHandle, _O_TEXT);
+			HANDLE lStdHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+			int hConHandle = _open_osfhandle((intptr_t)lStdHandle, _O_TEXT);
 			g_perfCons = _fdopen( hConHandle, "w" );
 			setvbuf(g_perfCons, NULL, _IONBF, 1);
 			*stdout = *g_perfCons;

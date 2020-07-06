@@ -116,7 +116,13 @@ inline __host__ __device__ float4 make_float4 ( uchar4 a )
 // 4x4 matrix operations
 ////////////////////////////////////////////////////////////////////////////
 
-inline __host__ __device__ float3 mmult(float3 vec, float* mtx)
+// Gets the result of transforming a point (vec.x, vec.y, vec.z, 1)^T by the
+// 4x4 column-major matrix mtx.
+// In other words, computes
+// (p.x)   (mtx[ 0] mtx[ 4] mtx[ 8]) (vec.x)   (mtx[12])
+// (p.y) = (mtx[ 1] mtx[ 5] mtx[ 9]) (vec.y) + (mtx[13])
+// (p.z)   (mtx[ 2] mtx[ 6] mtx[10]) (vec.z)   (mtx[14])
+inline __host__ __device__ float3 mmult(float* mtx, float3 vec)
 {
 	float3 p;
 	p.x = vec.x * mtx[0] + vec.y*mtx[4] + vec.z*mtx[8] + mtx[12];

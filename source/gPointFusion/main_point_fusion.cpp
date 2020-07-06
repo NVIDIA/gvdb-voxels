@@ -176,7 +176,7 @@ void Sample::RebuildOptixGraph ()
 
 	int m_mat_surf1 = optx.AddMaterial("optix_trace_surface", "trace_surface", "trace_shadow");		
 	MaterialParams* matp = optx.getMaterialParams( m_mat_surf1 );
-	matp->light_width = 1.2;
+	matp->light_width = 1.2f;
 	matp->shadow_width = 0.1f;
 	matp->shadow_bias = 0.5f;
 	matp->amb_color = Vector3DF(.1f, .1f, .1f);
@@ -242,8 +242,8 @@ Vector3DF Sample::getBuildingPos ( Vector3DF bloc, float block_max, Vector3DF bd
 	switch ( (int) bloc.y ) {
 	case 0:		p.Set ( bloc.x*block_max, 0, 0 );						bsz.Set( bdim.x, bdim.z, bdim.y );		break;
 	case 1:		p.Set ( block_max - bdim.y, 0, bloc.x*block_max );		bsz.Set( bdim.y, bdim.z, bdim.x );		break;
-	case 2:		p.Set ( (1.0-bloc.x)*block_max - bdim.x, 0, block_max - bdim.y );  bsz.Set( bdim.x, bdim.z, bdim.y );		break;
-	case 3:		p.Set ( 0, 0, (1.0-bloc.x)*block_max - bdim.x );		bsz.Set( bdim.y, bdim.z, bdim.x );		break;
+	case 2:		p.Set ( (1.0f-bloc.x)*block_max - bdim.x, 0, block_max - bdim.y );  bsz.Set( bdim.x, bdim.z, bdim.y );		break;
+	case 3:		p.Set ( 0, 0, (1.0f-bloc.x)*block_max - bdim.x );		bsz.Set( bdim.y, bdim.z, bdim.x );		break;
 	};
 	return p;
 }
@@ -251,7 +251,7 @@ Vector3DF Sample::getBuildingPos ( Vector3DF bloc, float block_max, Vector3DF bd
 
 void Sample::GenerateBuilding ( Vector3DF limits, Vector3DF& bloc, Vector3DF& bpos, Vector3DF& bsz, float block_max, float dctr ) 
 {
-	float hgt = 3.0 + 200 * exp ( dctr / -200.0 );
+	float hgt = 3.0f + 200 * expf ( dctr / -200.0f );
 
 	Vector3DF bdim;
 	bdim.Random ( 5, 20, 10, 40, 3, hgt );			// x=along street, y=away from street	
@@ -289,11 +289,11 @@ void Sample::GenerateCity ()
 	int first_obj;
 	
 	float block_sz = 100;					// size of city block in meters	
-	float lane_sz = 7.4;					// width of street (meters)
-	float curb_sz = 3.7;					// width of curb
+	float lane_sz = 7.4f;					// width of street (meters)
+	float curb_sz = 3.7f;					// width of curb
 	m_gridsz = (block_sz + lane_sz*2 + curb_sz*2);
 
-	m_city_ctr = Vector3DF( GRID_X*m_gridsz*0.5, 0, GRID_Y*m_gridsz*0.5 );
+	m_city_ctr = Vector3DF( GRID_X*m_gridsz*0.5f, 0, GRID_Y*m_gridsz*0.5f );
 
 	gvdb.AllocData ( m_objgrid, GRID_CNT, sizeof(int), true );
 	gvdb.AllocData ( m_objcnts, GRID_CNT, sizeof(int), true );
@@ -318,12 +318,12 @@ void Sample::GenerateCity ()
 
 				// generate building
 				blimit = LimitBuilding ( first_obj, bloc );				
-				dist_ctr = m_city_ctr.Dist ( block_pos + getBuildingPos ( bloc, block_sz ) );
+				dist_ctr = static_cast<float>(m_city_ctr.Dist(block_pos + getBuildingPos(bloc, block_sz)));
 				
 				GenerateBuilding ( blimit, bloc, bpos, bsize, block_sz, dist_ctr );
 				
 				// add building
-				bclr.Random ( 0, 0.9, 0, .5, 0, 0 );				
+				bclr.Random ( 0, 0.9f, 0, .5f, 0, 0 );				
 				bldg.clr = COLORA ( bclr.x, bclr.y, bclr.z, 1 );
 				bldg.loc = bloc;
 				bldg.pos = (block_pos + bpos) * GRID_SCALE;
@@ -343,7 +343,7 @@ void Sample::GenerateCity ()
 			bldg.clr = COLORA ( .5, .5, .5, 1 );
 			bldg.loc = Vector3DF(0,0,0);
 			bldg.pos = (block_pos - Vector3DF(lane_sz+curb_sz, 0, lane_sz+curb_sz )) * GRID_SCALE;
-			bldg.size = Vector3DF( block_sz+(lane_sz+curb_sz)*2, 0.01, block_sz+(lane_sz+curb_sz)*2 ) * GRID_SCALE;
+			bldg.size = Vector3DF( block_sz+(lane_sz+curb_sz)*2, 0.01f, block_sz+(lane_sz+curb_sz)*2 ) * GRID_SCALE;
 			*objlist++ = bldg;
 			bcnt++;			
 
@@ -495,8 +495,8 @@ bool Sample::init()
 	gvdb.getScene()->SetExtinct(-1.0f, 1.1f, 0.0f);			// Set volume extinction	
 	gvdb.getScene()->SetVolumeRange(0.0f, 3.0f, -1.0f);		// Set volume value range
 	gvdb.getScene()->SetCutoff(0.005f, 0.001f, 0.0f);
-	gvdb.getScene()->SetShadowParams ( 0.8, 1, 0 );	
-	gvdb.getScene()->SetBackgroundClr(0.1, 0.2, 0.3, 1.0);
+	gvdb.getScene()->SetShadowParams ( 0.8f, 1, 0 );	
+	gvdb.getScene()->SetBackgroundClr(0.1f, 0.2f, 0.3f, 1.0f);
 
 	// Add render buffer
 	nvprintf("Output buffer: %d x %d\n", m_w, m_h);	
@@ -569,7 +569,7 @@ void Sample::render_update()
 	// Rebuild GVDB Render topology
 	
 	PERF_PUSH("Dynamic Topology");	
-	gvdb.AccumulateTopology( m_numpnts, m_radius*2.0, m_origin );
+	gvdb.AccumulateTopology( m_numpnts, m_radius*2.0f, m_origin );
 	gvdb.FinishTopology(false, true);	// false. no commit pool	false. no compute bounds
 	gvdb.UpdateAtlas();
 	PERF_POP();
@@ -580,8 +580,8 @@ void Sample::render_update()
 
 	int scPntLen = 0;
 	int subcell_size = 4;
-	gvdb.InsertPointsSubcell (subcell_size, m_numpnts, m_radius*2.0, m_origin, scPntLen);
-	gvdb.GatherLevelSet (subcell_size, m_numpnts, m_radius, m_origin, scPntLen, 0, 1, true );		// true = accumulate
+	gvdb.InsertPointsSubcell (subcell_size, m_numpnts, m_radius*2.0f, m_origin, scPntLen);
+	gvdb.GatherLevelSet (subcell_size, m_numpnts, float(m_radius), m_origin, scPntLen, 0, 1, true );		// true = accumulate
 	gvdb.UpdateApron(0, 0.0f);	
 	PERF_POP();
 
@@ -719,7 +719,7 @@ void Sample::draw_topology ()
 	Camera3D* cam = gvdb.getScene()->getCamera();
 	start3D(cam);
 	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = g->getNumTotalNodes(lev);
+		int node_cnt = static_cast<int>(g->getNumTotalNodes(lev));
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = g->getNodeAtLevel ( n, lev );
 			if (!int(node->mFlags)) continue;
@@ -822,7 +822,7 @@ void Sample::motion(int x, int y, int dx, int dy)
 	
 	case NVPWindow::MOUSE_BUTTON_RIGHT: {		
 		if ( shift || m_show_pov ) {
-			m_speed += dy * 0.1;
+			m_speed += dy * 0.1f;
 			if (m_speed < 0) m_speed = 0;			
 		} else {
 			float dist = cam->getOrbitDist() - dy;

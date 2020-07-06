@@ -84,7 +84,7 @@ void Sample::RebuildOptixGraph ( int shading )
 	matp->spec_power = 80.0;
 	matp->env_color  = Vector3DF(0, 0, 0);
 	matp->refl_width = 0.3f;
-	matp->refl_color = Vector3DF(.8, .8, .8 );
+	matp->refl_color = Vector3DF(.8f, .8f, .8f );
 	matp->refr_width = 0.0f;
 	matp->refr_color = Vector3DF(0, 0, 0);
 	matp->refr_ior = 1.2f;
@@ -181,7 +181,7 @@ bool Sample::init()
 
 	// Set volume params		
 	gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.25, .25, .25), Vector3DF(0, 0, 0), m_translate);
-	gvdb.SetEpsilon(0.001, 256);
+	gvdb.SetEpsilon(0.001f, 256);
 	gvdb.getScene()->SetSteps ( 0.2f, 16, 0.2f );			// SCN_PSTEP, SCN_SSTEP, SCN_FSTEP - Raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.0f, 0.0f );		// SCN_EXTINCT, SCN_ALBEDO - Volume extinction	
 	gvdb.getScene()->SetVolumeRange(0.1f, 0.0f, 0.3f);		// Threshold: Isoval, Vmin, Vmax
@@ -254,10 +254,9 @@ void Sample::draw_topology()
 	start3D(gvdb.getScene()->getCamera());		// start 3D drawing
 	Vector3DF bmin, bmax;
 	Node* node;
-	Node* node2;
 	
 	for (int lev = 0; lev < 5; lev++) {				// draw all levels
-		int node_cnt = gvdb.getNumTotalNodes(lev);
+		int node_cnt = static_cast<int>(gvdb.getNumTotalNodes(lev));
 		for (int n = 0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb.getNodeAtLevel(n, lev);
 			if (!int(node->mFlags)) continue;

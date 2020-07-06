@@ -89,8 +89,8 @@ RT_PROGRAM void vol_deep( int primIdx )
 	if (ray_info.rtype == MESH_RAY ) return;
 
 	//-- Volume grid transform 
-	float3 orig = mmult(ray.origin, SCN_INVXFORM);
-	float3 dir = mmult(normalize(ray.direction), SCN_INVXROT);
+	float3 orig = mmult(SCN_INVXFORM, ray.origin);
+	float3 dir = mmult(SCN_INVXROT, normalize(ray.direction));
 
 	// ---- Debugging
 	// Uncomment this code to demonstrate tracing of the bounding box 

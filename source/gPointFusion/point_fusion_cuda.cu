@@ -63,11 +63,6 @@ static __host__ __device__ __inline__ unsigned int lcg(unsigned int &prev)
   prev = (LCG_A * prev + LCG_C);
   return prev & 0x00FFFFFF;
 }
-static __host__ __device__ __inline__ unsigned int lcg2(unsigned int &prev)
-{
-  prev = (prev*8121 + 28411)  % 134456;
-  return prev;
-}
 static __host__ __device__ __inline__ float rnd(unsigned int &prev)
 {
   return ((float) lcg(prev) / (float) 0x01000000);

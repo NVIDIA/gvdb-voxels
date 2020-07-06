@@ -23,75 +23,6 @@
 #include "gvdb_vec.h"
 using namespace nvdb;
 
-#undef VTYPE
-#define VTYPE	float
-
-// p' = Mp
-Vector3DF &Vector3DF::operator*= (const Matrix4F &op)
-{
-	float xa, ya, za;
-	xa = x * op.data[0] + y * op.data[4] + z * op.data[8] + op.data[12];
-	ya = x * op.data[1] + y * op.data[5] + z * op.data[9] + op.data[13];
-	za = x * op.data[2] + y * op.data[6] + z * op.data[10] + op.data[14];
-	x = xa; y = ya; z = za;
-	return *this;
-}
-
-Vector3DF& Vector3DF::Clamp (float a, float b)
-{
-	x = (x<a) ? a : ((x>b) ? b : x);
-	y = (y<a) ? a : ((y>b) ? b : y);
-	z = (z<a) ? a : ((z>b) ? b : z);	
-	return *this;
-}
-
-	
-#define min3(a,b,c)		( (a<b) ? ((a<c) ? a : c) : ((b<c) ? b : c) )
-#define max3(a,b,c)		( (a>b) ? ((a>c) ? a : c) : ((b>c) ? b : c) )
-
-Vector3DF Vector3DF::RGBtoHSV ()
-{
-	float h,s,v;
-	float minv, maxv;
-	int i;
-	float f;
-
-	minv = min3(x, y, z);
-	maxv = max3(x, y, z);
-	if (minv==maxv) {
-		v = (float) maxv;
-		h = 0.0; 
-		s = 0.0;			
-	} else {
-		v = (float) maxv;
-		s = (maxv - minv) / maxv;
-		f = (x == minv) ? y - z : ((y == minv) ? z - x : x - y); 	
-		i = (x == minv) ? 3 : ((y == minv) ? 5 : 1);
-		h = (i - f / (maxv - minv) ) / 6.0f;	
-	}
-	return Vector3DF(h,s,v);
-}
-
-Vector3DF Vector3DF::HSVtoRGB ()
-{
-	float m, n, f;
-	int i = (int) floor ( x*6.0 );
-	f = x*6.0f - i;
-	if ( i % 2 == 0 ) f = 1.0f - f;	
-	m = z * (1.0f - y );
-	n = z * (1.0f - y * f );	
-	switch ( i ) {
-	case 6: 
-	case 0: return Vector3DF( z, n, m );	break;
-	case 1: return Vector3DF( n, z, m );	break;
-	case 2: return Vector3DF( m, z, n );	break;
-	case 3: return Vector3DF( m, n, z );	break;
-	case 4: return Vector3DF( n, m, z );	break;
-	case 5: return Vector3DF( z, m, n );	break;
-	};
-	return Vector3DF(1,1,1);
-}
-
 Vector4DF &Vector4DF::operator*= (const Matrix4F &op)
 {
 	float xa, ya, za, wa;
@@ -103,7 +34,6 @@ Vector4DF &Vector4DF::operator*= (const Matrix4F &op)
 	return *this;
 }
 
-
 Vector4DF &Vector4DF::operator*= (const float* op)
 {
 	float xa, ya, za, wa;
@@ -114,153 +44,6 @@ Vector4DF &Vector4DF::operator*= (const float* op)
 	x = xa; y = ya; z = za; w = wa;
 	return *this;
 }
-
-#undef VTYPE
-#undef VNAME
-
-#define VNAME		3DI
-#define VTYPE		int
-
-// Constructors/Destructors
-Vector3DI::Vector3DI() {x=0; y=0; z=0;}
-Vector3DI::Vector3DI (const VTYPE xa, const VTYPE ya, const VTYPE za) {x=xa; y=ya; z=za;}
-Vector3DI::Vector3DI (const Vector3DI &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z;}
-Vector3DI::Vector3DI (const Vector3DF &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z;}
-Vector3DI::Vector3DI (const Vector4DF &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z;}
-
-// Set Functions
-Vector3DI &Vector3DI::Set (const int xa, const int ya, const int za)
-{
-	x = xa; y = ya; z = za;
-	return *this;
-}
-
-// Member Functions
-Vector3DI &Vector3DI::operator= (const Vector3DI &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator= (const Vector3DF &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator= (const Vector4DF &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z; return *this;}	
-	
-Vector3DI &Vector3DI::operator+= (const Vector3DI &op) {x+=(VTYPE) op.x; y+=(VTYPE) op.y; z+=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator+= (const Vector3DF &op) {x+=(VTYPE) op.x; y+=(VTYPE) op.y; z+=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator+= (const Vector4DF &op) {x+=(VTYPE) op.x; y+=(VTYPE) op.y; z+=(VTYPE) op.z; return *this;}
-
-Vector3DI &Vector3DI::operator-= (const Vector3DI &op) {x-=(VTYPE) op.x; y-=(VTYPE) op.y; z-=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator-= (const Vector3DF &op) {x-=(VTYPE) op.x; y-=(VTYPE) op.y; z-=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator-= (const Vector4DF &op) {x-=(VTYPE) op.x; y-=(VTYPE) op.y; z-=(VTYPE) op.z; return *this;}
-	
-Vector3DI &Vector3DI::operator*= (const Vector3DI &op) {x*=(VTYPE) op.x; y*=(VTYPE) op.y; z*=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator*= (const Vector3DF &op) {x*=(VTYPE) op.x; y*=(VTYPE) op.y; z*=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator*= (const Vector4DF &op) {x*=(VTYPE) op.x; y*=(VTYPE) op.y; z*=(VTYPE) op.z; return *this;}
-
-Vector3DI &Vector3DI::operator/= (const Vector3DI &op) {x/=(VTYPE) op.x; y/=(VTYPE) op.y; z/=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator/= (const Vector3DF &op) {x/=(VTYPE) op.x; y/=(VTYPE) op.y; z/=(VTYPE) op.z; return *this;}
-Vector3DI &Vector3DI::operator/= (const Vector4DF &op) {x/=(VTYPE) op.x; y/=(VTYPE) op.y; z/=(VTYPE) op.z; return *this;}
-
-Vector3DI &Vector3DI::Cross (const Vector3DI &v) {double ax = x, ay = y, az = z; x = (VTYPE) (ay * (double) v.z - az * (double) v.y); y = (VTYPE) (-ax * (double) v.z + az * (double) v.x); z = (VTYPE) (ax * (double) v.y - ay * (double) v.x); return *this;}
-Vector3DI &Vector3DI::Cross (const Vector3DF &v) {double ax = x, ay = y, az = z; x = (VTYPE) (ay * (double) v.z - az * (double) v.y); y = (VTYPE) (-ax * (double) v.z + az * (double) v.x); z = (VTYPE) (ax * (double) v.y - ay * (double) v.x); return *this;}
-		
-double Vector3DI::Dot(const Vector3DI &v)			{double dot; dot = (double) x*v.x + (double) y*v.y + (double) z*v.z; return dot;}
-double Vector3DI::Dot(const Vector3DF &v)			{double dot; dot = (double) x*v.x + (double) y*v.y + (double) z*v.z; return dot;}
-
-double Vector3DI::Dist (const Vector3DI &v)		{ double distsq = DistSq (v); if (distsq!=0) return sqrt(distsq); return 0.0;}
-double Vector3DI::Dist (const Vector3DF &v)		{ double distsq = DistSq (v); if (distsq!=0) return sqrt(distsq); return 0.0;}
-double Vector3DI::Dist (const Vector4DF &v)		{ double distsq = DistSq (v); if (distsq!=0) return sqrt(distsq); return 0.0;}
-
-double Vector3DI::DistSq (const Vector3DI &v)		{ double a,b,c; a = (double) x - (double) v.x; b = (double) y - (double) v.y; c = (double) z - (double) v.z; return (a*a + b*b + c*c);}
-double Vector3DI::DistSq (const Vector3DF &v)		{ double a,b,c; a = (double) x - (double) v.x; b = (double) y - (double) v.y; c = (double) z - (double) v.z; return (a*a + b*b + c*c);}
-double Vector3DI::DistSq (const Vector4DF &v)		{ double a,b,c; a = (double) x - (double) v.x; b = (double) y - (double) v.y; c = (double) z - (double) v.z; return (a*a + b*b + c*c);}
-
-Vector3DI &Vector3DI::Normalize (void) {
-	double n = (double) x*x + (double) y*y + (double) z*z;
-	if (n!=0.0) {
-		n = sqrt(n);
-		x = (VTYPE) (((double) x*255)/n);
-		y = (VTYPE) (((double) y*255)/n);
-		z = (VTYPE) (((double) z*255)/n);
-	}
-	return *this;
-}
-double Vector3DI::Length (void) { double n; n = (double) x*x + (double) y*y + (double) z*z; if (n != 0.0) return sqrt(n); return 0.0; }
-
-
-#undef VTYPE
-#undef VNAME
-
-// Vector3DF Code Definition
-
-#define VNAME		3DF
-#define VTYPE		float
-
-Vector3DF::Vector3DF (const VTYPE xa, const VTYPE ya, const VTYPE za) {x=xa; y=ya; z=za;}
-Vector3DF::Vector3DF (const Vector3DI &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z;}
-Vector3DF::Vector3DF (const Vector3DF &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z;}
-Vector3DF::Vector3DF (const Vector4DF &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z;}
-
-// Set Functions
-Vector3DF &Vector3DF::Set (const VTYPE xa, const VTYPE ya, const VTYPE za)
-{
-	x = (float) xa; y = (float) ya; z = (float) za;
-	return *this;
-}
-
-// Member Functions
-Vector3DF &Vector3DF::operator= (const int op) {x= (VTYPE) op; y= (VTYPE) op; z= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator= (const double op) {x= (VTYPE) op; y= (VTYPE) op; z= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator= (const Vector3DI &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator= (const Vector3DF &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator= (const Vector4DF &op) {x=(VTYPE) op.x; y=(VTYPE) op.y; z=(VTYPE) op.z; return *this;}	
-	
-Vector3DF &Vector3DF::operator+= (const int op) {x+= (VTYPE) op; y+= (VTYPE) op; z+= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator+= (const double op) {x+= (VTYPE) op; y+= (VTYPE) op; z+= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator+= (const Vector3DI &op) {x+=(VTYPE) op.x; y+=(VTYPE) op.y; z+=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator+= (const Vector3DF &op) {x+=(VTYPE) op.x; y+=(VTYPE) op.y; z+=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator+= (const Vector4DF &op) {x+=(VTYPE) op.x; y+=(VTYPE) op.y; z+=(VTYPE) op.z; return *this;}
-
-Vector3DF &Vector3DF::operator-= (const int op) {x-= (VTYPE) op; y-= (VTYPE) op; z-= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator-= (const double op) {x-= (VTYPE) op; y-= (VTYPE) op; z-= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator-= (const Vector3DI &op) {x-=(VTYPE) op.x; y-=(VTYPE) op.y; z-=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator-= (const Vector3DF &op) {x-=(VTYPE) op.x; y-=(VTYPE) op.y; z-=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator-= (const Vector4DF &op) {x-=(VTYPE) op.x; y-=(VTYPE) op.y; z-=(VTYPE) op.z; return *this;}
-	
-Vector3DF &Vector3DF::operator*= (const int op) {x*= (VTYPE) op; y*= (VTYPE) op; z*= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator*= (const double op) {x*= (VTYPE) op; y*= (VTYPE) op; z*= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator*= (const Vector3DI &op) {x*=(VTYPE) op.x; y*=(VTYPE) op.y; z*=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator*= (const Vector3DF &op) {x*=(VTYPE) op.x; y*=(VTYPE) op.y; z*=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator*= (const Vector4DF &op) {x*=(VTYPE) op.x; y*=(VTYPE) op.y; z*=(VTYPE) op.z; return *this;}
-
-Vector3DF &Vector3DF::operator/= (const int op) {x/= (VTYPE) op; y/= (VTYPE) op; z/= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator/= (const double op) {x/= (VTYPE) op; y/= (VTYPE) op; z/= (VTYPE) op; return *this;}
-Vector3DF &Vector3DF::operator/= (const Vector3DI &op) {x/=(VTYPE) op.x; y/=(VTYPE) op.y; z/=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator/= (const Vector3DF &op) {x/=(VTYPE) op.x; y/=(VTYPE) op.y; z/=(VTYPE) op.z; return *this;}
-Vector3DF &Vector3DF::operator/= (const Vector4DF &op) {x/=(VTYPE) op.x; y/=(VTYPE) op.y; z/=(VTYPE) op.z; return *this;}
-
-Vector3DF &Vector3DF::Cross (const Vector3DI &v) {double ax = x, ay = y, az = z; x = (VTYPE) (ay * (double) v.z - az * (double) v.y); y = (VTYPE) (-ax * (double) v.z + az * (double) v.x); z = (VTYPE) (ax * (double) v.y - ay * (double) v.x); return *this;}
-Vector3DF &Vector3DF::Cross (const Vector3DF &v) {double ax = x, ay = y, az = z; x = (VTYPE) (ay * (double) v.z - az * (double) v.y); y = (VTYPE) (-ax * (double) v.z + az * (double) v.x); z = (VTYPE) (ax * (double) v.y - ay * (double) v.x); return *this;}
-		
-double Vector3DF::Dot(const Vector3DI &v)			{double dot; dot = (double) x*v.x + (double) y*v.y + (double) z*v.z; return dot;}
-double Vector3DF::Dot(const Vector3DF &v)			{double dot; dot = (double) x*v.x + (double) y*v.y + (double) z*v.z; return dot;}
-
-double Vector3DF::Dist (const Vector3DI &v)		{ double distsq = DistSq (v); if (distsq!=0) return sqrt(distsq); return 0.0;}
-double Vector3DF::Dist (const Vector3DF &v)		{ double distsq = DistSq (v); if (distsq!=0) return sqrt(distsq); return 0.0;}
-double Vector3DF::Dist (const Vector4DF &v)		{ double distsq = DistSq (v); if (distsq!=0) return sqrt(distsq); return 0.0;}
-
-double Vector3DF::DistSq (const Vector3DI &v)		{ double a,b,c; a = (double) x - (double) v.x; b = (double) y - (double) v.y; c = (double) z - (double) v.z; return (a*a + b*b + c*c);}
-double Vector3DF::DistSq (const Vector3DF &v)		{ double a,b,c; a = (double) x - (double) v.x; b = (double) y - (double) v.y; c = (double) z - (double) v.z; return (a*a + b*b + c*c);}
-double Vector3DF::DistSq (const Vector4DF &v)		{ double a,b,c; a = (double) x - (double) v.x; b = (double) y - (double) v.y; c = (double) z - (double) v.z; return (a*a + b*b + c*c);}
-
-Vector3DF &Vector3DF::Normalize (void) {
-	double n = (double) x*x + (double) y*y + (double) z*z;
-	if (n!=0.0) {
-		n = sqrt(n);
-		x /= (float) n; y /= (float) n; z /= (float) n;
-	}
-	return *this;
-}
-double Vector3DF::Length (void) { double n; n = (double) x*x + (double) y*y + (double) z*z; if (n != 0.0) return sqrt(n); return 0.0; }
-
-
-#undef VTYPE
-#undef VNAME
 
 // Vector4DF Code Definition
 
@@ -355,12 +138,20 @@ Matrix4F Matrix4F::operator* (const float &op)
 					  data[12],		data[13],	data[14],	data[15] );
 }
 
-Matrix4F Matrix4F::operator* (const Vector3DF &op)
+Vector3DF Matrix4F::operator* (const Vector3DF& op) {
+	Vector3DF result;
+	result.x = data[0] * op.x + data[4] * op.y + data[ 8] * op.z + data[12];
+	result.y = data[1] * op.x + data[5] * op.y + data[ 9] * op.z + data[13];
+	result.z = data[2] * op.x + data[6] * op.y + data[10] * op.z + data[14];
+	return result;
+}
+
+Matrix4F &Matrix4F::ScaleInPlace (const Vector3DF &op)
 {
-	return Matrix4F ( data[0]*op.x, data[1]*op.y, data[2]*op.z, data[3],
-					  data[4]*op.x, data[5]*op.y, data[6]*op.z, data[7],
-					  data[8]*op.x, data[9]*op.y, data[10]*op.z, data[11],
-					  data[12]*op.x, data[13]*op.y, data[14]*op.z, data[15] );
+	data[0] *= op.x; data[4] *= op.x; data[ 8] *= op.x; data[12] *= op.x;
+	data[1] *= op.y; data[5] *= op.y; data[ 9] *= op.y; data[13] *= op.y;
+	data[2] *= op.z; data[6] *= op.z; data[10] *= op.z; data[14] *= op.z;
+	return *this;
 }
 
 Matrix4F &Matrix4F::operator= (const unsigned char op)	{for ( int n=0; n<16; n++) data[n] = (VTYPE) op; return *this;}
@@ -472,8 +263,6 @@ Matrix4F &Matrix4F::Identity ()
 	return *this;
 }
 
-// Pre-multiply (left side multiply ZYX) = Euler rotation about X, then Y, then Z
-//
 Matrix4F &Matrix4F::RotateZYX (const Vector3DF& angs)
 {	
 	float cx,sx,cy,sy,cz,sz;
@@ -759,17 +548,6 @@ Matrix4F &Matrix4F::InvertTRS ()
 		data[i] = (float) (inv[i] * det);
 	
 	return *this;
-}
-float Matrix4F::GetF (const int r, const int c)		{return (float) data[ (r<<2) + c];}
-
-Vector4DF Matrix4F::GetRowVec(int r)
-{
-	Vector4DF v;
-	v.x = data[ (r<<2) ]; 
-	v.y = data[ (r<<2)+1 ]; 
-	v.z = data[ (r<<2)+2 ];
-	v.w = data[ (r<<2)+3 ];
-	return v;
 }
 
 Matrix4F &Matrix4F::operator= ( float* mat )

@@ -60,7 +60,7 @@ inline __host__ __device__ void fminmax3 (float a, float b, float c, float& mn, 
 
 inline __device__ float3 getViewPos ()
 {
-	return mmult ( scn.campos, SCN_INVXFORM );  
+	return mmult(SCN_INVXFORM, scn.campos);
 }
 
 // Note that the view ray returned by this function is not normalized, but
@@ -72,7 +72,7 @@ inline __device__ float3 getViewRay ( float x, float y )
   #else
 	float3 v = make_float3(0,0,0);
   #endif
-  return mmult(normalize(v), SCN_INVXROT);
+  return mmult(SCN_INVXROT, normalize(v));
 }
 
 

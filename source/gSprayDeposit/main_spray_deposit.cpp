@@ -347,7 +347,7 @@ void Sample::draw_topology ()
 	Vector3DF bmin, bmax;
 	Node* node;
 	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = gvdb.getNumNodes(lev);
+		int node_cnt = static_cast<int>(gvdb.getNumNodes(lev));
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb.getNodeAtLevel ( n, lev );
 			bmin = gvdb.getWorldMin ( node );		// get node bounding box

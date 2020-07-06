@@ -105,7 +105,7 @@ void Sample::reshape (int w, int h)
 
 void Sample::display() 
 {
-	m_angs.y += 0.05;		
+	m_angs.y += 0.05f;		
 	gvdb.SetTransform(m_pretrans, m_scale, m_angs, m_trans);
 
 	// Render volume

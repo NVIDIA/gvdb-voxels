@@ -96,6 +96,7 @@ bool Sample::LoadRAW (char* fname, Vector3DI res, int bpp)
 	fread(m_DataBuf, 1, sz, fp);
 	
 	fclose(fp);
+	return true;
 }
 
 void Sample::Rebuild(Vector3DF vmax, bool bSparse, bool bHalo )
@@ -275,7 +276,7 @@ void Sample::draw_topology()
 	Vector3DF bmin, bmax;
 	Node* node;
 	for (int lev = 0; lev < 5; lev++) {				// draw all levels
-		int node_cnt = gvdb.getNumNodes(lev);
+		int node_cnt = static_cast<int>(gvdb.getNumNodes(lev));
 		for (int n = 0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = gvdb.getNodeAtLevel(n, lev);
 			bmin = gvdb.getWorldMin(node);		// get node bounding box

@@ -116,11 +116,6 @@ static __device__ __inline__ float3 TraceRay (float3 origin, float3 direction, i
   return (rtype == SHADOW_RAY) ? make_float3(rayi.alpha, rayi.alpha, rayi.alpha) : rayi.result;
 }
 
-static __device__ __inline__ float3 exp( const float3& x )
-{
-  return make_float3(exp(x.x), exp(x.y), exp(x.z));
-}
-
 // -----------------------------------------------------------------------------
 
 float3 __device__ __inline__ jitter_sample ()
@@ -153,7 +148,7 @@ RT_PROGRAM void trace_surface ()
 	const float3 fhp = rtTransformPoint(RT_OBJECT_TO_WORLD, front_hit_point);
 	const float3 bhp = rtTransformPoint(RT_OBJECT_TO_WORLD, back_hit_point);
 	const float3 raydir = ray.direction;                                            // incident direction
-	float3 lightdir, spos, refldir, refrdir, reflclr, refrclr, shadowclr;
+	float3 lightdir, refldir, refrdir, reflclr, refrclr, shadowclr;
 	float3 jit = jitter_sample();
 	float ndotl, refldist, refrdist;
 

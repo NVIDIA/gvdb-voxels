@@ -362,7 +362,7 @@ int Scene::AddShader ( int prog_id, const char* vertfile, const char* fragfile, 
 		params.p[n] = -1;
 	mParams.push_back ( params );
 	
-	mProgToSlot[ program ] = mParams.size()-1;
+	mProgToSlot[ program ] = static_cast<int>(mParams.size()-1);
 	mProgram[ prog_id ] = program;
 
     return program;
@@ -419,7 +419,7 @@ void Scene::SetAspect ( int w, int h )
 int Scene::AddMaterial ()
 {
 	Mat m;
-	m.id = mMaterials.size();
+	m.id = static_cast<int>(mMaterials.size());
 	mMaterials.push_back ( m );
 	return m.id;
 }
@@ -600,7 +600,7 @@ void Scene::LoadAnimation ()
 		if ( var=="frames" ) {
 			str1 = line.substr ( pos+1 );			
 			strToVec3 ( str1, "", " ", "", frames.Data() );	
-			gScene->setFrameSamples ( frames.z );
+			gScene->setFrameSamples ( static_cast<int>(frames.z) );
 		} else {
 			obj = strParse ( var, "(", ")" );	// read variable and object
 			if ( obj != "" ) {
@@ -609,7 +609,9 @@ void Scene::LoadAnimation ()
 				strToVec3 ( str1, "", " ", "", val1.Data() );
 				strToVec3 ( str2, "", " ", "", val2.Data() );			// convert values to vec3
 				// gprintf ( "%s: %f %f %f -> %f %f %f\n", obj.c_str(), val1.x, val1.y, val1.z, val2.x, val2.y, val2.z );
-				gScene->AddKey ( obj, var, frames.x, frames.y, val1, val2 );
+				gScene->AddKey ( obj, var,
+					static_cast<int>(frames.x), static_cast<int>(frames.y),
+					val1, val2 );
 			}
 		}
 
@@ -621,8 +623,8 @@ void Scene::LoadAnimation ()
 void Scene::AddKey ( std::string obj, std::string var, int f1, int f2, Vector3DF val1, Vector3DF val2 )
 {
 	Key k;
-	k.f1 = (float) f1;
-	k.f2 = f2;
+	k.f1 = static_cast<float>(f1);
+	k.f2 = static_cast<float>(f2);
 	k.val1 = val1;
 	k.val2 = val2;
 	k.obj = obj.at(0);

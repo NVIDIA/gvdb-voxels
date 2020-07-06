@@ -109,10 +109,6 @@
 		Vector3DF	cams;
 		Vector3DF	camu;
 		Vector3DF	camv;
-		Vector4DF 	camivprow0;
-		Vector4DF 	camivprow1;
-		Vector4DF 	camivprow2;
-		Vector4DF 	camivprow3;
 		Vector3DF	light_pos;
 		Vector3DF	slice_pnt;
 		Vector3DF	slice_norm;
@@ -415,7 +411,7 @@
 			slong Reparent ( int lev, slong prevroot_id, Vector3DI pos, bool& bNew );		// Reparent tree with new root			
 			slong ActivateSpace ( Vector3DF pos );
 			slong ActivateSpace ( slong nodeid, Vector3DI pos, bool& bNew, slong stopnode = ID_UNDEFL, int stoplev = 0 );	// Active leaf at given location
-			slong ActivateSpaceAtLevel ( int lev, Vector3DF pos );
+			slong ActivateSpaceAtLevel ( int lev, Vector3DI pos );
 			Vector3DI GetCoveringNode ( int lev, Vector3DI pos, Vector3DI& range );
 			void ComputeBounds ();
 			void ClearAtlasAccess ();
@@ -467,8 +463,8 @@
 			nvdb::Node* getNode ( slong nodeid )		{ return (Node*) mPool->PoolData ( nodeid ); }			
 			nvdb::Node* getChild (Node* curr, uint ndx);
 			nvdb::Node* getChildAtBit ( Node* curr, uint b);			
-			bool  isActive(Vector3DF wpos);
-			bool  isActive(Vector3DF wpos, slong nodeid);	// recursive
+			bool  isActive(Vector3DI wpos);
+			bool  isActive(Vector3DI wpos, slong nodeid);	// recursive
 			bool  isLeaf ( slong nodeid )		{ return ElemLev ( nodeid )==0; }			
 			uint64 getChildNode ( slong nodeid, uint b );
 			uint32 getChildOffset ( slong  nodeid, slong childid, Vector3DI& pos );
@@ -612,9 +608,9 @@
 				va_start(vlist, fmt);
 				gprintf2(vlist, fmt, 0);
 			}
-			int		getNumNodes(int lev) { return getNumTotalNodes(lev); }
-			int		getNumUsedNodes ( int lev );
-			int		getNumTotalNodes ( int lev );
+			uint64	getNumNodes(int lev) { return getNumTotalNodes(lev); }
+			uint64	getNumUsedNodes ( int lev );
+			uint64	getNumTotalNodes ( int lev );
 			Node*	getNodeAtLevel ( int n, int lev );
 			uint64	getNodeAtPoint ( uint64 nodeid, Vector3DF pos);
 			
@@ -623,9 +619,18 @@
 			Vector3DF getWorldMax ( Node* node );
 			
 			//-- Grid Transform - arbitrary transforms on volume (replaces Voxsize)
+			// Sets the transform from points in GVDB's coordinate system to the application's coordinate system.
+			// This transform consists of the following operations in order:
+			// - Add `pretrans` to the point
+			// - Multiply the result's coordinates by `scal`
+			// - Rotate the result around the X axis by angs.x, around the Y axis by angs.x, and then around the Z axis
+			// by angs.z (as in `Matrix4F::RotateTZYXS`)
+			// - Add `trans` to the result
 			void SetTransform(Vector3DF pretrans, Vector3DF scal, Vector3DF angs, Vector3DF trans);
 			Vector3DF getWorldMin();
 			Vector3DF getWorldMax();
+			// Returns the transform as a 4x4 matrix. If `v` is a vector, then computing `v`*`mXform` transforms the
+			// point `v` from GVDB's coordinate system to the application's coordinate system.
 			Matrix4F& getTransform() { return mXform; }	
 
 			int		getMaskBytes(Node* node) { int r = getRes(node->mLev); return imax(((uint64)r*r*r) >> 3, 1); }		// divide by bits per byte (2^3=8)

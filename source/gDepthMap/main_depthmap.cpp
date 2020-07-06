@@ -82,7 +82,7 @@ bool Sample::init()
 	gvdb.UpdateApron();
 
 	// Set volume params
-	gvdb.getScene()->SetSteps ( .1, 16, .1 );				// Set raycasting steps
+	gvdb.getScene()->SetSteps ( .1f, 16, .1f );				// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.0f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, 0.5f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.005f, 0.0f );
@@ -90,7 +90,7 @@ bool Sample::init()
 	gvdb.getScene()->LinearTransferFunc ( 0.00f, 0.10f, Vector4DF(0,0,0,0), Vector4DF(0,0,0,0.0f) );	
 	gvdb.getScene()->LinearTransferFunc ( 0.10f, 0.50f, Vector4DF(1,1,0,0.1f), Vector4DF(1,0,0,0.3f) );
 	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.3f), Vector4DF(.2f,.2f,0.2f,0.1f) );
-	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.1f), Vector4DF(0.1,0.1,.1,0.3) ); 
+	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.1f), Vector4DF(0.1f,0.1f,.1f,0.3f) ); 
 	gvdb.CommitTransferFunc ();
 	gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.5, .5, .5), m_rotate, m_translate );
 
@@ -194,7 +194,6 @@ void Sample::update_camera_gl (int w, int h )
 	double aspect = float(w)/float(h);
 	GLfloat proj_mtx[16];
 	GLfloat view_mtx[16];
-	GLfloat invmodel_mtx[16];
 
 	// construct & read back projection matrix 
 	glMatrixMode ( GL_PROJECTION );
@@ -256,7 +255,7 @@ void Sample::render_depth (int w, int h)
 	renderCamSetupGL(gvdb.getScene(), simple_id, &model_mtx);	
 	renderLightSetupGL(gvdb.getScene(), simple_id);
 	checkGL ( "lights" );
-	renderSetMaterialGL(gvdb.getScene(), simple_id, Vector4DF(.1, .1, .1, 1), Vector4DF(.5, .5, .5, 1), Vector4DF(1, 1, 1, 1));
+	renderSetMaterialGL(gvdb.getScene(), simple_id, Vector4DF(.1f, .1f, .1f, 1), Vector4DF(.5f, .5f, .5f, 1), Vector4DF(1, 1, 1, 1));
 	checkGL ( "mats" );
 
 	// Render polygons for color and depth
@@ -336,8 +335,8 @@ void Sample::motion(int x, int y, int dx, int dy)
 			m_translate.z -= dy;
 			gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.5, .5, .5), m_rotate, m_translate);
 		} else if (ctrl) {
-			m_rotate.y += dx*0.1;
-			m_rotate.x += dy*0.1;
+			m_rotate.y += dx*0.1f;
+			m_rotate.x += dy*0.1f;
 			gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.5, .5, .5), m_rotate, m_translate);
 		} else {
 			// Adjust orbit angles

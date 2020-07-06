@@ -53,11 +53,7 @@ struct ALIGN(16) ScnInfo {
 	float3		campos;
 	float3		cams;
 	float3		camu;
-	float3		camv;	
-	float4 		camivprow0;
-	float4 		camivprow1;
-	float4 		camivprow2;
-	float4 		camivprow3;
+	float3		camv;
 	float3		light_pos;		
 	float3		slice_pnt;
 	float3		slice_norm;

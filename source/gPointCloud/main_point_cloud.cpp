@@ -218,7 +218,8 @@ void Sample::RebuildOptixGraph(int shading)
 			sprintf ( filepath, "%s%s", model_list[n].fpath, model_list[n].fname );
 		}
 		nvprintf ( "Load model %s...", filepath );
-		id = gvdb.getScene()->AddModel( filepath, model_list[n].scal, model_list[n].offs.x, model_list[n].offs.y, model_list[n].offs.z);
+		id = static_cast<int>(gvdb.getScene()->AddModel(filepath,
+			model_list[n].scal, model_list[n].offs.x, model_list[n].offs.y, model_list[n].offs.z));
 		gvdb.CommitGeometry( id );
 
 		m = gvdb.getScene()->getModel ( id );
@@ -272,19 +273,19 @@ void Sample::parse_value ( int mode, std::string tag, std::string val )
 	case M_POINTS:
 		if (strEq(tag,"path")) m_pntpath = strTrim(val);
 		if (strEq(tag,"file")) m_pntfile = strTrim(val);
-		if (strEq(tag,"mat")) m_pntmat= strToNum(val);
-		if (strEq(tag,"frame")) m_frame = strToNum(val);
-		if (strEq(tag,"fstep")) m_fstep = strToNum(val);
+		if (strEq(tag,"mat")) m_pntmat= static_cast<int>(strToNum(val));
+		if (strEq(tag,"frame")) m_frame = static_cast<int>(strToNum(val));
+		if (strEq(tag, "fstep")) m_fstep = static_cast<int>(strToNum(val));
 		break;
 	case M_POLYS:
 		if (strEq(tag,"path")) m_polypath = val;
 		if (strEq(tag,"file")) m_polyfile = val;
-		if (strEq(tag,"mat")) m_polymat= strToNum(val);
-		if (strEq(tag,"frame")) m_pframe = strToNum(val);
-		if (strEq(tag,"fstep")) m_pfstep = strToNum(val);
+		if (strEq(tag, "mat")) m_polymat = static_cast<int>(strToNum(val));
+		if (strEq(tag, "frame")) m_pframe = static_cast<int>(strToNum(val));
+		if (strEq(tag, "fstep")) m_pfstep = static_cast<int>(strToNum(val));
 		break;
 	case M_MATERIAL: {
-		int i = mat_list.size()-1;
+		int i = static_cast<int>(mat_list.size()-1);
 		matp = &mat_list[i];
 		if (strEq(tag,"lightwid"))	matp->light_width = strToNum(val);	
 		if (strEq(tag,"shwid"))		matp->shadow_width = strToNum(val);
@@ -305,9 +306,9 @@ void Sample::parse_value ( int mode, std::string tag, std::string val )
 		if (strEq(tag,"reframt"))	matp->refr_amount = strToNum(val);		
 		} break;
 	case M_RENDER: 
-		if (strEq(tag,"width"))		m_w = strToNum(val);
-		if (strEq(tag,"height"))	m_h = strToNum(val);
-		if (strEq(tag,"samples"))	m_max_samples = strToNum(val);		
+		if (strEq(tag,"width"))		m_w = static_cast<int>(strToNum(val));
+		if (strEq(tag,"height"))	m_h = static_cast<int>(strToNum(val));
+		if (strEq(tag,"samples"))	m_max_samples = static_cast<int>(strToNum(val));		
 		if (strEq(tag,"backclr"))	{ strToVec3( val, "<",",",">", &vec.x); gvdb.getScene()->SetBackgroundClr(vec.x,vec.y,vec.z, 1.0); }
 		if (strEq(tag,"envmap"))	m_envfile = val;
 		if (strEq(tag,"outpath"))	m_outpath = val;
@@ -321,7 +322,7 @@ void Sample::parse_value ( int mode, std::string tag, std::string val )
 		if (strEq(tag,"extinct"))	{ strToVec3( val, "<",",",">", &vec.x); scn->SetExtinct(vec.x,vec.y,vec.z); }
 		if (strEq(tag,"range"))		{ strToVec3( val, "<",",",">", &vec.x); scn->SetVolumeRange(vec.x,vec.y,vec.z); }
 		if (strEq(tag,"cutoff"))	{ strToVec3( val, "<",",",">", &vec.x); scn->SetCutoff(vec.x,vec.y,vec.z); }
-		if (strEq(tag,"smooth"))	m_smooth = strToNum(val);
+		if (strEq(tag,"smooth"))	m_smooth = static_cast<int>(strToNum(val));
 		if (strEq(tag,"smoothp")) { strToVec3(val, "<", ",", ">", &vec.x); m_smoothp = vec; }		
 		} break;
 	case M_CAMERA: {
@@ -341,10 +342,10 @@ void Sample::parse_value ( int mode, std::string tag, std::string val )
 		lgt->setOrbit ( lgt->getAng(), lgt->getToPos(), lgt->getOrbitDist(), lgt->getDolly() );
 		} break;
 	case M_MODEL: {
-		int id = model_list.size()-1;
+		int id = static_cast<int>(model_list.size()-1);
 		if (strEq(tag,"path"))		strncpy( model_list[id].fpath, val.c_str(), 1024);
 		if (strEq(tag,"file"))		strncpy( model_list[id].fname, val.c_str(), 1024);
-		if (strEq(tag,"mat"))		model_list[id].mat = strToNum(val);
+		if (strEq(tag,"mat"))		model_list[id].mat = static_cast<int>(strToNum(val));
 		if (strEq(tag,"scale"))		model_list[id].scal = strToNum(val);
 		if (strEq(tag,"offset"))	{ strToVec3( val, "<",",",">", &vec.x);  model_list[id].offs = vec; }
 		} break;
@@ -395,7 +396,7 @@ void Sample::on_arg(std::string arg, std::string val)
 	}
 
 	if (arg.compare("-frame") == 0) {		
-		m_frame = strToNum(val);
+		m_frame = static_cast<int>(strToNum(val));
 		nvprintf("frame: %d\n", m_frame);	
 	}
 
@@ -412,7 +413,7 @@ void Sample::on_arg(std::string arg, std::string val)
 		nvprintf("render scale: %f\n", m_renderscale);
 	}
 	if (arg.compare("-io") == 0) {
-		m_io_method = strToNum(val);
+		m_io_method = static_cast<int>(strToNum(val));
 		nvprintf("io method: %d\n", m_io_method);
 	}
 }
@@ -559,8 +560,6 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 	}
 
 	nvprintf ( "Load points from %s...", filepath );
-	
-	float buf[3];
 
 	// Read # of points
 	m_numpnts = 0;
@@ -645,7 +644,6 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 		fread(&wMax.z, sizeof(float), 1, fph);	
 
 		// Allocate memory for points
-		ushort outbuf[3];
 		PERF_PUSH("  Buffer alloc");
 		gvdb.AllocData(m_pnt1, m_numpnts, sizeof(ushort) * 3, true);
 		gvdb.AllocData(m_pnts, m_numpnts, sizeof(Vector3DF), false);
@@ -721,7 +719,7 @@ void Sample::render_update()
 	// Rebuild GVDB Render topology
 	PERF_PUSH("Dynamic Topology");
 	//gvdb.RequestFullRebuild ( true );
-	gvdb.RebuildTopology(m_numpnts, m_radius*2.0, m_origin);
+	gvdb.RebuildTopology(m_numpnts, m_radius*2.0f, m_origin);
 	gvdb.FinishTopology(false, true);	// false. no commit pool	false. no compute bounds
 	gvdb.UpdateAtlas();
 	PERF_POP();
@@ -732,8 +730,8 @@ void Sample::render_update()
 
 	int scPntLen = 0;
 	int subcell_size = 4;
-	gvdb.InsertPointsSubcell_FP16 (subcell_size, m_numpnts, m_radius, m_origin, scPntLen);
-	gvdb.GatherLevelSet_FP16 (subcell_size, m_numpnts, m_radius, m_origin, scPntLen, 0, 0);
+	gvdb.InsertPointsSubcell_FP16 (subcell_size, m_numpnts, static_cast<float>(m_radius), m_origin, scPntLen);
+	gvdb.GatherLevelSet_FP16 (subcell_size, m_numpnts, static_cast<float>(m_radius), m_origin, scPntLen, 0, 0);
 	gvdb.UpdateApron(0, 3.0f);
 	PERF_POP();
 
@@ -814,7 +812,7 @@ void Sample::draw_topology ()
 	Camera3D* cam = gvdb.getScene()->getCamera();
 	start3D(cam);
 	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = g->getNumTotalNodes(lev);
+		int node_cnt = static_cast<int>(g->getNumTotalNodes(lev));
 		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
 			node = g->getNodeAtLevel ( n, lev );
 			if (!int(node->mFlags)) continue;
@@ -839,7 +837,7 @@ void Sample::draw_points ()
 	start3D(cam);
 	for (int n=0; n < m_numpnts; n++ ) {
 		p1 = *fpos++; 
-		p2 = p1+Vector3DF(0.01,0.01,0.01);		
+		p2 = p1+Vector3DF(0.01f,0.01f,0.01f);		
 		c =  p1 / Vector3DF(256.0,256,256);
 		drawLine3D ( p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, c.x, c.y, c.z, 1);		
 	}
@@ -859,7 +857,7 @@ void Sample::display()
 	if (m_key && m_frame >= 1100 && m_frame <= 1340 ) {
 		float u = float(m_frame - 1100) / (1340 - 1100);
 		Vector3DF a0, t0, d0; 
-		a0 = interp(Vector3DF(0,35,0), Vector3DF(0, 24.6,0), u);
+		a0 = interp(Vector3DF(0,35,0), Vector3DF(0, 24.6f,0), u);
 		t0 = interp(Vector3DF(240, 0, 0), Vector3DF(362, -201, 20), u);
 		d0 = interp(Vector3DF(1600, 0, 0), Vector3DF(2132, 0, 0), u);
 		Camera3D* cam = gvdb.getScene()->getCamera();

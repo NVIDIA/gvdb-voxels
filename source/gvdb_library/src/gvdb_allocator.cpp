@@ -354,7 +354,10 @@ void Allocator::AllocateTextureGPU ( DataPtr& p, uchar dtype, Vector3DI res, boo
 
 			// preserve old texture data
 			if ( preserve > 0 && old_glid != -1 ) {
-				Vector3DI src (res.x, res.y, preserve / (res.x*res.y*getSize(dtype)) );	 // src amount to copy 				
+				const uint64 bytesPerPlane = static_cast<uint64>(res.x)
+					* static_cast<uint64>(res.y)
+					* static_cast<uint64>(getSize(dtype));
+				const Vector3DI src (res.x, res.y, static_cast<int>(preserve / bytesPerPlane));	 // src amount to copy 				
 				glCopyImageSubData ( old_glid, GL_TEXTURE_3D, 0, 0,0,0, p.glid, GL_TEXTURE_3D, 0, 0,0,0, src.x, src.y, src.z );
 			}
 			if ( old_glid != -1 ) {
@@ -586,7 +589,7 @@ void Allocator::AtlasSetNum ( uchar chan, int n )
 bool Allocator::AtlasResize ( uchar chan, int cx, int cy, int cz )
 {
 	DataPtr p = mAtlas[chan];
-	int leafdim = p.stride;
+	int leafdim = static_cast<int>(p.stride);
 	Vector3DI axiscnt (cx, cy, cz);
 	Vector3DI axisres;
 	
@@ -610,7 +613,7 @@ void Allocator::CopyChannel(int chanDst, int chanSrc)
 	DataPtr pDst = mAtlas[chanDst];
 	DataPtr pSrc = mAtlas[chanSrc];
 
-	int leafdim = pSrc.stride;	
+	int leafdim = static_cast<int>(pSrc.stride);	
 	Vector3DI axisres;
 	Vector3DI axiscnt = pSrc.subdim;	// number of bricks on each axis	
 	uint64 preserve = pSrc.size;		// previous size of atlas (# bytes to preserve)
@@ -632,13 +635,13 @@ void Allocator::CopyChannel(int chanDst, int chanSrc)
 bool Allocator::AtlasResize ( uchar chan, uint64 max_leaf )
 {
 	DataPtr p = mAtlas[chan];
-	int leafdim = p.stride;			// dimensions of brick
+	int leafdim = static_cast<int>(p.stride);			// dimensions of brick
 	Vector3DI axisres;
 	Vector3DI axiscnt = p.subdim;	// number of bricks on each axis	
 	uint64 preserve = p.size;		// previous size of atlas (# bytes to preserve)
 
 	// Expand Z-axis of atlas
-	axiscnt.z = ceil ( max_leaf / float(axiscnt.x*axiscnt.y) );		// expand number of bricks along Z-axis
+	axiscnt.z = int(ceil ( max_leaf / float(axiscnt.x*axiscnt.y) ));		// expand number of bricks along Z-axis
 
 	// If atlas will have the same dimensions, do not reallocate
 	if ( p.subdim.x==axiscnt.x && p.subdim.y==axiscnt.y && p.subdim.z==axiscnt.z )
@@ -659,11 +662,11 @@ bool Allocator::AtlasResize ( uchar chan, uint64 max_leaf )
 	return true;
 }
 
-void Allocator::AllocateNeighbors( int cnt )
+void Allocator::AllocateNeighbors( uint64 cnt )
 {
 	if ( cnt <= mNeighbors.max ) return;
 
-	int brks = getPoolTotalCnt(0, 0);
+	uint64 brks = getPoolTotalCnt(0, 0);
 	mNeighbors.usedNum = brks;
 	mNeighbors.max = brks;
 	mNeighbors.stride = sizeof(int) * 8;
@@ -683,7 +686,7 @@ void Allocator::CommitNeighbors()
 
 char* Allocator::getAtlasMapNode ( uchar chan, Vector3DI val )
 {
-	int leafres = mAtlas[chan].stride + (mAtlas[chan].apron << 1);			// leaf res
+	int leafres = static_cast<int>(mAtlas[chan].stride + (mAtlas[chan].apron << 1));			// leaf res
 	Vector3DI axiscnt = mAtlas[chan].subdim;	
 	Vector3DI i = Vector3DI(val.x/leafres, val.y/leafres, val.z/leafres);	// get brick index
 	int id = (i.z*axiscnt.y + i.y) * axiscnt.x + i.x;						// get brick id	
@@ -701,7 +704,7 @@ void Allocator::AtlasEmptyAll ()
 
 bool Allocator::AtlasAlloc ( uchar chan, Vector3DI& val )
 {
-	int id;	
+	uint64 id;	
 	if ( mAtlas[chan].lastEle >= mAtlas[chan].max ) {
 		int layer = mAtlas[chan].subdim.x * mAtlas[chan].subdim.y;
 		AtlasResize ( chan, mAtlas[chan].lastEle + layer );
@@ -727,9 +730,9 @@ Vector3DI Allocator::getAtlasPos ( uchar chan, uint64 id )
 void Allocator::AtlasAppendLinearCPU ( uchar chan, int n, float* src )
 {
 	// find starting position
-	int br = mAtlas[chan].stride;			// brick res
-	int ssize = br*br*br*sizeof(float);		// total bytes in brick
-	char* start = mAtlas[chan].cpu + br*n;
+	uint64 br = mAtlas[chan].stride;			// brick res
+	uint64 ssize = br*br*br*sizeof(float);		// total bytes in brick
+	char* start = mAtlas[chan].cpu + br*static_cast<uint64>(n);
 
 	// append data
 	memcpy ( start, src, ssize );
@@ -754,7 +757,7 @@ void Allocator::AtlasCopyTex ( uchar chan, Vector3DI val, const DataPtr& src )
 void Allocator::AtlasCopyLinear ( uchar chan, Vector3DI offset, CUdeviceptr gpu_buf )
 {
 	Vector3DI atlasres = getAtlasRes(chan);
-	int br = mAtlas[chan].stride;
+	int br = static_cast<int>(mAtlas[chan].stride);
 
 	Vector3DI brickres = Vector3DI(br,br,br);
 	Vector3DI block ( 8, 8, 8 );
@@ -771,7 +774,7 @@ void Allocator::AtlasCopyLinear ( uchar chan, Vector3DI offset, CUdeviceptr gpu_
 void Allocator::AtlasRetrieveTexXYZ ( uchar chan, Vector3DI val, DataPtr& dest )
 {
 	Vector3DI atlasres = getAtlasRes(chan);
-	int br = mAtlas[chan].stride;
+	int br = static_cast<int>(mAtlas[chan].stride);
 	
 	Vector3DI brickres = Vector3DI(br, br, br);
 	Vector3DI block ( 8, 8, 8 );
@@ -973,12 +976,12 @@ Vector3DI Allocator::getAtlasPackres(uchar chan)
 // Res of single brick, including apron
 int Allocator::getAtlasBrickres ( uchar chan )
 {
-	return (mAtlas[chan].stride + (mAtlas[chan].apron<<1));
+	return static_cast<int>(mAtlas[chan].stride + (mAtlas[chan].apron<<1));
 }
 // Res of single brick, without apron
 int Allocator::getAtlasBrickwid (uchar chan)
 {
-	return mAtlas[chan].stride;
+	return static_cast<int>(mAtlas[chan].stride);
 }
 
 uint64 Allocator::getAtlasMem ()

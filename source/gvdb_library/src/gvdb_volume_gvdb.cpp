@@ -384,7 +384,7 @@ float* ConvertToScalar ( int cnt, float* inbuf, float* outbuf, float& vmin, floa
 	Vector3DF* vec = (Vector3DF*) inbuf;	
 	float val;	
 	for ( int n=0; n < cnt; n++ ) {
-		val = vec->Length();
+		val = static_cast<float>(vec->Length());
 		if ( val < vmin ) vmin = val;
 		if ( val > vmax ) vmax = val;		
 		*outv++ = val;
@@ -406,7 +406,7 @@ bool VolumeGVDB::ImportVTK ( std::string fname, std::string field, Vector3DI& re
 	bool bAscii = false;	
 	float f;
 	float* vox = 0x0;
-	long cnt = 0, max_cnt = 0;
+	uint64 cnt = 0, max_cnt = 0;
 	char status = 'X'; 
 
 	verbosef ( "Loading VTK: %s\n", buf );
@@ -425,9 +425,9 @@ bool VolumeGVDB::ImportVTK ( std::string fname, std::string field, Vector3DI& re
 			return false;
 		}
 		if ( word.compare("DIMENSIONS")==0 ) {
-			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.x = f-1;
-			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.y = f-1;
-			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.z = f-1;
+			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.x = static_cast<int>(f-1);
+			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.y = static_cast<int>(f-1);
+			word = strSplit ( lin, " \n" ); strIsNum(word, f ); res.z = static_cast<int>(f-1);
 			verbosef ( "  Res: %d, %d, %d\n", res.x, res.y, res.z );
 			PrepareAux ( AUX_DATA3D, res.x*res.y*res.z, sizeof(float), false, true );
 			vox = (float*) mAux[AUX_DATA3D].cpu;
@@ -441,7 +441,7 @@ bool VolumeGVDB::ImportVTK ( std::string fname, std::string field, Vector3DI& re
 			// if desired field is found, start reading
 			if ( word.compare ( field ) == 0 ) status = 'R';
 			word = strSplit ( lin, " \n" );
-			word = strSplit ( lin, " \n" ); strIsNum(word, f); max_cnt = f;
+			word = strSplit ( lin, " \n" ); strIsNum(word, f); max_cnt = static_cast<int>(f);
 			verbosef ( "  Reading: %s, %ld\n", field.c_str(), max_cnt );
 			continue;
 		}
@@ -456,7 +456,7 @@ bool VolumeGVDB::ImportVTK ( std::string fname, std::string field, Vector3DI& re
 				*vox++ = f;				
 				word = strSplit( lin, " \n" );
 			}
-			cnt = vox - (float*) mAux[AUX_DATA3D].cpu;
+			cnt = static_cast<uint64>(vox - (float*) mAux[AUX_DATA3D].cpu);
 			if ( cnt >= max_cnt) status = 'D';		// done
 		}
 	}
@@ -477,7 +477,7 @@ void VolumeGVDB::ConvertBitmaskToNonBitmask( int levs )
 	uint64 childid;
 //	uint32 cnt;
 	uint32 ndx;
-	int ccnt, cmax, btchk;
+	uint64 ccnt, cmax, btchk;
 
 	// Activate all bricks (assuming earlier file did not use flags)
 	for (int n = 0; n < getNumTotalNodes(0); n++) {
@@ -502,7 +502,7 @@ void VolumeGVDB::ConvertBitmaskToNonBitmask( int levs )
 			memset(clist + ccnt, 0xFF, sizeof(uint64)*(cmax - ccnt));
 
 			// move children into index locations			
-			for (int j = ccnt-1; j >=0; j--) {
+			for (int64_t j = static_cast<int64_t>(ccnt-1); j >=0; j--) {
 				ndx = countToIndex(node, j);
 				btchk = countOn(node, ndx);
 				if (btchk != j) {
@@ -559,7 +559,7 @@ bool VolumeGVDB::LoadVBX(const std::string fname, int force_maj, int force_min)
 	Vector3DI range[MAXLEV];
 	int ld[MAXLEV], res[MAXLEV];
 	int cnt0[MAXLEV], cnt1[MAXLEV];
-	int width0[MAXLEV], width1[MAXLEV];
+	int width0[MAXLEV]{}, width1[MAXLEV];
 
 	std::vector<uint64> grid_offs;
 
@@ -1038,7 +1038,7 @@ void VolumeGVDB::ActivateIncreBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 	PERF_PUSH("Incremental node");	
 
 	// mark all leaf node deactivated
-	int totalLeafNodeCnt = getNumTotalNodes(0);
+	int totalLeafNodeCnt = static_cast<int>(getNumTotalNodes(0));
 	PrepareAux ( AUX_NODE_MARKER, totalLeafNodeCnt, sizeof(int), false, true);
 	
 	//--- Accumulate topology (OPTIONAL)
@@ -1154,7 +1154,7 @@ void VolumeGVDB::ActivateIncreBricksGPU(int pNumPnts, float pRadius, Vector3DF p
 	mPool->PoolFetchAll();
 
 	PERF_PUSH ( "UpdateUsed");
-	int usedNum = mPool->getPoolTotalCnt(0,0);
+	uint64 usedNum = mPool->getPoolTotalCnt(0,0);
 	for (int ni = 0; ni < mPool->getPoolTotalCnt(0,0); ni++) if(!getNode(0,0,ni)->mFlags) usedNum--;
 	mPool->SetPoolUsedCnt(0,0,usedNum);
 	PERF_POP();
@@ -1465,11 +1465,11 @@ void VolumeGVDB::FindActivBricks(int pLev,  int pRootlev,  int pNumPnts, Vector3
 					"VolumeGVDB", "ActivateBricksGPU", "cuLaunch", "FUNC_FIND_ACTIV_BRICKS", mbDebug);
 	
 	// retrieve data
-	int* brickIdx = (int*) malloc ( pNumPnts*sizeof(int) );
+	int* brickIdx = new int[pNumPnts];
 	cudaCheck ( cuMemcpyDtoH ( brickIdx, mAux[AUX_PBRICKDX].gpu, pNumPnts*sizeof(int) ), "VolumeGVDB", "ActivateBricksGPU", "cuMemcpyDtoH", "AUX_PBRICKDX", mbDebug);
 
-	Vector3DF* sortedPos = (Vector3DF*) malloc ( pNumPnts*sizeof(Vector3DF) );
-	Vector3DF* pos = (Vector3DF*) malloc ( pNumPnts*sizeof(Vector3DF) );
+	Vector3DF* sortedPos = new Vector3DF[pNumPnts];
+	Vector3DF* pos = new Vector3DF[pNumPnts];
 	cudaCheck ( cuMemcpyDtoH ( pos, mAux[AUX_PNTPOS].gpu, pNumPnts*sizeof(Vector3DF) ), "VolumeGVDB", "ActivateBricksGPU", "cuMemcpyDtoH", "AUX_PNTPOS", mbDebug);
 
 	PERF_POP ();
@@ -1548,10 +1548,10 @@ void VolumeGVDB::FindActivBricks(int pLev,  int pRootlev,  int pNumPnts, Vector3
 		posInNode = nd->mPos - parentNd->mPos;
 		posInNode *= res;
 		posInNode /= range;
-		posInNode.x = floor(posInNode.x);	// IMPORTANT!!! truncate decimal 
-		posInNode.y = floor(posInNode.y);
-		posInNode.z = floor(posInNode.z);	
-		bitMaskPos = (posInNode.z*res.x + posInNode.y)*res.x+ posInNode.x;
+		int posInNodeX = int(floor(posInNode.x));	// IMPORTANT!!! truncate decimal 
+		int posInNodeY = int(floor(posInNode.y));
+		int posInNodeZ = int(floor(posInNode.z));
+		bitMaskPos = (posInNodeZ*res.x + posInNodeY)*res.x+ posInNodeX;
 
 		// parent in node
 		nd->mParent = parentNodeID;	// set parent of child
@@ -1777,13 +1777,13 @@ void VolumeGVDB::SetBounds(Vector3DF pMin, Vector3DF pMax)
 {
 	Vector3DI range = getRange(0);
 
-	mVoxMin.x = int(pMin.x / range.x) * range.x - range.x;
-	mVoxMin.y = int(pMin.y / range.y) * range.y - range.y;
-	mVoxMin.z = int(pMin.z / range.z) * range.z - range.z;
+	mVoxMin.x = float(int(pMin.x / range.x) * range.x - range.x);
+	mVoxMin.y = float(int(pMin.y / range.y) * range.y - range.y);
+	mVoxMin.z = float(int(pMin.z / range.z) * range.z - range.z);
 
-	mVoxMax.x = int(pMax.x / range.x) * range.x + 2 * range.x;
-	mVoxMax.y = int(pMax.y / range.y) * range.y + 2 * range.y;
-	mVoxMax.z = int(pMax.z / range.z) * range.z + 2 * range.z;
+	mVoxMax.x = float(int(pMax.x / range.x) * range.x + 2 * range.x);
+	mVoxMax.y = float(int(pMax.y / range.y) * range.y + 2 * range.y);
+	mVoxMax.z = float(int(pMax.z / range.z) * range.z + 2 * range.z);
 
 	mObjMin = mVoxMin;
 	mObjMax = mVoxMax;
@@ -1806,12 +1806,12 @@ void VolumeGVDB::ComputeBounds ()
 		curr = getNode ( 0, 0, n );
 		if (!curr->mFlags) continue;		// inactivated, skip
 		
-		if ( curr->mPos.x < mVoxMin.x ) mVoxMin.x = curr->mPos.x;
-		if ( curr->mPos.y < mVoxMin.y ) mVoxMin.y = curr->mPos.y;
-		if ( curr->mPos.z < mVoxMin.z ) mVoxMin.z = curr->mPos.z;		
-		if ( curr->mPos.x + range.x > mVoxMax.x ) mVoxMax.x = curr->mPos.x + range.x;
-		if ( curr->mPos.y + range.y > mVoxMax.y ) mVoxMax.y = curr->mPos.y + range.y;
-		if ( curr->mPos.z + range.z > mVoxMax.z ) mVoxMax.z = curr->mPos.z + range.z;		
+		if ( curr->mPos.x < mVoxMin.x ) mVoxMin.x = static_cast<float>(curr->mPos.x);
+		if ( curr->mPos.y < mVoxMin.y ) mVoxMin.y = static_cast<float>(curr->mPos.y);
+		if ( curr->mPos.z < mVoxMin.z ) mVoxMin.z = static_cast<float>(curr->mPos.z);	
+		if ( curr->mPos.x + range.x > mVoxMax.x ) mVoxMax.x = static_cast<float>(curr->mPos.x + range.x);
+		if ( curr->mPos.y + range.y > mVoxMax.y ) mVoxMax.y = static_cast<float>(curr->mPos.y + range.y);
+		if ( curr->mPos.z + range.z > mVoxMax.z ) mVoxMax.z = static_cast<float>(curr->mPos.z + range.z);		
 	}
 	mObjMin = mVoxMin;
 	mObjMax = mVoxMax;
@@ -1888,12 +1888,12 @@ bool VolumeGVDB::LoadBRK ( std::string fname )
 	mPool->AtlasReleaseAll ();	
 	PERF_PUSH ( "Create Atlas" );	
 	
-	int side = ceil ( pow ( brkcnt, 1/3.0f ) );		// number of leafs along one axis	
+	int side = int(ceil(pow(brkcnt, 1 / 3.0f)));		// number of leaves along one axis	
 	Vector3DI axiscnt (side, side, side);
 	mPool->AtlasCreate ( 0, T_FLOAT, bres, axiscnt, mApron, sizeof(AtlasNode), false, mbUseGLAtlas );
 	PERF_POP ();
 	
-	float vmin = +1.0e20, vmax = -1.0e20;
+	float vmin = FLT_MAX, vmax = -FLT_MAX;
 
 	// Read all bricks
 	Vector3DF t;
@@ -2538,7 +2538,7 @@ void VolumeGVDB::UpdateNeighbors()
 	mPool->AllocateNeighbors( brks );
 
 	Vector3DF ct;
-	float d = mPool->getAtlasBrickwid(0);
+	float d = static_cast<float>(mPool->getAtlasBrickwid(0));
 
 	DataPtr* ntable = mPool->getNeighborTable();
 	int* nbr = (int*) ntable->cpu;
@@ -2547,12 +2547,12 @@ void VolumeGVDB::UpdateNeighbors()
 	for (uint64 n = 0; n < brks; n++) {
 		node = getNode(0, 0, n);
 		ct = node->mPos + Vector3DF(d / 2, d / 2, d / 2);
-		*nbr++ = ElemNdx(getNodeAtPoint(mRoot, ct - Vector3DF(d, 0, 0)) );
-		*nbr++ = ElemNdx(getNodeAtPoint(mRoot, ct - Vector3DF(0, d, 0)) );
-		*nbr++ = ElemNdx(getNodeAtPoint(mRoot, ct - Vector3DF(0, 0, d)) );
-		*nbr++ = ElemNdx(getNodeAtPoint(mRoot, ct + Vector3DF(d, 0, 0)) );
-		*nbr++ = ElemNdx(getNodeAtPoint(mRoot, ct + Vector3DF(0, d, 0)) );
-		*nbr++ = ElemNdx(getNodeAtPoint(mRoot, ct + Vector3DF(0, 0, d)) );
+		*nbr++ = static_cast<int>(ElemNdx(getNodeAtPoint(mRoot, ct - Vector3DF(d, 0, 0))));
+		*nbr++ = static_cast<int>(ElemNdx(getNodeAtPoint(mRoot, ct - Vector3DF(0, d, 0))));
+		*nbr++ = static_cast<int>(ElemNdx(getNodeAtPoint(mRoot, ct - Vector3DF(0, 0, d))));
+		*nbr++ = static_cast<int>(ElemNdx(getNodeAtPoint(mRoot, ct + Vector3DF(d, 0, 0))));
+		*nbr++ = static_cast<int>(ElemNdx(getNodeAtPoint(mRoot, ct + Vector3DF(0, d, 0))));
+		*nbr++ = static_cast<int>(ElemNdx(getNodeAtPoint(mRoot, ct + Vector3DF(0, 0, d))));
 	}
 
 	mPool->CommitNeighbors();
@@ -2605,7 +2605,7 @@ float Mandelbulb ( Vector3DF s )
 	float r = 0.0;
 	
 	for (int i = 0; i < iter; i++ ) {		
-		r = z.Length ();
+		r = static_cast<float>(z.Length());
 		if ( r > bail ) break;
 
 		theta = asin(z.z/r) * pwr;
@@ -2690,7 +2690,7 @@ void VolumeGVDB::UpdateAtlas ()
 			gprintf ( "ERROR: Node value exceeds atlas res. node: %d, val: %d %d %d, atlas: %d %d %d\n", n, node->mValue.x, node->mValue.y, node->mValue.z, atlasres.x, atlasres.y, atlasres.z );
 			gerror ();
 		}
-		AssignMapping ( node->mValue, node->mPos, n );
+		AssignMapping ( node->mValue, node->mPos, static_cast<int>(n) );
 	}
 	PERF_POP ();
 	
@@ -2779,7 +2779,7 @@ slong VolumeGVDB::ActivateSpace ( Vector3DF pos )
 }
 
 // Activate region of space at 3D position down to a given level
-slong VolumeGVDB::ActivateSpaceAtLevel ( int lev, Vector3DF pos )
+slong VolumeGVDB::ActivateSpaceAtLevel ( int lev, Vector3DI pos )
 {
 	Vector3DI brickpos;
 	bool bnew = false;
@@ -2896,7 +2896,7 @@ void VolumeGVDB::DebugNode ( slong nodeid )
 	Node* curr = getNode ( nodeid );
 
 	int b = -1;	
-	int ndx = ElemNdx ( nodeid );
+	int ndx = static_cast<int>(ElemNdx(nodeid));
 	
 	if ( curr->mLev < 4 && curr->mParent != ID_UNDEFL ) {
 		Vector3DF range = getRange ( curr->mLev+1 );
@@ -2954,10 +2954,10 @@ slong VolumeGVDB::FindParent(int lev,  Vector3DI pos)
 		posInNode = pos - nd->mPos;
 		posInNode *= res;
 		posInNode /= range;
-		posInNode.x = floor(posInNode.x);	// IMPORTANT!!! truncate decimal 
-		posInNode.y = floor(posInNode.y);
-		posInNode.z = floor(posInNode.z);	
-		bitMaskPos = (posInNode.z*res.x + posInNode.y)*res.x+ posInNode.x;
+		int posInNodeX = static_cast<int>(floor(posInNode.x)); // IMPORTANT!!! truncate decimal 
+		int posInNodeY = static_cast<int>(floor(posInNode.y)); // IMPORTANT!!! truncate decimal 
+		int posInNodeZ = static_cast<int>(floor(posInNode.z)); // IMPORTANT!!! truncate decimal 
+		bitMaskPos = (posInNodeZ*res.x + posInNodeY)*res.x+ posInNodeX;
 #ifdef USE_BITMASKS
 		uint64 p = nd->countOn ( bitMaskPos );
 
@@ -3042,7 +3042,7 @@ Node* VolumeGVDB::getChild(Node* curr, uint ndx)
 		ch = *(clist + ndx);
 	#else
 		int vox = 0;
-		int sum = 0;
+		uint sum = 0;
 		ndx++;
 		for (; sum < ndx && vox < getVoxCnt(curr->mLev); vox++ ) {
 			if ( *(clist + vox) != ID_UNDEF64) sum++;
@@ -3101,7 +3101,7 @@ void VolumeGVDB::writeCube (  FILE* fp, unsigned char vpix[], slong& numfaces, i
 {
 	// find absolute vert indices for this cube
 	// * map from local grid index to local vertex id, then add base index for this leaf	
-	long v[8];
+	slong v[8];
 	vbase++;	// * .obj file indices are base 1;
 	v[0] = vbase + vgToVert[ gv[0] ];
 	v[1] = vbase + vgToVert[ gv[1] ];
@@ -3112,12 +3112,12 @@ void VolumeGVDB::writeCube (  FILE* fp, unsigned char vpix[], slong& numfaces, i
 	v[6] = vbase + vgToVert[ gv[6] ];
 	v[7] = vbase + vgToVert[ gv[7] ];
 
-	if ( vpix[1] == 0 ) {fprintf(fp, "f %ld//0 %ld//0 %ld//0 %ld//0\n", v[1], v[2], v[6], v[5] );  numfaces++; }	// x+	
-	if ( vpix[2] == 0 ) {fprintf(fp, "f %ld//1 %ld//1 %ld//1 %ld//1\n", v[0], v[3], v[7], v[4] );  numfaces++; }	// x-
-	if ( vpix[3] == 0 ) {fprintf(fp, "f %ld//2 %ld//2 %ld//2 %ld//2\n", v[2], v[3], v[7], v[6] );  numfaces++; }	// y+
-	if ( vpix[4] == 0 ) {fprintf(fp, "f %ld//3 %ld//3 %ld//3 %ld//3\n", v[1], v[0], v[4], v[5] );  numfaces++; }	// y- 
-	if ( vpix[5] == 0 ) {fprintf(fp, "f %ld//4 %ld//4 %ld//4 %ld//4\n", v[4], v[5], v[6], v[7] );  numfaces++; }	// z+
-	if ( vpix[6] == 0 ) {fprintf(fp, "f %ld//5 %ld//5 %ld//5 %ld//5\n", v[0], v[1], v[2], v[3] );  numfaces++; }	// z-	
+	if ( vpix[1] == 0 ) {fprintf(fp, "f %lld//0 %lld//0 %lld//0 %lld//0\n", v[1], v[2], v[6], v[5] );  numfaces++; }	// x+	
+	if ( vpix[2] == 0 ) {fprintf(fp, "f %lld//1 %lld//1 %lld//1 %lld//1\n", v[0], v[3], v[7], v[4] );  numfaces++; }	// x-
+	if ( vpix[3] == 0 ) {fprintf(fp, "f %lld//2 %lld//2 %lld//2 %lld//2\n", v[2], v[3], v[7], v[6] );  numfaces++; }	// y+
+	if ( vpix[4] == 0 ) {fprintf(fp, "f %lld//3 %lld//3 %lld//3 %lld//3\n", v[1], v[0], v[4], v[5] );  numfaces++; }	// y- 
+	if ( vpix[5] == 0 ) {fprintf(fp, "f %lld//4 %lld//4 %lld//4 %lld//4\n", v[4], v[5], v[6], v[7] );  numfaces++; }	// z+
+	if ( vpix[6] == 0 ) {fprintf(fp, "f %lld//5 %lld//5 %lld//5 %lld//5\n", v[0], v[1], v[2], v[3] );  numfaces++; }	// z-	
 }
 
 void VolumeGVDB::enableVerts ( int*& vgToVert, std::vector<Vector3DF>& verts, Vector3DF vm, int gv[] )
@@ -3302,14 +3302,14 @@ void VolumeGVDB::AuxGeometryUnmap ( Model* model, int vertaux, int elemaux )
 // Activate a region of space
 int VolumeGVDB::ActivateRegion ( int lev, Extents& e )
 {
-	Vector3DF pos;
+	Vector3DI pos;
 	uint64 leaf;		
 	int cnt = 0;
 	assert ( lev == e.lev-1 );		// make sure extens match desired level
 	for (int z=e.imin.z; z <= e.imax.z; z++ )
 		for (int y=e.imin.y; y <= e.imax.y; y++ )
 			for (int x=e.imin.x; x <= e.imax.x; x++ ) {
-				pos.Set(x,y,z); pos *= e.cover;
+				pos.Set(x, y, z); pos *= e.cover;
 				leaf = ActivateSpaceAtLevel ( e.lev-1, pos );
 				cnt++;
 			}
@@ -3319,7 +3319,7 @@ int VolumeGVDB::ActivateRegion ( int lev, Extents& e )
 
 int VolumeGVDB::ActivateHalo(Extents& e)
 {
-	Vector3DF pos, nbr;
+	Vector3DI pos, nbr;
 	int cnt, actv;
 
 	// tag buffer
@@ -3368,7 +3368,7 @@ int VolumeGVDB::ActivateHalo(Extents& e)
 // Activate a region of space from an auxiliary byte buffer
 int VolumeGVDB::ActivateRegionFromAux (Extents& e, int auxid, uchar dt, float vthresh)
 {
-	Vector3DF pos;
+	Vector3DI pos;
 	uint64 leaf;
 	char* vdat = mAux[auxid].cpu;			// Get AUX data		
 	int cnt = 0;
@@ -3435,10 +3435,7 @@ int VolumeGVDB::VoxelizeNode ( Node* node, uchar chan, Matrix4F* xform, float bd
 
 	Vector3DI block ( 8, 8, 8 );
 	Vector3DI grid ( int(e.ires.x/block.x) + 1, int(e.ires.y/block.y) + 1, int(e.ires.z/block.z) + 1 );
-	int vcnt = mAux[AUX_VERTEX_BUF].lastEle;
-	int ecnt = mAux[AUX_ELEM_BUF].lastEle;
-	int bmax = mAux[AUX_GRIDOFF].lastEle;
-	int tcnt = mAux[AUX_TRI_BUF].lastEle;
+	int bmax = static_cast<int>(mAux[AUX_GRIDOFF].lastEle);
 	void* args[12] = {  &e.vmin, &e.vmax, &e.ires, &mAux[AUX_VOXELIZE].gpu, &dt, &val_surf, &val_inside, 
 						&bdiv, &bmax, &mAux[AUX_GRIDCNT].gpu, &mAux[AUX_GRIDOFF].gpu, &mAux[AUX_TRI_BUF].gpu };
 
@@ -3483,7 +3480,7 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	cudaCheck ( cuMemcpyHtoD ( cuXform, xform->GetDataF(), sizeof(float)*16), "VolumeGVDB", "SolidVoxelize", "cuMemcpyHtoD", "cuXform", mbDebug );	// Send transform
 	
 	// Identify model bounding box
-	model->ComputeBounds ( *xform, 0.1 );
+	model->ComputeBounds ( *xform, 0.1f );
 	mObjMin = model->objMin; mObjMax = model->objMax;
 	mVoxMin = mObjMin;
 	mVoxMax = mObjMax;
@@ -3504,7 +3501,7 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 	int node_cnt, cnt;
 	Node* node;	
 	for (int lev = N-1; lev >= 0; lev-- ) {						// scan - level N-1 down to 0
-		node_cnt = getNumUsedNodes(lev);
+		node_cnt = static_cast<int>(getNumUsedNodes(lev));
 		cnt = 0;		
 		// Insert triangles into bins
 		float ydiv = getCover(lev).y;							// use brick boundaries for triangle sorting
@@ -3542,13 +3539,13 @@ Vector3DI VolumeGVDB::InsertTriangles ( Model* model, Matrix4F* xform, float& yd
 	PUSH_CTX
 
 	// Identify model bounding box
-	model->ComputeBounds ( *xform, 0.1 );	
+	model->ComputeBounds ( *xform, 0.1f );	
 	int ybins = int(model->objMax.y / ydiv)+1;						// y divisions align with lev0 brick boundaries	
 	
 	PrepareAux ( AUX_GRIDCNT, ybins, sizeof(uint), true, true );	// allow return to cpu
 	PrepareAux ( AUX_GRIDOFF, ybins, sizeof(uint), false, false );
-	int vcnt = mAux[AUX_VERTEX_BUF].lastEle;			// input
-	int ecnt = mAux[AUX_ELEM_BUF].lastEle;
+	int vcnt = static_cast<int>(mAux[AUX_VERTEX_BUF].lastEle);			// input
+	int ecnt = static_cast<int>(mAux[AUX_ELEM_BUF].lastEle);
 	int tri_cnt = 0;								// output
 		
 	Vector3DI block ( 512, 1, 1 );
@@ -3605,7 +3602,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 	PERF_POP ();
 
 	// Configure model
-	model->ComputeBounds ( *xform, 0.1 );
+	model->ComputeBounds ( *xform, 0.1f );
 	mObjMin = model->objMin; mObjMax = model->objMax;
 	mVoxMin = mObjMin;
 	mVoxMax = mObjMax;
@@ -3650,7 +3647,7 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 				for ( int z0=0; z0 < res1; z0++ ) {
 					for ( int y0=0; y0 < res1; y0++ ) {
 						for ( int x0=0; x0 < res1; x0++ ) {
-							vpix[0] = *(vdat + (z0*res1 + y0)*res1 + x0);
+							vpix[0] = static_cast<uchar>(*(vdat + (z0*res1 + y0)*res1 + x0));
 							if ( vpix[0] > 0 ) {
 								vmin0.x = vmin1.x + x0 * vrange1.x / res1;
 								vmin0.y = vmin1.y + y0 * vrange1.y / res1;
@@ -3663,12 +3660,12 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 							} else {
 								// correction when not using conservative raster									
 								c[1]=c[2]=c[3]=c[4]=c[5]=c[6] = 0;
-								vpix[1] = (x0==res1-1) ? 0 :	*(vdat + ( z0*res1 +	 y0)	*res1 +	(x0+1));
-								vpix[2] = (y0==res1-1) ? 0 :	*(vdat + ( z0*res1 +	(y0+1))	*res1 +	 x0);
-								vpix[3] = (z0==res1-1) ? 0 :	*(vdat + ((z0+1)*res1 +  y0)	*res1 +	 x0);
-								vpix[4] = (x0==0) ? 0 :		*(vdat + ( z0*res1 +	 y0)	*res1 +	(x0-1));
-								vpix[5] = (y0==0) ? 0 :		*(vdat + ( z0*res1 +	(y0-1))	*res1 +	 x0);
-								vpix[6] = (z0==0) ? 0 :		*(vdat + ((z0-1)*res1 +  y0)	*res1 +	 x0);
+								vpix[1] = static_cast<uchar>((x0 == res1 - 1) ? 0 : *(vdat + (z0 * res1 + y0) * res1 + (x0 + 1)));
+								vpix[2] = static_cast<uchar>((y0 == res1 - 1) ? 0 : *(vdat + (z0 * res1 + (y0 + 1)) * res1 + x0));
+								vpix[3] = static_cast<uchar>((z0 == res1 - 1) ? 0 : *(vdat + ((z0 + 1) * res1 + y0) * res1 + x0));
+								vpix[4] = static_cast<uchar>((x0 == 0) ? 0 : *(vdat + (z0 * res1 + y0) * res1 + (x0 - 1)));
+								vpix[5] = static_cast<uchar>((y0 == 0) ? 0 : *(vdat + (z0 * res1 + (y0 - 1)) * res1 + x0));
+								vpix[6] = static_cast<uchar>((z0 == 0) ? 0 : *(vdat + ((z0 - 1) * res1 + y0) * res1 + x0));
 								vpix[7] = (vpix[1] > 0) + (vpix[2] > 0) + (vpix[3] > 0) + (vpix[4] > 0) + (vpix[5] > 0 ) + (vpix[6] > 0 );								
 								
 								if ( vpix[7] > 0 ) {
@@ -3682,12 +3679,12 @@ void VolumeGVDB::SurfaceVoxelizeGL ( uchar chan, Model* model, Matrix4F* xform )
 									}
 								}
 								c[1]=c[2]=c[3]=c[4]=c[5]=c[6] = 0;
-								vpix[1] = (x0==res1-1) ? (++c[1]==1) :	*(vdat + ( z0*res1 +	 y0)	*res1 +	(x0+1));
-								vpix[2] = (y0==res1-1) ? (++c[2]==1) :	*(vdat + ( z0*res1 +	(y0+1))	*res1 +	 x0);
-								vpix[3] = (z0==res1-1) ? (++c[3]==1) :	*(vdat + ((z0+1)*res1 +  y0)	*res1 +	 x0);
-								vpix[4] = (x0==0) ? (++c[4]==1) :		*(vdat + ( z0*res1 +	 y0)	*res1 +	(x0-1));
-								vpix[5] = (y0==0) ? (++c[5]==1) :		*(vdat + ( z0*res1 +	(y0-1))	*res1 +	 x0);
-								vpix[6] = (z0==0) ? (++c[6]==1) :		*(vdat + ((z0-1)*res1 +  y0)	*res1 +	 x0);
+								vpix[1] = static_cast<uchar>((x0 == res1 - 1) ? (++c[1] == 1) : *(vdat + (z0 * res1 + y0) * res1 + (x0 + 1)));
+								vpix[2] = static_cast<uchar>((y0 == res1 - 1) ? (++c[2] == 1) : *(vdat + (z0 * res1 + (y0 + 1)) * res1 + x0));
+								vpix[3] = static_cast<uchar>((z0 == res1 - 1) ? (++c[3] == 1) : *(vdat + ((z0 + 1) * res1 + y0) * res1 + x0));
+								vpix[4] = static_cast<uchar>((x0 == 0) ? (++c[4] == 1) : *(vdat + (z0 * res1 + y0) * res1 + (x0 - 1)));
+								vpix[5] = static_cast<uchar>((y0 == 0) ? (++c[5] == 1) : *(vdat + (z0 * res1 + (y0 - 1)) * res1 + x0));
+								vpix[6] = static_cast<uchar>((z0 == 0) ? (++c[6] == 1) : *(vdat + ((z0 - 1) * res1 + y0) * res1 + x0));
 								vpix[7] = (vpix[1] > 0) + (vpix[2] > 0) + (vpix[3] > 0) + (vpix[4] > 0) + (vpix[5] > 0 ) + (vpix[6] > 0 );
 								c[7] = (c[1]+c[2]+c[3]+c[4]+c[5]+c[6] == 3) ? 1 : 0;
 								if ( vpix[7] >= 3 + c[7] ) {
@@ -3837,11 +3834,11 @@ void VolumeGVDB::getUsage( Vector3DF& ext, Vector3DF& vox, Vector3DF& used, Vect
 	
 	// brick/voxel count 
 	if (mPool->getNumAtlas() > 0) {
-		int leafdim = mPool->getAtlas(0).stride;
+		int leafdim = static_cast<int>(mPool->getAtlas(0).stride);
 		Vector3DI vb = mVoxResMax; vb /= Vector3DI(leafdim, leafdim, leafdim);
 		long vbrk = vb.x*vb.y*vb.z;					// number of bricks covering bounded world domain
-		long abrk = mPool->getPoolUsedCnt(0, 0);	// active bricks
-		vox = Vector3DF(abrk, float(abrk)*leafdim*leafdim*leafdim / 1000000.0f, float(abrk)*100.0f / vbrk);		// # bricks, # voxels(M), occupancy(%)
+		float abrk = static_cast<float>(mPool->getPoolUsedCnt(0, 0));	// active bricks
+		vox = Vector3DF(abrk, abrk*leafdim*leafdim*leafdim / 1000000.0f, abrk*100.0f / vbrk);		// # bricks, # voxels(M), occupancy(%)
 	} else {
 		vox = Vector3DF(0, 0, 0);
 	}
@@ -3868,8 +3865,8 @@ void VolumeGVDB::Measure ( bool bPrint )
 {	
 	PUSH_CTX
 
-	int numnodes_at_lev, maxnodes_at_lev;
-	int numnodes_total = 0, maxnodes_total = 0;
+	uint64 numnodes_at_lev, maxnodes_at_lev;
+	uint64 numnodes_total = 0, maxnodes_total = 0;
 	Vector3DI axisres, axiscnt;
 	int leafdim;
 	uint64 atlas_sz = 0;	
@@ -3901,7 +3898,7 @@ void VolumeGVDB::Measure ( bool bPrint )
 
 		// Atlas info
 		if ( mPool->getNumAtlas() > 0 ) {
-			leafdim = mPool->getAtlas(0).stride;				// voxel res of one brick
+			leafdim = static_cast<int>(mPool->getAtlas(0).stride);				// voxel res of one brick
 			axiscnt = mPool->getAtlas(0).subdim;				// number of bricks in atlas			
 			axisres = axiscnt * (leafdim + mApron*2);			// number of voxels in atlas
 			atlas_sz = mPool->getAtlas(0).size;			
@@ -3912,7 +3909,7 @@ void VolumeGVDB::Measure ( bool bPrint )
 			vb /= Vector3DI(leafdim, leafdim, leafdim);
 			long vbrk = vb.x*vb.y*vb.z;		// number of bricks covering bounded world domain
 			int sbrk = axiscnt.x*axiscnt.y*axiscnt.z;	// number of bricks stored in atlas
-			int abrk = mPool->getPoolUsedCnt(0, 0);
+			uint64 abrk = mPool->getPoolUsedCnt(0, 0);
 
 			gprintf ( "   Vol Extents:   %d bricks,  %5.2f million voxels\n", vbrk, float(vbrk)*leafdim*leafdim*leafdim / 1000000.0f );
 			gprintf ( "   Atlas Storage: %d bricks,  %5.2f million voxels\n", sbrk, float(sbrk)*leafdim*leafdim*leafdim / 1000000.0f );
@@ -3955,9 +3952,9 @@ void VolumeGVDB::PrepareVDB ()
 			mVDBInfo.res[n]			= getRes(n);
 			mVDBInfo.vdel[n]		= Vector3DF(getRange(n));	mVDBInfo.vdel[n] /= Vector3DF( getRes3DI(n) );
 			mVDBInfo.noderange[n]	= getRange(n);		// integer (cannot send cover)
-			mVDBInfo.nodecnt[n]		= mPool->getPoolTotalCnt(0, n);
-			mVDBInfo.nodewid[n]		= mPool->getPoolWidth(0, n);
-			mVDBInfo.childwid[n]	= mPool->getPoolWidth(1, n);
+			mVDBInfo.nodecnt[n]		= static_cast<int>(mPool->getPoolTotalCnt(0, n));
+			mVDBInfo.nodewid[n]		= static_cast<int>(mPool->getPoolWidth(0, n));
+			mVDBInfo.childwid[n]	= static_cast<int>(mPool->getPoolWidth(1, n));
 			mVDBInfo.nodelist[n]	= mPool->getPoolGPU(0, n);
 			mVDBInfo.childlist[n]	= mPool->getPoolGPU(1, n);								
 			if ( mVDBInfo.nodecnt[n] == 1 ) tlev = n;		// get top level for rendering
@@ -3999,9 +3996,9 @@ void VolumeGVDB::PrepareVDBPartially ()
 		mVDBInfo.res[n]			= getRes(n);
 		mVDBInfo.vdel[n]		= Vector3DF(getRange(n));	mVDBInfo.vdel[n] /= Vector3DF( getRes3DI(n) );
 		mVDBInfo.noderange[n]	= getRange(n);		// integer (cannot send cover)
-		mVDBInfo.nodecnt[n]		= mPool->getPoolTotalCnt(0, n);
-		mVDBInfo.nodewid[n]		= mPool->getPoolWidth(0, n);
-		mVDBInfo.childwid[n]	= mPool->getPoolWidth(1, n);
+		mVDBInfo.nodecnt[n]		= static_cast<int>(mPool->getPoolTotalCnt(0, n));
+		mVDBInfo.nodewid[n]		= static_cast<int>(mPool->getPoolWidth(0, n));
+		mVDBInfo.childwid[n]	= static_cast<int>(mPool->getPoolWidth(1, n));
 		mVDBInfo.nodelist[n]	= mPool->getPoolGPU(0, n);
 		mVDBInfo.childlist[n]	= mPool->getPoolGPU(1, n);								
 		if ( mVDBInfo.nodecnt[n] == 1 ) tlev = n;		// get top level for rendering
@@ -4045,7 +4042,10 @@ void VolumeGVDB::WriteDepthTexGL(int chan, int glid)
 
 	// Copy contents of depth target into _depthBuffer for use in CUDA rendering:
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, mRenderBuf[chan].glid);
-	glReadPixels(0, 0, mRenderBuf[chan].stride, mRenderBuf[chan].max / mRenderBuf[chan].stride, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glReadPixels(0, 0,
+		static_cast<GLsizei>(mRenderBuf[chan].stride),
+		static_cast<GLsizei>(mRenderBuf[chan].max / mRenderBuf[chan].stride),
+		GL_DEPTH_COMPONENT, GL_FLOAT, 0);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 	glCheck();
 
@@ -4074,9 +4074,9 @@ void VolumeGVDB::WriteRenderTexGL ( int chan, int glid )
     cudaCheck(cuGraphicsSubResourceGetMappedArray(&mRenderBuf[chan].garray, mRenderBuf[chan].grsc, 0, 0), "VolumeGVDB", "WriteRenderTexGL", "cuGraphicsSubResourceGetMappedArray", "mRenderBuf", mbDebug);
     cudaCheck(cuGraphicsUnmapResources(1, &mRenderBuf[chan].grsc, 0), "VolumeGVDB", "WriteRenderTexGL", "cuGraphicsUnmapResources", "mRenderBuf", mbDebug);
   }
-  int bpp = mRenderBuf[chan].size / mRenderBuf[chan].max;
-  int width = mRenderBuf[chan].stride * bpp;
-  int height = mRenderBuf[chan].max / mRenderBuf[chan].stride;
+  size_t bpp = mRenderBuf[chan].size / mRenderBuf[chan].max;
+  size_t width = mRenderBuf[chan].stride * bpp;
+  size_t height = mRenderBuf[chan].max / mRenderBuf[chan].stride;
 
   // Cuda Memcpy2D to transfer cuda output buffer
   // into opengl texture as a CUarray
@@ -4113,9 +4113,9 @@ void VolumeGVDB::ReadRenderTexGL ( int chan, int glid )
 		cudaCheck ( cuGraphicsSubResourceGetMappedArray ( &mRenderBuf[chan].garray, mRenderBuf[chan].grsc, 0, 0 ), "VolumeGVDB", "ReadRenderTexGL", "cuGraphicsSubResourcesGetMappedArray", "mRenderBuf", mbDebug);
 		cudaCheck ( cuGraphicsUnmapResources(1, &mRenderBuf[chan].grsc, 0), "VolumeGVDB", "ReadRenderTexGL", "cuGraphicsUnmapResources", "mRenderBuf", mbDebug);
 	}
-	int bpp = mRenderBuf[chan].size / mRenderBuf[chan].max;
-	int width = mRenderBuf[chan].stride * bpp;
-	int height = mRenderBuf[chan].max / mRenderBuf[chan].stride;
+	size_t bpp = mRenderBuf[chan].size / mRenderBuf[chan].max;
+	size_t width = mRenderBuf[chan].stride * bpp;
+	size_t height = mRenderBuf[chan].max / mRenderBuf[chan].stride;
 
 	// Cuda Memcpy2D to transfer cuda output buffer
 	// into opengl texture as a CUarray
@@ -4258,10 +4258,6 @@ void VolumeGVDB::PrepareRender ( int w, int h, char shading )
 	mScnInfo.cams		= cam->tlRayWorld;
 	mScnInfo.camu		= cam->trRayWorld; mScnInfo.camu -= mScnInfo.cams;
 	mScnInfo.camv		= cam->blRayWorld; mScnInfo.camv -= mScnInfo.cams;
-	mScnInfo.camivprow0 = cam->invviewproj_matrix.GetRowVec(0);
-	mScnInfo.camivprow1 = cam->invviewproj_matrix.GetRowVec(1);
-	mScnInfo.camivprow2 = cam->invviewproj_matrix.GetRowVec(2);
-	mScnInfo.camivprow3 = cam->invviewproj_matrix.GetRowVec(3);
 	mScnInfo.bias		= m_bias;
 	// Transform the light position from application space to voxel space,
 	// like getViewPos:
@@ -4309,8 +4305,8 @@ void VolumeGVDB::RenderKernel ( CUfunction user_kernel, uchar chan, uchar rbuf )
 
 	if (mbProfile) PERF_PUSH ( "Render" );
 	
-	int width = mRenderBuf[rbuf].stride;
-	int height = mRenderBuf[rbuf].max / width;	
+	int width = static_cast<int>(mRenderBuf[rbuf].stride);
+	int height = static_cast<int>(mRenderBuf[rbuf].max / mRenderBuf[rbuf].stride);
 
 	// Send Scene info (camera, lights)
 	PrepareRender ( width, height, getScene()->getShading() );
@@ -4320,7 +4316,7 @@ void VolumeGVDB::RenderKernel ( CUfunction user_kernel, uchar chan, uchar rbuf )
 
 	// Run CUDA User-Kernel
 	Vector3DI block ( 8, 8, 1 );
-	Vector3DI grid ( int(width/block.x)+1, int(height/block.y)+1, 1);		
+	Vector3DI grid ( (int(width) + block.x - 1)/block.x, (int(height) + block.y - 1)/block.y, 1);		
 	void* args[3] = { &cuVDBInfo,  &chan, &mRenderBuf[rbuf].gpu };
 	cudaCheck ( cuLaunchKernel ( user_kernel, grid.x, grid.y, 1, block.x, block.y, 1, 0, NULL, args, NULL ), "VolumeGVDB", "RenderKernel", "cuLaunch", "(user kernel)", mbDebug);
 	
@@ -4332,11 +4328,12 @@ void VolumeGVDB::RenderKernel ( CUfunction user_kernel, uchar chan, uchar rbuf )
 // Render using native kernel
 void VolumeGVDB::Render ( char shading, uchar chan, uchar rbuf )
 {
-	int width = mRenderBuf[rbuf].stride;
-	int height = mRenderBuf[rbuf].max / width;	
+	int width = static_cast<int>(mRenderBuf[rbuf].stride);
+	int height = static_cast<int>(mRenderBuf[rbuf].max / mRenderBuf[rbuf].stride);
 	if ( shading==SHADE_OFF ) {
 		PUSH_CTX
-		cudaCheck ( cuMemsetD8 ( mRenderBuf[rbuf].gpu, 0, width*height*4 ), "VolumeGVDB", "Render", "cuMemsetD8", "(no shading)", mbDebug);
+		cudaCheck ( cuMemsetD8 ( mRenderBuf[rbuf].gpu, 0, static_cast<uint64>(width)*static_cast<uint64>(height)*4 ),
+			"VolumeGVDB", "Render", "cuMemsetD8", "(no shading)", mbDebug);
 		POP_CTX
 		return;
 	}
@@ -4353,7 +4350,7 @@ void VolumeGVDB::Render ( char shading, uchar chan, uchar rbuf )
 
 	// Prepare kernel
 	Vector3DI block ( 16, 16, 1);
-	Vector3DI grid ( int(width/block.x)+1, int(height/block.y)+1, 1);		
+	Vector3DI grid((int(width) + block.x - 1) / block.x, (int(height) + block.y - 1) / block.y, 1);
 	void* args[3] = { &cuVDBInfo, &chan, &mRenderBuf[rbuf].gpu };
 	int kern;	
 	switch ( shading ) {
@@ -4390,9 +4387,9 @@ void VolumeGVDB::Raytrace ( DataPtr rays, uchar chan, char shading, int frame, f
 	PrepareVDB ();												
 
 	// Run CUDA GVDB Raytracer
-	int cnt = rays.lastEle;
+	int cnt = static_cast<int>(rays.lastEle);
 	Vector3DI block ( 64, 1, 1);
-	Vector3DI grid ( int(cnt/block.x)+1, 1, 1);		
+	Vector3DI grid ( (cnt + block.x - 1)/block.x, 1, 1);		
     void* args[5] = { &cuVDBInfo, &chan, &cnt, &rays.gpu, &bias };
 	cudaCheck ( cuLaunchKernel ( cuFunc[FUNC_RAYTRACE], grid.x, 1, 1, block.x, 1, 1, 0, NULL, args, NULL ), 
 				"VolumeGVDB", "Raytrace", "cuLaunch", "FUNC_RAYTRACE", mbDebug );	 	
@@ -4433,9 +4430,9 @@ void VolumeGVDB::UpdateApron ( uchar chan, float boundval, bool changeCtx)
 	}
 
 	// Dimensions
-	int bricks = mPool->getPoolTotalCnt(0,0);				// number of bricks
-	int brickres = mPool->getAtlasBrickres(chan);			// dimension of brick (including apron)
-	int brickwid = mPool->getAtlasBrickwid(chan);			// dimension of brick (without apron)
+	int bricks = static_cast<int>(mPool->getPoolTotalCnt(0,0));	// number of bricks
+	int brickres = mPool->getAtlasBrickres(chan);				// dimension of brick (including apron)
+	int brickwid = mPool->getAtlasBrickwid(chan);				// dimension of brick (without apron)
 
 	if (bricks == 0) return;
 
@@ -4472,7 +4469,7 @@ void VolumeGVDB::UpdateApronFaces (uchar chan)
 	PUSH_CTX
 
 	// Dimensions
-	int bricks = mPool->getPoolTotalCnt(0, 0);				// number of bricks
+	int bricks = static_cast<int>(mPool->getPoolTotalCnt(0, 0));				// number of bricks
 	int brickres = mPool->getAtlasBrickres(chan);			// dimension of brick (including apron)
 	int brickwid = mPool->getAtlasBrickwid(chan);			// dimension of brick (without apron)
 
@@ -4681,12 +4678,12 @@ uint64 VolumeGVDB::getNodeAtPoint (uint64 nodeid, Vector3DF pos)
 }
 
 
-bool  VolumeGVDB::isActive(Vector3DF wpos)
+bool  VolumeGVDB::isActive(Vector3DI wpos)
 {
 	return isActive(wpos, mRoot);
 }
 
-bool  VolumeGVDB::isActive( Vector3DF pos, slong nodeid)
+bool  VolumeGVDB::isActive( Vector3DI pos, slong nodeid)
 {
 	// Recurse to leaf	
 	unsigned int b;
@@ -4960,7 +4957,7 @@ void VolumeGVDB::PrepareAux ( int id, int cnt, int stride, bool bZero, bool bCPU
 
 void VolumeGVDB::InsertPointsSubcell( int subcell_size, int num_pnts, float pRadius, Vector3DF trans,  int& pSCPntsLength)
 {
-	int numBrick = mPool->getPoolUsedCnt(0, 0);
+	int numBrick = static_cast<int>(mPool->getPoolUsedCnt(0, 0));
 	if (numBrick == 0) {
 		gprintf("Warning: InsertPointsSubcell yet no bricks exist.\n");
 		return;
@@ -4972,13 +4969,13 @@ void VolumeGVDB::InsertPointsSubcell( int subcell_size, int num_pnts, float pRad
 
 	PERF_PUSH("Insert pnt sc");
 
-	int numSCellPerBrick = pow(getRes(0) / subcell_size, 3);	
-	int numSCell = numSCellPerBrick *  mPool->getPoolUsedCnt(0, 0);
+	int numSCellPerBrick = static_cast<int>(pow(getRes(0) / subcell_size, 3));	
+	int numSCell = numSCellPerBrick * numBrick;
 	int SCDim = getRes(0) / subcell_size;
 
 	Vector3DI range = getRange(0) / (getRes(0) / subcell_size);
 
-	int numSCellMapping = mPool->getPoolTotalCnt(0, 0);
+	int numSCellMapping = static_cast<int>(mPool->getPoolTotalCnt(0, 0));
 
 	int threads = 512;	
 	int pblks = int(numSCellMapping / threads)+1;
@@ -5089,14 +5086,14 @@ void VolumeGVDB::InsertPointsSubcell_FP16(int subcell_size, int num_pnts, float 
 
 		PERF_PUSH("Insert pnt sc");
 
-	int numSCellPerBrick = pow(getRes(0) / subcell_size, 3);
-	int numBrick = mPool->getPoolUsedCnt(0, 0);
-	int numSCell = numSCellPerBrick *  mPool->getPoolUsedCnt(0, 0);
+	int numSCellPerBrick = static_cast<int>(pow(getRes(0) / subcell_size, 3));
+	int numBrick = static_cast<int>(mPool->getPoolUsedCnt(0, 0));
+	int numSCell = numSCellPerBrick * numBrick;
 	int SCDim = getRes(0) / subcell_size;
 
 	Vector3DI range = getRange(0) / (getRes(0) / subcell_size);
 
-	int numSCellMapping = mPool->getPoolTotalCnt(0, 0);
+	int numSCellMapping = static_cast<int>(mPool->getPoolTotalCnt(0, 0));
 
 	int threads = 512;
 	int pblks = int(numSCellMapping / threads) + 1;
@@ -5185,14 +5182,14 @@ void VolumeGVDB::MapExtraGVDB (int subcell_size)
 	PUSH_CTX
 	PERF_PUSH("SC extra");
 	
-	int numSCellPerBrick = pow(getRes(0) / subcell_size, 3);
-	int numBrick = mPool->getPoolUsedCnt(0, 0);
-	int numSCell = numSCellPerBrick *  mPool->getPoolUsedCnt(0, 0);
+	int numSCellPerBrick = static_cast<int>(pow(getRes(0) / subcell_size, 3));
+	int numBrick = static_cast<int>(mPool->getPoolUsedCnt(0, 0));
+	int numSCell = numSCellPerBrick * numBrick;
 	int SCDim = getRes(0) / subcell_size;
 
 	Vector3DI range = getRange(0) / (getRes(0) / subcell_size);
 
-	int numSCellMapping = mPool->getPoolTotalCnt(0, 0);
+	int numSCellMapping = static_cast<int>(mPool->getPoolTotalCnt(0, 0));
 
 	int threads = 512;	
 
@@ -5216,7 +5213,7 @@ void VolumeGVDB::InsertPoints ( int num_pnts, Vector3DF trans, bool bPrefix )
 
 	// Prepare aux arrays
 	PERF_PUSH ( "Prepare Aux");
-	int bricks = mPool->getAtlas(0).lastEle;
+	int bricks = static_cast<int>(mPool->getAtlas(0).lastEle);
 	PrepareAux ( AUX_PNODE, num_pnts, sizeof(int), false );			// node which each point falls into
 	PrepareAux ( AUX_PNDX,  num_pnts, sizeof(int), false );			// index of the point inside that node
 	PrepareAux ( AUX_GRIDCNT, bricks, sizeof(int), true );			// number of points in each brick cell
@@ -5266,7 +5263,7 @@ void VolumeGVDB::InsertSupportPoints ( int num_pnts, float offset, Vector3DF tra
 
 	// Prepare aux arrays
 	PERF_PUSH ( "Prepare Aux");
-	int bricks = mPool->getAtlas(0).usedNum;
+	int bricks = static_cast<int>(mPool->getAtlas(0).usedNum);
 	PrepareAux ( AUX_PNODE, num_pnts, sizeof(int), false );			// node which each point falls into
 	PrepareAux ( AUX_PNDX,  num_pnts, sizeof(int), false );			// index of the point inside that node
 	PrepareAux ( AUX_GRIDCNT, bricks, sizeof(int), true );			// number of points in each brick cell
@@ -5307,7 +5304,7 @@ void VolumeGVDB::ScalePntPos (int num_pnts, float scale)
 
 void VolumeGVDB::GatherDensity ( int subcell_size, int num_pnts, float radius, Vector3DF trans, int& pSCPntsLength, int chanDensity, int chanClr, bool bAccum )
 {
-	int num_brick = mPool->getPoolUsedCnt(0, 0);
+	int num_brick = static_cast<int>(mPool->getPoolUsedCnt(0, 0));
 	if (pSCPntsLength==0) return;
 	if (num_brick == 0) return;
 
@@ -5315,7 +5312,7 @@ void VolumeGVDB::GatherDensity ( int subcell_size, int num_pnts, float radius, V
 
 	PERF_PUSH("Gather Density");
 
-	int numSCell = pow(getRes(0) / subcell_size, 3) *  num_brick;
+	int numSCell = static_cast<int>(pow(getRes(0) / subcell_size, 3)) *  num_brick;
 
 	void* args[14] = 
 	{  
@@ -5337,14 +5334,14 @@ void VolumeGVDB::GatherDensity ( int subcell_size, int num_pnts, float radius, V
 
 void VolumeGVDB::GatherLevelSet (int subcell_size, int num_pnts, float radius, Vector3DF trans, int& pSCPntsLength, int chanDensity, int chanClr, bool bAccum )
 {
-	int num_brick = mPool->getPoolUsedCnt(0, 0);
+	int num_brick = static_cast<int>(mPool->getPoolUsedCnt(0, 0));
 	if (num_brick == 0) return;
 
 	PrepareVDB();
 
 	PERF_PUSH("Gather LevelSet");
 
-	int numSCell = pow(getRes(0) / subcell_size, 3) *  num_brick;
+	int numSCell = static_cast<int>(pow(getRes(0) / subcell_size, 3)) *  num_brick;
 
 	void* args[14] = 
 	{  
@@ -5364,14 +5361,14 @@ void VolumeGVDB::GatherLevelSet (int subcell_size, int num_pnts, float radius, V
 
 void VolumeGVDB::GatherLevelSet_FP16(int subcell_size, int num_pnts, float radius, Vector3DF trans, int& pSCPntsLength, int chanDensity, int chanClr)
 {
-	int num_brick = mPool->getPoolUsedCnt(0, 0);
+	int num_brick = static_cast<int>(mPool->getPoolUsedCnt(0, 0));
 	if (num_brick == 0) return;
 
 	PrepareVDB();
 
 	PERF_PUSH("Gather LevelSet");
 
-	int numSCell = pow(getRes(0) / subcell_size, 3) * num_brick;
+	int numSCell = static_cast<int>(pow(getRes(0) / subcell_size, 3)) * num_brick;
 	
 	void* args[23] =
 	{
@@ -5626,7 +5623,7 @@ void VolumeGVDB::ScatterDensity ( int num_pnts, float radius, float amp, Vector3
 	
     if (mAux[AUX_PNTCLR].gpu != NULL && avgColor) {
 		Vector3DI brickResVec = getRes3DI(0);
-		num_voxels = brickResVec.x * brickResVec.y * brickResVec.z * getNumUsedNodes(0);
+		num_voxels = brickResVec.x * brickResVec.y * brickResVec.z * static_cast<uint>(getNumUsedNodes(0));
 		if (mbProfile) PERF_PUSH("Prepare Aux");
 		PrepareAux(AUX_COLAVG, 4 * num_voxels, sizeof(uint), true);					// node which each point falls into
 		if (mbProfile) PERF_POP();
@@ -5763,6 +5760,7 @@ void VolumeGVDB::SetTransform(Vector3DF pretrans, Vector3DF scal, Vector3DF angs
 	mScale = scal;
 	mAngs = angs;
 	mTrans = trans;
+
 	
 	// p' = T R S PT p				pretrans -> scale -> rotate -> translate
 	mXform.RotateTZYXS( mAngs, mTrans, mScale);
@@ -5780,8 +5778,8 @@ void VolumeGVDB::SetTransform(Vector3DF pretrans, Vector3DF scal, Vector3DF angs
 }
 
 // Node queries
-int	VolumeGVDB::getNumUsedNodes ( int lev )			{ return mPool->getPoolUsedCnt(0, lev); }
-int	VolumeGVDB::getNumTotalNodes ( int lev )		{ return mPool->getPoolTotalCnt(0, lev); }
+uint64 VolumeGVDB::getNumUsedNodes ( int lev )		{ return mPool->getPoolUsedCnt(0, lev); }
+uint64 VolumeGVDB::getNumTotalNodes ( int lev )		{ return mPool->getPoolTotalCnt(0, lev); }
 Node* VolumeGVDB::getNodeAtLevel ( int n, int lev )	{ return (Node*) (mPool->PoolData( 0, lev, n )); }
 
 //--- must be updated to use mXform

@@ -145,7 +145,7 @@ bool strIsNum ( std::string str, float& f )
 			 break;
 	}
 	if ( it==str.end() ) {
-		f = atof ( str.c_str() );
+		f = static_cast<float>(atof(str.c_str()));
 		return true;
 	}
 	return false;

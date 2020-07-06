@@ -252,7 +252,7 @@ inline __host__ __device__ float2 normalize(float2 v)
 // floor
 inline __host__ __device__ float2 floor(const float2 v)
 {
-    return make_float2(floor(v.x), floor(v.y));
+    return make_float2(floorf(v.x), floorf(v.y));
 }
 
 // reflect
@@ -416,7 +416,7 @@ inline __host__ __device__ float3 normalize(float3 v)
 // floor
 inline __host__ __device__ float3 floor(const float3 v)
 {
-    return make_float3(floor(v.x), floor(v.y), floor(v.z));
+    return make_float3(floorf(v.x), floorf(v.y), floorf(v.z));
 }
 
 // reflect
@@ -558,7 +558,7 @@ inline __host__ __device__ float4 normalize(float4 v)
 // floor
 inline __host__ __device__ float4 floor(const float4 v)
 {
-    return make_float4(floor(v.x), floor(v.y), floor(v.z), floor(v.w));
+    return make_float4(floorf(v.x), floorf(v.y), floorf(v.z), floorf(v.w));
 }
 
 // int3 functions
