@@ -89,6 +89,8 @@ float getTextY ( char* msg )	{ return g_2D.getTextY(msg); }
 void start3D ( Camera3D* cam )	{ g_2D.start3D( cam ); }
 void drawLine3D ( float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a ) { g_2D.drawLine3D(x1,y1,z1,x2,y2,z2,r,g,b,a); }
 void drawBox3D ( float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a ) { g_2D.drawBox3D(x1,y1,z1,x2,y2,z2,r,g,b,a); }
+// Draws the edges of the axis-aligned box from `bMin` to `bMax` after being transformed by `xform`.
+void drawBox3DXform(const Vector3DF& bMin, const Vector3DF& bMax, const Vector3DF& color, const Matrix4F& xform) { g_2D.drawBox3DXform(bMin, bMax, color, xform); }
 void end3D ()		{ g_2D.end3D(); }
 void draw3D ()		{ g_2D.draw3D(); }
 
@@ -195,6 +197,42 @@ void nvDraw::drawBox3D ( float x1, float y1, float z1, float x2, float y2, float
 	v->x = x1; v->y = y1; v->z = z1; v->r = r; v->g = g; v->b = b; v->a = a; v->tx = 0; v->ty = 0;	v++;
 	v->x = x2; v->y = y2; v->z = z2; v->r = r; v->g = g; v->b = b; v->a = a; v->tx = 0; v->ty = 0;
 }
+void nvDraw::drawBox3DXform(const Vector3DF& bMin, const Vector3DF& bMax, const Vector3DF& color, const Matrix4F& xform)
+{
+	// This is implemented in terms of `drawLine3D` calls. TODO: Change this so that box instances use their own
+	// world matrices.
+	// z
+	// 4--6
+	// |\ |\
+	// | 5--7
+	// 0-|2 | y
+	//  \| \|
+	//   1--3
+	//    x
+	// Compute the 8 vertices. These are ordered so that the ith bit of the index gives its location on the ith axis.
+	Vector3DF p[8];
+	p[0].Set(bMin.x, bMin.y, bMin.z);
+	p[1].Set(bMax.x, bMin.y, bMin.z);
+	p[2].Set(bMin.x, bMax.y, bMin.z);
+	p[3].Set(bMax.x, bMax.y, bMin.z);
+	p[4].Set(bMin.x, bMin.y, bMax.z);
+	p[5].Set(bMax.x, bMin.y, bMax.z);
+	p[6].Set(bMin.x, bMax.y, bMax.z);
+	p[7].Set(bMax.x, bMax.y, bMax.z);
+	for (int i = 0; i < 8; i++) {
+		p[i] *= xform;
+	}
+	
+	// Draw the 12 lines between adjacent vertices. Each group of 2 numbers in the following array represents two
+	// indices in a line.
+	int linePairs[24] = { 0, 1, 0, 2, 0, 4, 1, 3, 1, 5, 2, 3, 2, 6, 3, 7, 4, 5, 4, 6, 5, 7, 6, 7 };
+	for (int i = 0; i < 24; i += 2) {
+		const Vector3DF& vtx0 = p[linePairs[i+0]];
+		const Vector3DF& vtx1 = p[linePairs[i+1]];
+		drawLine3D(vtx0.x, vtx0.y, vtx0.z, vtx1.x, vtx1.y, vtx1.z, color.x, color.y, color.z, 1);
+	}
+}
+
 
 void nvDraw::end3D ()
 {

@@ -1,9 +1,3 @@
-
-
-
-#define C_IO		0		// settings for m_io_method
-#define WIN_IO		1
-
 // GVDB library
 #include "gvdb.h"			
 using namespace nvdb;
@@ -107,8 +101,6 @@ public:
 
 	bool		m_key;
 	bool		m_info;
-
-	int			m_io_method;
 };
 
 Sample sample_obj;
@@ -261,7 +253,6 @@ Sample::Sample()
 	m_key = false;
 	m_renderscale = 0.0;
 	m_infile = "teapot.scn";
-	m_io_method = C_IO;
 }
 
 void Sample::parse_value ( int mode, std::string tag, std::string val )
@@ -412,10 +403,6 @@ void Sample::on_arg(std::string arg, std::string val)
 		m_renderscale = strToNum(val);
 		nvprintf("render scale: %f\n", m_renderscale);
 	}
-	if (arg.compare("-io") == 0) {
-		m_io_method = static_cast<int>(strToNum(val));
-		nvprintf("io method: %d\n", m_io_method);
-	}
 }
 
 bool Sample::init() 
@@ -517,11 +504,11 @@ bool Sample::init()
 	if ( m_polyon )
 		load_polys ( m_polypath, m_polyfile, m_pframe, m_pscale, m_poffset, m_polymat );
 
+	render_update();
+
 	// Rebuild the Optix scene graph with GVDB
 	if (m_render_optix)	
 		RebuildOptixGraph( SHADE_LEVELSET );
-	
-	render_update();
 	
 	return true; 
 }
@@ -567,24 +554,7 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 
 	// Read header
 	PERF_PUSH ( "  Open file" );
-	#if WINDOWS
-	if (m_io_method == WIN_IO) {
-		HANDLE fph = CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL, // | FILE_FLAG_NO_BUFFERING, 
-			NULL);
-		DWORD bread;
-		ReadFile(fph, &m_numpnts, sizeof(int), &bread, NULL);
-		ReadFile(fph, &wMin.x, sizeof(float), &bread, NULL);
-		ReadFile(fph, &wMin.y, sizeof(float), &bread, NULL);
-		ReadFile(fph, &wMin.z, sizeof(float), &bread, NULL);
-		ReadFile(fph, &wMax.x, sizeof(float), &bread, NULL);
-		ReadFile(fph, &wMax.y, sizeof(float), &bread, NULL);
-		ReadFile(fph, &wMax.z, sizeof(float), &bread, NULL);
-		CloseHandle(fph);
-	}
-	else 
-	#endif
-	if ( m_io_method == C_IO ) {
+	{
 		// Standard read for header info whne using C_IO
 		FILE* fph = fopen(filepath, "rb");
 		if (fph == 0) {
@@ -603,31 +573,7 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 	PERF_POP ();
 
 	// Read data from disk to CPU	
-	#if WINDOWS
-	if (m_io_method == WIN_IO) {
-
-		// Allocate memory for points
-		ushort outbuf[3];
-		PERF_PUSH("  Buffer alloc");
-		gvdb.AllocData(m_pnt1, m_numpnts, sizeof(ushort) * 3, true);
-		gvdb.AllocData(m_pnts, m_numpnts, sizeof(Vector3DF), false);
-		PERF_POP();
-
-		// Windows IO
-		PERF_PUSH("Read");
-		HANDLE fp = CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL, // | FILE_FLAG_NO_BUFFERING, 
-			NULL);
-		SetFilePointer(fp, 28, 0, FILE_BEGIN);
-		DWORD bread;
-		ReadFile(fp, m_pnt1.cpu, 3 * sizeof(ushort)*m_numpnts, &bread, NULL);
-		PERF_POP();
-		PERF_PUSH("Commit");
-		gvdb.CommitData(m_pnt1);		// Commit to GPU
-		PERF_POP();
-	} else 
-	#endif
-	if ( m_io_method==C_IO) {
+	{
 		// C-style IO
 		PERF_PUSH("Read");
 		FILE* fph = fopen(filepath, "rb");
@@ -646,7 +592,7 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 		// Allocate memory for points
 		PERF_PUSH("  Buffer alloc");
 		gvdb.AllocData(m_pnt1, m_numpnts, sizeof(ushort) * 3, true);
-		gvdb.AllocData(m_pnts, m_numpnts, sizeof(Vector3DF), false);
+		gvdb.AllocData(m_pnts, m_numpnts, sizeof(Vector3DF), true);
 		PERF_POP();
 
 		//fseek(fp, 28, SEEK_SET);
@@ -661,6 +607,7 @@ void Sample::load_points ( std::string pntpath, std::string pntfile, int frame )
 	PERF_PUSH ( "  Convert" );
 	Vector3DF wdelta ( (wMax.x - wMin.x)/65535.0f, (wMax.y - wMin.y)/65535.0f, (wMax.z - wMin.z)/65535.0f );
 	gvdb.ConvertAndTransform ( m_pnt1, 2, m_pnts, 4, m_numpnts, wMin, wdelta, Vector3DF(0,0,0), Vector3DF(m_renderscale,m_renderscale,m_renderscale) );
+	gvdb.RetrieveData(m_pnts); // Copy back to the CPU so that we can locally view it
 	PERF_POP ();
 	
 	// Set points for GVDB	
@@ -794,35 +741,24 @@ void Sample::render_frame()
 
 void Sample::draw_topology ()
 {
-	Vector3DF clrs[10];
-	clrs[0] = Vector3DF(0,0,1);			// blue
-	clrs[1] = Vector3DF(0,1,0);			// green
-	clrs[2] = Vector3DF(1,0,0);			// red
-	clrs[3] = Vector3DF(1,1,0);			// yellow
-	clrs[4] = Vector3DF(1,0,1);			// purple
-	clrs[5] = Vector3DF(0,1,1);			// aqua
-	clrs[6] = Vector3DF(1,0.5,0);		// orange
-	clrs[7] = Vector3DF(0,0.5,1);		// green-blue
-	clrs[8] = Vector3DF(0.7f,0.7f,0.7f);	// grey
+	start3D(gvdb.getScene()->getCamera());		// start 3D drawing
 
-	VolumeGVDB* g = &gvdb;
-	Vector3DF bmin, bmax;
-	Node* node;
+	for (int lev = 0; lev < 5; lev++) {				// draw all levels
+		int node_cnt = static_cast<int>(gvdb.getNumNodes(lev));
+		const Vector3DF& color = gvdb.getClrDim(lev);
+		const Matrix4F& xform = gvdb.getTransform();
 
-	Camera3D* cam = gvdb.getScene()->getCamera();
-	start3D(cam);
-	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = static_cast<int>(g->getNumTotalNodes(lev));
-		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
-			node = g->getNodeAtLevel ( n, lev );
-			if (!int(node->mFlags)) continue;
-			
-			bmin = g->getWorldMin ( node );		// get node bounding box
-			bmax = g->getWorldMax ( node );		// draw node as a box
-			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, clrs[lev].x, clrs[lev].y, clrs[lev].z, 1 );	
-		}		
+		for (int n = 0; n < node_cnt; n++) {			// draw all nodes at this level
+			Node* node = gvdb.getNodeAtLevel(n, lev);
+			if (node->mFlags == 0) continue;
+
+			Vector3DF bmin = gvdb.getWorldMin(node); // get node bounding box
+			Vector3DF bmax = gvdb.getWorldMax(node); // draw node as a box
+			drawBox3DXform(bmin, bmax, color, xform);
+		}
 	}
-	end3D();
+
+	end3D();										// end 3D drawing
 }
 
 
@@ -903,7 +839,7 @@ void Sample::display()
 		render_update();		
 	}
 	
-	/*glDisable(GL_DEPTH_TEST);
+	glDisable(GL_DEPTH_TEST);
 	glClearDepth(1.0);
 	glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -912,7 +848,7 @@ void Sample::display()
 
 	draw3D();
 	drawGui(0);
-	draw2D(); */
+	draw2D();
 
 	postRedisplay();								// Post redisplay since simulation is continuous
 

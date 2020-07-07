@@ -5785,16 +5785,13 @@ uint64 VolumeGVDB::getNumUsedNodes ( int lev )		{ return mPool->getPoolUsedCnt(0
 uint64 VolumeGVDB::getNumTotalNodes ( int lev )		{ return mPool->getPoolTotalCnt(0, lev); }
 Node* VolumeGVDB::getNodeAtLevel ( int n, int lev )	{ return (Node*) (mPool->PoolData( 0, lev, n )); }
 
-//--- must be updated to use mXform
 Vector3DF VolumeGVDB::getWorldMin ( Node* node )	{ return Vector3DF(node->mPos); }
 Vector3DF VolumeGVDB::getWorldMax ( Node* node )	{ return Vector3DF(node->mPos) + getCover(node->mLev); }
 
 Vector3DF VolumeGVDB::getWorldMin() {
-	Vector3DF wmin = mObjMin; wmin *= mXform;
-	return wmin;
+	return mObjMin;
 }
 Vector3DF VolumeGVDB::getWorldMax()
 {
-	Vector3DF wmax = mObjMax; wmax *= mXform;
-	return wmax;
+	return mObjMax;
 }

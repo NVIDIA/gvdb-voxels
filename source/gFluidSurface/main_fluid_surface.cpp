@@ -408,30 +408,19 @@ void Sample::draw_fluid ()
 
 void Sample::draw_topology ()
 {
-	Vector3DF clrs[10];
-	clrs[0] = Vector3DF(0,0,1);			// blue
-	clrs[1] = Vector3DF(0,1,0);			// green
-	clrs[2] = Vector3DF(1,0,0);			// red
-	clrs[3] = Vector3DF(1,1,0);			// yellow
-	clrs[4] = Vector3DF(1,0,1);			// purple
-	clrs[5] = Vector3DF(0,1,1);			// aqua
-	clrs[6] = Vector3DF(1,0.5,0);		// orange
-	clrs[7] = Vector3DF(0,0.5,1);		// green-blue
-	clrs[8] = Vector3DF(0.7f,0.7f,0.7f);	// grey
+	start3D(gvdb.getScene()->getCamera());		// start 3D drawing
 
-	Camera3D* cam = gvdb.getScene()->getCamera();		
-	
-	start3D ( gvdb.getScene()->getCamera() );		// start 3D drawing
-	Vector3DF bmin, bmax;
-	Node* node;
-	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = static_cast<int>(gvdb.getNumNodes(lev));				
-		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
-			node = gvdb.getNodeAtLevel ( n, lev );
-			bmin = gvdb.getWorldMin ( node );		// get node bounding box
-			bmax = gvdb.getWorldMax ( node );		// draw node as a box
-			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, clrs[lev].x, clrs[lev].y, clrs[lev].z, 1 );			
-		}		
+	for (int lev = 0; lev < 5; lev++) {				// draw all levels
+		int node_cnt = static_cast<int>(gvdb.getNumNodes(lev));
+		const Vector3DF& color = gvdb.getClrDim(lev);
+		const Matrix4F& xform = gvdb.getTransform();
+
+		for (int n = 0; n < node_cnt; n++) {			// draw all nodes at this level
+			Node* node = gvdb.getNodeAtLevel(n, lev);
+			Vector3DF bmin = gvdb.getWorldMin(node); // get node bounding box
+			Vector3DF bmax = gvdb.getWorldMax(node); // draw node as a box
+			drawBox3DXform(bmin, bmax, color, xform);
+		}
 	}
 
 	end3D();										// end 3D drawing

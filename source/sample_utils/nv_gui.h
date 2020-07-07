@@ -268,6 +268,8 @@
 		void start3D ( Camera3D* cam );			
 		void drawLine3D ( float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a );
 		void drawBox3D ( float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a );
+		// Draws the edges of the axis-aligned box from `bMin` to `bMax` after being transformed by `xform`.
+		void drawBox3DXform(const Vector3DF& bMin, const Vector3DF& bMax, const Vector3DF& color, const Matrix4F& xform);
 		void end3D ();
 		void draw3D ();		// do all 3D draws
 		
@@ -393,6 +395,8 @@
 	extern void start3D ( Camera3D* cam );
 	extern void drawLine3D ( float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a );
 	extern void drawBox3D ( float x1, float y1, float z1, float x2, float y2, float z2, float r, float g, float b, float a );
+	// Draws the edges of the axis-aligned box from `bMin` to `bMax` after being transformed by `xform`.
+	extern void drawBox3DXform(const Vector3DF& bMin, const Vector3DF& bMax, const Vector3DF& color, const Matrix4F& xform);
 	extern void end3D ();
 	extern void draw3D ();
 	extern void drawGL ();

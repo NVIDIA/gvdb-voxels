@@ -614,9 +614,20 @@
 			Node*	getNodeAtLevel ( int n, int lev );
 			uint64	getNodeAtPoint ( uint64 nodeid, Vector3DF pos);
 			
-			//-- Voxsize - this should be made obsolete by SetTransform in the future
+			// Gets the inclusive lower bound of the node's bounding box in voxel coordinates (i.e. `node->mPos`).
+			// This function's return type may be changed to `Vector3DI` in the future.
 			Vector3DF getWorldMin ( Node* node );
+			// Gets the exclusive upper bound of the node's bounding box in voxel coordinates
+			// (i.e. `getWorldMin` plus the size of this node).
+			// This function's return type may be changed to `Vector3DI` in the future.
 			Vector3DF getWorldMax ( Node* node );
+			// Gets the lower bound of the `VolumeGVDB`'s bounding box in voxel coordinates.
+			// This function's return type may be changed to `Vector3DI` in the future.
+			Vector3DF getWorldMin();
+			// Gets the upper bound of the `VolumeGVDB`'s bounding box in voxel coordinates
+			// (i.e. `getWorldMin` plus the size of the entire volume's bounding box).
+			// This function's return type may be changed to `Vector3DI` in the future.
+			Vector3DF getWorldMax();
 			
 			//-- Grid Transform - arbitrary transforms on volume (replaces Voxsize)
 			// Sets the transform from points in GVDB's coordinate system to the application's coordinate system.
@@ -627,8 +638,6 @@
 			// by angs.z (as in `Matrix4F::RotateTZYXS`)
 			// - Add `trans` to the result
 			void SetTransform(Vector3DF pretrans, Vector3DF scal, Vector3DF angs, Vector3DF trans);
-			Vector3DF getWorldMin();
-			Vector3DF getWorldMax();
 			// Returns the transform as a 4x4 matrix. If `v` is a vector, then computing `v`*`mXform` transforms the
 			// point `v` from GVDB's coordinate system to the application's coordinate system.
 			Matrix4F& getTransform() { return mXform; }	
