@@ -469,8 +469,11 @@ namespace nvdb {
 		Matrix4F& operator*= (const float* op);
 
 		Matrix4F& PreTranslate(const Vector3DF& t);
-		Matrix4F& operator+= (const Vector3DF& t);		// quick translate
-		Matrix4F& operator*= (const Vector3DF& t);		// quick scale
+		// Applies post-translation, i.e. sets M to T*M, where T is the matrix that translates by t.
+		Matrix4F& operator+= (const Vector3DF& t);
+		// Applies post-scaling, i.e. sets M to S*M, where S is the diagonal matrix with diagonal entries
+		// (s.x, s.y, s.z, 1).
+		Matrix4F& operator*= (const Vector3DF& s);
 
 		Matrix4F& Transpose(void);
 		// Sets this matrix to and returns a matrix representing a rotation by angs.x around the X axis, followed by a
@@ -505,7 +508,7 @@ namespace nvdb {
 		Matrix4F& Scale(double sx, double sy, double sz);
 		Matrix4F& Basis(const Vector3DF& yaxis);
 		Matrix4F& Basis(const Vector3DF& c1, const Vector3DF& c2, const Vector3DF& c3);
-		// Inverts this matrix and returns itself.
+		// Inverts this matrix and returns itself. If the matrix has determinant 0, does nothing.
 		Matrix4F& InvertTRS();
 		// Sets this matrix to and returns the identity matrix.
 		Matrix4F& Identity();
@@ -514,7 +517,6 @@ namespace nvdb {
 		std::string WriteToStr();
 
 		Matrix4F operator* (const float& op);
-		Matrix4F& ScaleInPlace(const Vector3DF& op);
 		Vector3DF operator* (const Vector3DF& op);
 
 		// Scale-Rotate-Translate (compound matrix)
@@ -531,6 +533,23 @@ namespace nvdb {
 		Matrix4F& InverseView(const float* mat, const Vector3DF& pos);
 		Vector4DF GetT(float* mat);
 
+		// Composing operations
+		// Sets this matrix `M` to `T*M`, where `T` translates by `translation`. Alias for `operator +=`.
+		Matrix4F& Matrix4F::TranslateInPlace(const Vector3DF& translation);
+		// Sets this matrix `M` to `mtx*M`.
+		Matrix4F& Matrix4F::LeftMultiplyInPlace(const Matrix4F& mtx);
+		// Sets this matrix `M` to `S*M`, where S is the diagonal matrix with entries scale.x, scale.y, scale.z, and 1.
+		Matrix4F& Matrix4F::ScaleInPlace(const Vector3DF& scale);
+		// Sets this matrix `M` to `(T^-1)*M`, where `T` translates by `translation`. Equivalent to translating
+		// by `-translation`.
+		Matrix4F& Matrix4F::InvTranslateInPlace(const Vector3DF& translation);
+		// Sets this matrix `M` to `(mtx^-1)*M`.
+		Matrix4F& Matrix4F::InvLeftMultiplyInPlace(Matrix4F mtx);
+		// Sets this matrix `M` to `(S^-1)*M`, where S is the diagonal matrix with entries scale.x, scale.y, scale.z,
+		// and 1. Equivalent to scaling by 1/scale.
+		Matrix4F& Matrix4F::InvScaleInPlace(const Vector3DF& scale);
+
+
 		int GetX() { return 4; }
 		int GetY() { return 4; }
 		int GetRows(void) { return 4; }
@@ -541,6 +560,10 @@ namespace nvdb {
 		float* GetDataF(void) const { return (float*)data; }
 
 		float& operator() (int row, int col) {
+			return data[4 * col + row];
+		}
+
+		const float& operator()(int row, int col) const {
 			return data[4 * col + row];
 		}
 	};

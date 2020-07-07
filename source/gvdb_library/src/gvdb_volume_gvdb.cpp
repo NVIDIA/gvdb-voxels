@@ -5761,20 +5761,23 @@ void VolumeGVDB::SetTransform(Vector3DF pretrans, Vector3DF scal, Vector3DF angs
 	mAngs = angs;
 	mTrans = trans;
 
-	
-	// p' = T R S PT p				pretrans -> scale -> rotate -> translate
-	mXform.RotateTZYXS( mAngs, mTrans, mScale);
-	mXform.PreTranslate(mPretrans);
+	// Compute the rotation-only part of the matrix, mXrot = R
+	Matrix4F mXrot;
+	mXrot.RotateZYX(mAngs);
 
-	// p = PT^-1 S^-1 R^-1 T^-1 p'	inv trans -> inv rot -> inv scale -> inv pretrans
-	mInvXform.Translate( -mPretrans.x, -mPretrans.y, -mPretrans.z);	// PT^-1
-	Matrix4F tmp;
-	tmp.RotateTZYX(mAngs, Vector3DF(0, 0, 0));		
-	tmp.InvertTRS();								
-	mInvXrot.Scale( 1.0/mScale.x, 1.0/mScale.y, 1.0/mScale.z);		// S ^-1
-	mInvXrot *= tmp;												// R ^-1
-	mInvXform *= mInvXrot;	
-	mInvXform += Vector3DF(-mTrans.x, -mTrans.y, -mTrans.z);		// T ^-1
+	// Compute mInvXrot = (S R)^-1 = R^-1 S^-1
+	mInvXrot.Identity();
+	mInvXrot.InvScaleInPlace(mScale); // scale here supports non-uniform voxels
+	mInvXrot.InvLeftMultiplyInPlace(mXrot);
+
+	// Compute mXform = T R S PT (pretranslate, then scale, then rotate, then translate)
+	mXform.Identity();
+	mXform.RotateTZYXS(mAngs, mTrans, mScale); // T R S
+	mXform.PreTranslate(mPretrans); // T R S PT
+
+	// Compute mInvXform = mXform^-1
+	mInvXform = mXform;
+	mInvXform.InvertTRS();
 }
 
 // Node queries
