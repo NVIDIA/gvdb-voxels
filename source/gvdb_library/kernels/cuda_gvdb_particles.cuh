@@ -38,9 +38,9 @@ extern "C" __global__ void gvdbInsertPoints ( VDBInfo* gvdb, int num_pnts, char*
 	float3 wpos = (*(float3*) (ppos + i*pos_stride + pos_off)); // NOTE: +ptrans is below. Allows check for wpos.z==NOHIT 
 
 	if ( wpos.z == NOHIT ) { pnode[i] = ID_UNDEFL; return; }		// If position invalid, return. 
-	float3 offs, vmin, vdel;										// Get GVDB node at the particle point
+	float3 offs, vmin;												// Get GVDB node at the particle point
 	uint64 nid;
-	VDBNode* node = getNodeAtPoint ( gvdb, wpos + ptrans, &offs, &vmin, &vdel, &nid );
+	VDBNode* node = getNodeAtPoint ( gvdb, wpos + ptrans, &offs, &vmin, &nid );
 	if ( node == 0x0 ) { pnode[i] = ID_UNDEFL; return; }			// If no brick at location, return.	
 
 	__syncthreads();
@@ -59,9 +59,9 @@ extern "C" __global__ void gvdbInsertSupportPoints ( VDBInfo* gvdb, int num_pnts
 	float3 wdir = (*(float3*) (pdir + i*dir_stride + dir_off));
 
 	if ( wpos.z == NOHIT ) { pnode[i] = ID_UNDEFL; return; }		// If position invalid, return. 
-	float3 offs, vmin, vdel;										// Get GVDB node at the particle point
+	float3 offs, vmin;												// Get GVDB node at the particle point
 	uint64 nid;
-	VDBNode* node = getNodeAtPoint ( gvdb, wpos + ptrans + wdir * offset, &offs, &vmin, &vdel, &nid );
+	VDBNode* node = getNodeAtPoint ( gvdb, wpos + ptrans + wdir * offset, &offs, &vmin, &nid );
 	if ( node == 0x0 ) { pnode[i] = ID_UNDEFL; return; }			// If no brick at location, return.	
 
 	__syncthreads();
@@ -547,7 +547,7 @@ extern "C" __global__ void gvdbScatterPointDensity (VDBInfo* gvdb, int num_pnts,
 	float3 vmin;
 	float w;
 	VDBNode* node = getNode ( gvdb, 0, pnode[i], &vmin );			// Get node		
-	float3 p = (wpos-vmin)/gvdb->vdel[0];
+	float3 p = wpos-vmin;
 	float3 pi = make_float3(int(p.x), int(p.y), int(p.z));
 
 	// range of pi.x,pi.y,pi.z = [0, gvdb->res0-1]
@@ -604,7 +604,7 @@ extern "C" __global__ void gvdbAddSupportVoxel (VDBInfo* gvdb, int num_pnts,  fl
 	float3 vmin;
 	float w;
 	VDBNode* node = getNode ( gvdb, 0, pnode[i], &vmin );			// Get node	
-	float3 p = (wpos-vmin)/gvdb->vdel[0];
+	float3 p = wpos-vmin;
 	float3 pi = make_float3(int(p.x), int(p.y), int(p.z));
 
 	// -- should be ok that pi.x,pi.y,pi.z = 0 
@@ -720,8 +720,7 @@ extern "C" __global__ void gvdbGatherDensity (VDBInfo* gvdb, int num_pnts, int n
 	
 	VDBNode* node = getNode(gvdb, 0, sc_nid[sc_id]);
 	float3 vmin = make_float3(node->mPos);
-	float3 vdel = gvdb->vdel[0];
-	int3 vox = node->mValue + make_int3((wpos.x - vmin.x) / vdel.x, (wpos.y - vmin.y) / vdel.y, (wpos.z - vmin.z) / vdel.z);
+	int3 vox = node->mValue + make_int3(wpos.x - vmin.x, wpos.y - vmin.y, wpos.z - vmin.z);
 
 	float3 jpos;
 	float4 clr = make_float4(0,0,0,1);
@@ -761,8 +760,7 @@ extern "C" __global__ void gvdbGatherLevelSet (VDBInfo* gvdb, int num_pnts, int 
 	
 	VDBNode* node = getNode(gvdb, 0, sc_nid[sc_id]);
 	float3 vmin = make_float3(node->mPos);
-	float3 vdel = gvdb->vdel[0];
-	int3 vox = node->mValue + make_int3((wpos.x - vmin.x) / vdel.x, (wpos.y - vmin.y) / vdel.y, (wpos.z - vmin.z) / vdel.z);
+	int3 vox = node->mValue + make_int3(wpos.x - vmin.x, wpos.y - vmin.y, wpos.z - vmin.z);
 
 	float3 jpos;
 	float4 clr = make_float4(0,0,0,1);

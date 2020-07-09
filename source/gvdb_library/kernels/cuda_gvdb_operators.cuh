@@ -121,15 +121,15 @@ __device__ void UpdateApron(VDBInfo* gvdb, const uchar channel, const int brickC
 	{
 		float3 worldPos;
 		if (!getAtlasToWorld(gvdb, atlasVoxel, worldPos)) return;
-		float3 offs, vmin, vdel; uint64 nodeID;
-		VDBNode* node = getNodeAtPoint(gvdb, worldPos, &offs, &vmin, &vdel, &nodeID);
+		float3 offs, vmin; uint64 nodeID;
+		VDBNode* node = getNodeAtPoint(gvdb, worldPos, &offs, &vmin, &nodeID);
 
 		if (node == 0x0) {
 			// Out of range, use the boundary value
 			value = boundaryValue;
 		}
 		else {
-			offs += (worldPos - vmin) / vdel; // Get the atlas position
+			offs += (worldPos - vmin); // Get the atlas position
 			value = surf3Dread<T>(gvdb->volOut[channel], uint(offs.x) * sizeof(T), uint(offs.y), uint(offs.z));
 		}
 	}

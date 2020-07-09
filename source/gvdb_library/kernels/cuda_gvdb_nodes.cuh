@@ -249,10 +249,11 @@ inline __device__ VDBNode* getNodeIdAtPoint ( VDBInfo* gvdb, float3 pos, uint64*
 
 // Gets the node pointer, atlas-space AABB minimum (not including apron), index-space AABB minimum, and voxel size of
 // the brick (leaf node) containing the index-space position `pos`.
-// `offs` is the brick's mValue (i.e. atlas-space AABB minimum not including apron)
+// `offs` is the brick's atlas-space AABB minimum (i.e. mValue. This does not include apron.)
 // `vmin` is the brick's index-space AABB minimum
-// `vdel` is the world-space size of each voxel in index-space (which should be 1 since 1.1.1)
-inline __device__ VDBNode* getNodeAtPoint ( VDBInfo* gvdb, float3 pos, float3* offs, float3* vmin, float3* vdel, uint64* node_id )
+// Note that this function used to return `vdel`, the size of a brick's children in voxels. Since issue #74 on
+// 2019-07-14, voxelsize has been deprecated, so this was always (1, 1, 1).
+inline __device__ VDBNode* getNodeAtPoint ( VDBInfo* gvdb, float3 pos, float3* offs, float3* vmin, uint64* node_id )
 {
 	// iteratively get node at world point
 	VDBNode* node = getNode ( gvdb, gvdb->top_lev, 0, pos, node_id );	 
@@ -260,8 +261,7 @@ inline __device__ VDBNode* getNodeAtPoint ( VDBInfo* gvdb, float3 pos, float3* o
 	
 	// compute node bounding box
 	*vmin = make_float3(node->mPos);
-	*vdel = gvdb->vdel[ node->mLev ];
-	*offs = make_float3( node->mValue );
+	*offs = make_float3(node->mValue);
 	return node;
 }
 

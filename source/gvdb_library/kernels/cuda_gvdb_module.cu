@@ -253,16 +253,16 @@ extern "C" __global__ void gvdbSection3D ( VDBInfo* gvdb, uchar chan, uchar4* ou
 	if ( t > 0 ) {																		// yes..
 		wpos += t*rdir;																	// get point of surface
 		
-		float3 offs, vmin, vdel; uint64 nid;
-		VDBNode* node = getNodeAtPoint ( gvdb, wpos, &offs, &vmin, &vdel, &nid );				// find vdb node at point
+		float3 offs, vmin; uint64 nid;
+		VDBNode* node = getNodeAtPoint ( gvdb, wpos, &offs, &vmin, &nid );				// find vdb node at point
 		if ( node != 0x0 ) {															
 			//---- debugging: show apron
 			// float3 p = offs + (wpos-vmin)*(34.0/16.0) - make_float3(gvdb.atlas_apron);	
 			// clr = transfer ( tex3D ( volTexIn, p.x, p.y, p.z ) );
-			t = getTrilinear ( gvdb, chan, wpos, offs, vmin, vdel );								// t <= voxel value
+			t = getTrilinear ( gvdb, chan, wpos, offs, vmin );								// t <= voxel value
 			clr = transfer ( gvdb, t );														// clr at point on surface
 			if ( gvdb->clr_chan != CHAN_UNDEF ) {										
-				float3 p = offs + (wpos - vmin)/vdel;								
+				float3 p = offs + (wpos - vmin);								
 				clr *= make_float4( make_float3( getColor(gvdb, gvdb->clr_chan, p) ), 1.0 );
 			}
 		} else {
@@ -300,13 +300,13 @@ extern "C" __global__ void gvdbSection2D ( VDBInfo* gvdb, uchar chan, uchar4* ou
 	wpos = SCN_SLICE_PNT + spnt * SCN_SLICE_NORM;
 
 	// get leaf node at hit point
-	float3 offs, vmin, vdel;
+	float3 offs, vmin;
 	uint64 nid;
-	VDBNode* node = getNodeAtPoint ( gvdb, wpos, &offs, &vmin, &vdel, &nid );
+	VDBNode* node = getNodeAtPoint ( gvdb, wpos, &offs, &vmin, &nid );
 	if ( node == 0x0 ) { outBuf [ y*scn.width + x ] = make_uchar4(bgclr.x*255, bgclr.y*255, bgclr.z*255, 255); return; }
 
 	// get tricubic data value
-	clr = transfer ( gvdb, getTrilinear ( gvdb, chan, wpos, offs, vmin, vdel ) );	
+	clr = transfer ( gvdb, getTrilinear ( gvdb, chan, wpos, offs, vmin ) );
 	bgclr = lerp3 ( bgclr, make_float3(clr.x,clr.y,clr.z), clr.w );
 	
 	outBuf [ y*scn.width + x ] = make_uchar4( bgclr.x*255, bgclr.y*255, bgclr.z*255, 255 );	

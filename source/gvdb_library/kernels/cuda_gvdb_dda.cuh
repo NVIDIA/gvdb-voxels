@@ -70,10 +70,10 @@ struct HDDAState {
 	}
 
 	// Prepare a DDA for stepping through a brick, which omits the addition by t.x from Prepare.
-	// TODO: Is vdel always (1, 1, 1) here since 1.1.1?
-	__device__ void PrepareLeaf(float3 vmin, float3 vdel){
-		tDel = fabs3(vdel / dir);
-		float3 pFlt = (pos + t.x * dir - vmin) / vdel;
+	// For bricks, the size of a child node in voxels (vdel) is always 1.
+	__device__ void PrepareLeaf(float3 vmin){
+		tDel = fabs3(1.0f / dir);
+		float3 pFlt = pos + t.x * dir - vmin;
 		tSide = ((floor3(pFlt) - pFlt + 0.5f) * make_float3(pStep) + 0.5) * tDel;
 		p = make_int3(floor3(pFlt));
 	}
