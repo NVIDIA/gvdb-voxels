@@ -73,31 +73,33 @@
 	};
 	typedef std::vector<Stat>	statVec;
 
+	// Contains information for a GVDB volume.
+	// Levels vary from 0 (bricks) to top_lev (root node).
 	struct ALIGN(16) VDBInfo {
-		int				dim[MAXLEV];
-		int				res[MAXLEV];
-		Vector3DF		vdel[MAXLEV];
-		Vector3DI		noderange[MAXLEV];
-		int				nodecnt[MAXLEV];
-		int				nodewid[MAXLEV];
-		int				childwid[MAXLEV];		
-		CUdeviceptr		nodelist[MAXLEV];		
-		CUdeviceptr		childlist[MAXLEV];	
-		CUdeviceptr		atlas_map;					
-		Vector3DI		atlas_cnt;
-		Vector3DI		atlas_res;
-		int				atlas_apron;
-		int				brick_res;		
-		int				apron_table[8];
-		int				top_lev;
-		int				max_iter;
-		float			epsilon;
-		bool			update;
-		uchar			clr_chan;		
-		Vector3DF		bmin;
-		Vector3DF		bmax;				
-		CUtexObject		volIn[MAX_CHANNEL];
-		CUsurfObject	volOut[MAX_CHANNEL];
+		int				dim[MAXLEV]; // Log base 2 of lateral resolution of each node per level
+		int				res[MAXLEV]; // Lateral resolution of each node per level
+		Vector3DF		vdel[MAXLEV]; // How many voxels on a side a child of each level covers
+		Vector3DI		noderange[MAXLEV]; // How many voxels on a side a node of each level covers
+		int				nodecnt[MAXLEV]; // Total number of allocated nodes per level
+		int				nodewid[MAXLEV]; // Size of a node at each level in bytes
+		int				childwid[MAXLEV]; // Size of the child list per node at each level in bytes
+		CUdeviceptr		nodelist[MAXLEV]; // GPU pointer to each level's pool group 0 (nodes)
+		CUdeviceptr		childlist[MAXLEV]; // GPU pointer to each level's pool group 1 (child lists)
+		CUdeviceptr		atlas_map; // GPU pointer to the atlas map (which maps from atlas to world space)
+		Vector3DI		atlas_cnt; // Number of bricks on each axis of the atlas
+		Vector3DI		atlas_res; // Total resolution in voxels of the atlas
+		int				atlas_apron; // Apron size
+		int				brick_res; // Resolution of a single brick
+		int				apron_table[8]; // Unused
+		int				top_lev; // Top level (i.e. tree spans from voxels to level 0 to level top_lev)
+		int				max_iter; // Unused
+		float			epsilon; // Epsilon used for voxel ray tracing
+		bool			update; // Whether this information needs to be updated from the latest volume data
+		uchar			clr_chan; // Index of the color channel for rendering color information
+		Vector3DF		bmin; // Inclusive minimum of axis-aligned bounding box in voxels
+		Vector3DF		bmax; // Inclusive maximum of axis-aligned bounding box in voxels
+		CUtexObject		volIn[MAX_CHANNEL]; // Texture reference (read plus interpolation) to atlas per channel
+		CUsurfObject	volOut[MAX_CHANNEL]; // Surface reference (read and write) to atlas per channel
 	};
 
 	struct ALIGN(16) ScnInfo {
@@ -133,7 +135,6 @@
 
 	// CUDA modules
 	#define MODL_PRIMARY			0
-	#define MODL_TRANSFERS			1
 
 	// Raytracing
 	#define FUNC_RAYDEEP			0
@@ -459,15 +460,25 @@
 			void AssignMapping ( Vector3DI brickpos, Vector3DI pos, int leafid );
 			void UpdateNeighbors();
 			float getValue ( slong nodeid, Vector3DF pos, float* atlas );
+			// Gets a Node struct from a group, level, and index.
 			nvdb::Node* getNode ( int grp, int lev, slong ndx )		{ return (Node*) mPool->PoolData ( Elem(grp,lev,ndx) ); }			
+			// Gets a Node struct from a pool reference.
 			nvdb::Node* getNode ( slong nodeid )		{ return (Node*) mPool->PoolData ( nodeid ); }			
+			// Get the `ndx`th child of the node `curr`.
 			nvdb::Node* getChild (Node* curr, uint ndx);
+			// Get the child that corresponds to bit `b`.
 			nvdb::Node* getChildAtBit ( Node* curr, uint b);			
 			bool  isActive(Vector3DI wpos);
 			bool  isActive(Vector3DI wpos, slong nodeid);	// recursive
-			bool  isLeaf ( slong nodeid )		{ return ElemLev ( nodeid )==0; }			
+			// Returns true if the given pool reference is at level = 0.
+			bool  isLeaf ( slong nodeid )		{ return ElemLev ( nodeid )==0; }
+			// Gets the child node reference at the specific bit position of the given node reference.
 			uint64 getChildNode ( slong nodeid, uint b );
+			// Gets the bit position and local 3D position of the given child node reference within
+			// the given parent node reference.
 			uint32 getChildOffset ( slong  nodeid, slong childid, Vector3DI& pos );
+			// Returns true and sets `bit` to the corresponding bit index if the index-space position `pos` is inside
+			// the given node, for false otherwise
 			bool getPosInNode ( slong curr_id, Vector3DI pos, uint32& bit );
 
 			// Render Buffers
@@ -511,10 +522,15 @@
 			int  getAtlasGLID ( int chan )	{ return mPool->getAtlasGLID ( chan ); }
 
 			// Internal Data Accessors
+			// Gets the size of a VDBInfo struct
 			int  getVDBSize ()				{ return sizeof(mVDBInfo); }
+			// Gets a pointer to the volume's VDBInfo struct
 			char* getVDBInfo ()				{ return (char*) &mVDBInfo; }
+			// Gets a pointer to the volume's GPU copy of the VDBInfo struct
 			CUdeviceptr getCUVDBInfo()      { return cuVDBInfo; }
+			// Gets the size of a ScnInfo struct
 			int  getScnSize()				{ return sizeof(mScnInfo); }
+			// Gets a pointer to the volume's ScnInfo struct
 			char* getScnInfo()				{ return (char*) &mScnInfo; }			
 
 			// Data Operations
@@ -575,11 +591,22 @@
 
 			// VDB Configuration			
 			void SetVDBConfig ( int lev, int i )		{ mVCFG[lev] = i; }
+			// Gets the nearest node in index-space at the given level.
 			Vector3DI getNearestAbsVox ( int lev, Vector3DF pnt );
-			int getLD(int lev)			{ return mLogDim[lev]; }							// Logres
-			int getRes(int lev)			{ return (1 << mLogDim[lev]); }						// Resolution of level
-			uint64 getVoxCnt(int lev)	{ uint64 r = uint64(1) << mLogDim[lev]; return r*r*r; }		// # of Voxels of level			
+			// Gets the log base 2 branching factor per side of a node at the given level.
+			int getLD(int lev)			{ return mLogDim[lev]; }
+			// Gets the branching factor per side (number of child nodes or child voxels per side) of a node
+			// at the given level.
+			int getRes(int lev)			{ return (1 << mLogDim[lev]); }
+			// Gets the number of child nodes or child voxels of a node at the given level.
+			uint64 getVoxCnt(int lev)	{ uint64 r = uint64(1) << mLogDim[lev]; return r*r*r; }
+			// Returns the index of a position within a node at the given level.
+			// Suppose a node has resolution r, and its children are numbered from 0 to r^3-1.
+			// This returns the number of the child with local coordinate `pos` (in [0, r-1]^3).
 			int getBitPos ( int lv, Vector3DI pos )			{ int res=getRes(lv);	return (pos.z*res + pos.y)*res+ pos.x; }
+			// Inverts `getBitPos`.
+			// Suppose a node has resolution r, and its children are numbered from 0 to r^3-1.
+			// Given that number, this returns the child's local position (in [0, s-1]^3).
 			Vector3DI getPosFromBit ( int lv, uint32 b )	{ 
 					int logr = mLogDim[lv]; 					
 					uint32 mask = (uint32(1) << logr) - 1;		
@@ -588,15 +615,21 @@
 					int x = (b & mask);
 					return Vector3DI(x,y,z);
 			}
+			// Gets the size a node at the given level covers in voxels.
+			// Same except for return type as `getRange` since 1.1.1.
 			Vector3DF getCover(int lv)	{ return Vector3DF(getRange(lv)); }
+			// Gets the lateral size a node at the given level covers in voxels.
 			Vector3DI getRange(int lv)	{ 
 					if ( lv==-1 ) return Vector3DI(1,1,1);
 					Vector3DI r = getRes3DI(0);		// brick res
 					for ( int l=1; l<=lv; l++) r *= getRes3DI(l);
 					return r;
 			}
+			// Gets the resolution (branching factor per side) of a node as a `Vector3DI`.
 			Vector3DI getRes3DI(int lv)	{ int r = (1 << mLogDim[lv]); return Vector3DI(r,r,r); }
+			// Gets a color for the given level.
 			Vector3DF getClrDim(int lv) { return mClrDim[lv]; }
+			// Gets the `id`th auxiliary buffer.
 			DataPtr& getAux(int id) { return mAux[id]; }
 
 			void	SetSimBounds(Vector3DI b) {mSimBounds = b;}
@@ -608,10 +641,16 @@
 				va_start(vlist, fmt);
 				gprintf2(vlist, fmt, 0);
 			}
+			// Gets the total number of nodes at a given level.
 			uint64	getNumNodes(int lev) { return getNumTotalNodes(lev); }
+			// Gets the number of used nodes at a given level.
 			uint64	getNumUsedNodes ( int lev );
+			// Gets the total number of nodes at a given level.
 			uint64	getNumTotalNodes ( int lev );
+			// Gets node `n` at level `lev`.
 			Node*	getNodeAtLevel ( int n, int lev );
+			// Gets the pool reference of the leaf (level 0 node) that is a child of the pool reference `nodeid` and
+			// contains the point `pos` (in voxel coordinates). Returns ID_UNDEFL if no such leaf exists.
 			uint64	getNodeAtPoint ( uint64 nodeid, Vector3DF pos);
 			
 			// Gets the inclusive lower bound of the node's bounding box in voxel coordinates (i.e. `node->mPos`).
@@ -621,11 +660,12 @@
 			// (i.e. `getWorldMin` plus the size of this node).
 			// This function's return type may be changed to `Vector3DI` in the future.
 			Vector3DF getWorldMax ( Node* node );
-			// Gets the lower bound of the `VolumeGVDB`'s bounding box in voxel coordinates.
+			// Gets the inclusive lower bound of the `VolumeGVDB`'s bounding box in voxel coordinates.
+			// Same as getVoxMin since 2020-07-07.
 			// This function's return type may be changed to `Vector3DI` in the future.
 			Vector3DF getWorldMin();
-			// Gets the upper bound of the `VolumeGVDB`'s bounding box in voxel coordinates
-			// (i.e. `getWorldMin` plus the size of the entire volume's bounding box).
+			// Gets the inclusive upper bound of the `VolumeGVDB`'s bounding box in voxel coordinates.
+			// Same as getVoxMax since 2020-07-07.
 			// This function's return type may be changed to `Vector3DI` in the future.
 			Vector3DF getWorldMax();
 			

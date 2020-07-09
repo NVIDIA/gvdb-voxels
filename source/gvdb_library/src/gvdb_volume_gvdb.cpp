@@ -3973,7 +3973,7 @@ void VolumeGVDB::PrepareVDB ()
 		mVDBInfo.epsilon			= mEpsilon;
 		mVDBInfo.max_iter			= mMaxIter;
 		mVDBInfo.bmin				= mObjMin;
-		mVDBInfo.bmax				= mObjMax;		
+		mVDBInfo.bmax				= mObjMax;
 		
 		PUSH_CTX
 		cudaCheck ( cuMemcpyHtoD ( cuVDBInfo, &mVDBInfo, sizeof(VDBInfo) ), "VolumeGVDB", "PrepareVDB", "cuMemcpyHtoD", "cuVDBInfo", mbDebug);

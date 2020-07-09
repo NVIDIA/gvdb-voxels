@@ -53,30 +53,30 @@ struct ALIGN(16) VDBAtlasNode {
 	int			mLeafID;
 };
 struct ALIGN(16) VDBInfo {
-	int			dim[10];
-	int			res[10];	
-	float3		vdel[10];
-	int3		noderange[10];
-	int			nodecnt[10];
-	int			nodewid[10];
-	int			childwid[10];
-	char*		nodelist[10];
-	char*		childlist[10];
-	VDBAtlasNode*  atlas_map;	
-	int3		atlas_cnt;
-	int3		atlas_res;
-	int			atlas_apron;
-	int			brick_res;
-	int			apron_table[8];
-	int			top_lev;
-	int			max_iter;
-	float		epsilon;	
-	bool		update;
-	uchar		clr_chan;
-	float3		bmin;
-	float3		bmax;	
-	cudaTextureObject_t		volIn[MAX_CHANNEL];
-	cudaSurfaceObject_t		volOut[MAX_CHANNEL];	
+	int			dim[10]; // Log base 2 of lateral resolution of each node per level
+	int			res[10]; // Lateral resolution of each node per level
+	float3		vdel[10]; // How many voxels on a side a child of each level covers
+	int3		noderange[10]; // How many voxels on a side a node of each level covers
+	int			nodecnt[10]; // Total number of allocated nodes per level
+	int			nodewid[10]; // Size of a node at each level in bytes
+	int			childwid[10]; // Size of the child list per node at each level in bytes
+	char*		nodelist[10]; // Pointer to each level's pool group 0 (nodes)
+	char*		childlist[10]; // Pointer to each level's pool group 1 (child lists)
+	VDBAtlasNode*  atlas_map; // Pointer to the atlas map (which maps from atlas to world space)
+	int3		atlas_cnt; // Number of bricks on each axis of the atlas
+	int3		atlas_res; // Total resolution in voxels of the atlas
+	int			atlas_apron; // Apron size
+	int			brick_res; // Resolution of a single brick
+	int			apron_table[8]; // Unused
+	int			top_lev; // Top level (i.e. tree spans from voxels to level 0 to level top_lev)
+	int			max_iter; // Unused
+	float		epsilon; // Epsilon used for voxel ray tracing
+	bool		update; // Whether this information needs to be updated from the latest volume data
+	uchar		clr_chan; // Index of the color channel for rendering color information
+	float3		bmin; // Inclusive minimum of axis-aligned bounding box in voxels
+	float3		bmax; // Inclusive maximum of axis-aligned bounding box in voxels
+	cudaTextureObject_t	volIn[MAX_CHANNEL]; // Texture reference (read plus interpolation) to atlas per channel
+	cudaSurfaceObject_t	volOut[MAX_CHANNEL]; // Surface reference (read and write) to atlas per channel
 };
 
 __device__ float								cdebug[256]; 
@@ -247,6 +247,11 @@ inline __device__ VDBNode* getNodeIdAtPoint ( VDBInfo* gvdb, float3 pos, uint64*
 	return node;
 }
 
+// Gets the node pointer, atlas-space AABB minimum (not including apron), index-space AABB minimum, and voxel size of
+// the brick (leaf node) containing the index-space position `pos`.
+// `offs` is the brick's mValue (i.e. atlas-space AABB minimum not including apron)
+// `vmin` is the brick's index-space AABB minimum
+// `vdel` is the world-space size of each voxel in index-space (which should be 1 since 1.1.1)
 inline __device__ VDBNode* getNodeAtPoint ( VDBInfo* gvdb, float3 pos, float3* offs, float3* vmin, float3* vdel, uint64* node_id )
 {
 	// iteratively get node at world point

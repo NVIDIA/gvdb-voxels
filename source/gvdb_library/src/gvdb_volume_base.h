@@ -60,10 +60,15 @@
 		// Query functions
 		void			getDimensions ( Vector3DF& objmin, Vector3DF& objmax, Vector3DF& voxmin, Vector3DF& voxmax, Vector3DF& voxres );
 		void			getTiming ( float& render_time );
+		// Gets the transfer function as a DataPtr
 		DataPtr			getTransferPtr ()		{ return mTransferPtr; }
+		// Gets the transfer function as a CUdeviceptr
 		CUdeviceptr		getTransferFuncGPU ()	{ return mTransferPtr.gpu; }
+		// Gets the GVDB scene object
 		Scene*			getScene()				{ return mScene; }
+		// Get the minimum of the bounding box of the entire volume in voxels.
 		Vector3DF		getVolMin ()			{ return mObjMin; }
+		// Get the maximum of the bounding box of the entire volume in voxels.
 		Vector3DF		getVolMax ()			{ return mObjMax; }
 
 		void			SetProfiling ( bool tf )		{ mbProfile = tf; }

@@ -31,19 +31,22 @@
 //-----------------------------------------------
 
 // gvdbBrickFunc ( gvdb, channel, nodeid, t, pos, dir, pstep, hit, norm, clr )
-typedef void(*gvdbBrickFunc_t)( VDBInfo*, uchar, int, float3, float3, float3, float3&, float3&, float3&, float4& );
+typedef void(*gvdbBrickFunc_t)( VDBInfo*, uchar, int, float3, float3, float3, int3&, float3&, float3&, float4& );
 
-#define MAXLEV			5
-#define MAX_ITER		256
-#define EPS				0.01
+static const int MAXLEV = 5;
+static const int MAX_ITER = 256;
 
-#define LO		0
-#define	MID		1.0
-#define	HI		2.0
-
+// Gets the value of a given floating-point channel at a point inside a brick.
+// `gvdb` is the volume's `VDBInfo` object.
+// `chan` is the channel to sample.
+// `p` is the location of the point within the brick.
+// `offs` is the coordinate of the minimum corner of the brick in the atlas.
+// `vmin` and `vdel` are unused.
+// TODO: Turn `offs` into an integer vector.
 inline __device__ float getTricubic ( VDBInfo* gvdb, uchar chan, float3 p, float3 offs, float3 vmin, float3 vdel )
 { 
-	float tv[9];
+	static const float MID = 1.0;
+	static const float HI = 2.0;
 
 	// find bottom-left corner of local 3x3x3 group		
 	float3  q = floor3(p + offs) - MID;				// move to bottom-left corner	
@@ -56,6 +59,7 @@ inline __device__ float getTricubic ( VDBInfo* gvdb, uchar chan, float3 p, float
 	float3 tab = ta*tb*2.0;
 
 	// lookup 3x3x3 local neighborhood
+	float tv[9];
 	tv[0] = tex3D<float>( gvdb->volIn[chan], q.x,		q.y,		q.z );
 	tv[1] = tex3D<float>( gvdb->volIn[chan], q.x+MID,	q.y,		q.z );
 	tv[2] = tex3D<float>( gvdb->volIn[chan], q.x+HI,	q.y,		q.z );
@@ -104,6 +108,14 @@ inline __device__ float getTricubic ( VDBInfo* gvdb, uchar chan, float3 p, float
 
 	return jkl.x*ta2.z + jkl.y*tab.z + jkl.z*tb2.z;
 }
+
+// Gets the value of a given floating-point channel at a point inside a brick.
+// `gvdb` is the volume's `VDBInfo` object.
+// `chan` is the channel to sample.
+// `wp` is the point to sample in index-space (not atlas-space!)
+// `offs` is the minimum vertex of the brick's bounding box in atlas space.
+// `vmin` is the minimum vertex of the brick's bounding box in index-space.
+// `vdel` is the size of a voxel in index space, which should be 1. TODO: Remove this argument.
 inline __device__ float getTrilinear (VDBInfo* gvdb, uchar chan, float3 wp, float3 offs, float3 vmin, float3 vdel )
 {
 	float3 p = offs + (wp-vmin)/vdel;		// sample point in index coords		
@@ -129,6 +141,9 @@ inline __device__ float getTrilinear (VDBInfo* gvdb, uchar chan, float3 wp, floa
 	}
 #endif
 
+// Gets the negative of the gradient of the floating-point channel with index `chan` at the atlas-space position `p`
+// using default filtering.
+// This will point away from higher-density regions in a density field, and into a level set/signed distance field.
 inline __device__ float3 getGradient ( VDBInfo* gvdb, uchar chan, float3 p )
 {
 	float3 g;
@@ -139,6 +154,11 @@ inline __device__ float3 getGradient ( VDBInfo* gvdb, uchar chan, float3 p )
 	g = normalize ( g );
 	return g;
 }
+
+// Gets the gradient of the floating-point channel with index `chan` at the atlas-space position `p` using
+// default filtering.
+// This will approximate the normal of a level set/signed distance field, and point away from higher-density regions
+// in a density field.
 inline __device__ float3 getGradientLevelSet ( VDBInfo* gvdb, uchar chan, float3 p )
 {
 	// tri-linear filtered gradient 
@@ -150,6 +170,9 @@ inline __device__ float3 getGradientLevelSet ( VDBInfo* gvdb, uchar chan, float3
 	g = normalize ( g );
 	return g;
 }
+
+// Gets the negative of the gradient of the floating-point channel with index `chan` at the atlas-space position `p`
+// using tricubic interpolation.
 inline __device__ float3 getGradientTricubic ( VDBInfo* gvdb, uchar chan, float3 p, float3 offs, float3 vmin, float3 vdel )
 {
 	// tri-cubic filtered gradient
@@ -162,7 +185,20 @@ inline __device__ float3 getGradientTricubic ( VDBInfo* gvdb, uchar chan, float3
 	return g;
 }
 
-
+// Marches along the ray p + o + rdir*t in atlas-space in steps of SCN_FSTEP, using trilinear interpolation.
+// If it samples a point greater than or equal to SCN_THRESH, returns:
+//   `p`: The atlas-space coordinate of the intersection relative to `o`
+//   returned value: The index-space coordinate of the intersection
+// Otherwise, returns (NOHIT, NOHIT, NOHIT).
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to sample
+//   `p`: The origin of the ray in atlas-space relative to `o`
+//   `o`: The minimum AABB vertex of the brick to start sampling from
+//   `rpos`: Unused
+//   `rdir`: The direction of the ray in atlas-space
+//   `vmin`: The minimum AABB vertex of the brick in index-space
+//   `vdel`: The size of a voxel in world-space (always 1 since 1.1.1)
 __device__ float3 rayTricubic ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin, float3 vdel )
 {
 	float3 pt = SCN_FSTEP * rdir;
@@ -175,6 +211,20 @@ __device__ float3 rayTricubic ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, 
 	return make_float3(NOHIT, NOHIT, NOHIT);
 }
 
+// Marches along the ray p + o + rdir*t in atlas space in steps of SCN_FSTEP, using default interpolation.
+// If it samples a point greater than or equal to SCN_THRESH, halts and returns:
+//	 `p`: The atlas-space coordinate of the intersection relative to `o`
+//   returned value: The index-space coordinate of the intersection
+// Otherwise, returns (NOHIT, NOHIT, NOHIT).
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to sample
+//   `p`: The origin of the ray in atlas-space relative to `o`
+//   `o`: The minimum AABB vertex of the brick to start sampling from
+//   `rpos`: Unused
+//   `rdir`: The direction of the ray in atlas-space
+//   `vmin`: The minimum AABB vertex of the brick in index-space
+//   `vdel`: The size of a voxel in world-space (always 1 since 1.1.1)
 __device__ float3 rayTrilinear (VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin, float3 vdel )
 {
 	float dt = SCN_FSTEP;		
@@ -188,6 +238,20 @@ __device__ float3 rayTrilinear (VDBInfo* gvdb, uchar chan, float3& p, float3 o, 
 	return make_float3(NOHIT, NOHIT, NOHIT);
 }
 
+// Marches along the ray p + o + rdir*t in atlas space in steps of SCN_FSTEP, using default interpolation.
+// If it samples a point less than SCN_THRESH, halts and returns:
+//	 `p`: The atlas-space coordinate of the intersection relative to `o`
+//   returned value: The index-space coordinate of the intersection
+// Otherwise, returns (NOHIT, NOHIT, NOHIT).
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to sample
+//   `p`: The origin of the ray in atlas-space relative to `o`
+//   `o`: The minimum AABB vertex of the brick to start sampling from
+//   `rpos`: Unused
+//   `rdir`: The direction of the ray in atlas-space
+//   `vmin`: The minimum AABB vertex of the brick in index-space
+//   `vdel`: The size of a voxel in world-space (always 1 since 1.1.1)
 __device__ float3 rayLevelSet ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin, float3 vdel )
 {
 	float dt = SCN_FSTEP;
@@ -201,10 +265,13 @@ __device__ float3 rayLevelSet ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, 
 	return make_float3(NOHIT, NOHIT, NOHIT);
 }
 
+// Samples channel `chan` at atlas-space position `p`, returning a `uchar4` color.
 inline __device__ uchar4 getColor ( VDBInfo* gvdb, uchar chan, float3 p )
 {
 	return tex3D<uchar4> ( gvdb->volIn[chan], (int) p.x, (int) p.y, (int) p.z );
 }
+
+// Samples channel `chan` at atlas-space position `p`, obtaining a `uchar4` color and casting it to a `float4`.
 inline __device__ float4 getColorF ( VDBInfo* gvdb, uchar chan, float3 p )
 {
 	return make_float4 (tex3D<uchar4> ( gvdb->volIn[chan], (int) p.x, (int) p.y, (int) p.z ) );
@@ -212,26 +279,43 @@ inline __device__ float4 getColorF ( VDBInfo* gvdb, uchar chan, float3 p )
 
 //----------- RAY CASTING
 
-// SurfaceVoxelBrick - Trace brick to render voxels as cubes
-__device__ void raySurfaceVoxelBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& hclr )
+// Traces a brick, rendering voxels as cubes.
+// To find a surface intersection, this steps through each voxel once using DDA and stops when it finds a voxel with
+// value greater than or equal to SCN_THRESH.
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to render
+//   `nodeid`: The index of the node at level 0
+//   `t`: The current parameter of the ray
+//   `pos`: The origin of the ray
+//   `dir`: The direction of the ray
+//   `pStep`: Unused
+// Outputs:
+//   `hit`: If hit.z == NOHIT, no intersection; otherwise, the coordinates of the intersection
+//   `norm`: The normal at the intersection
+//   `hclr`: The color of the color channel at the intersection point.
+__device__ void raySurfaceVoxelBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, int3& pStep, float3& hit, float3& norm, float4& hclr )
 {
 	float3 vmin;
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );				// Get the VDB leaf node
-	float3	p, tDel, tSide, mask;								// 3DDA variables	
 	float3  o = make_float3( node->mValue ) ;	// Atlas sub-volume to trace	
 
-	PREPARE_DDA_LEAF
+	HDDAState dda;
+	dda.SetFromRay(pos, dir, t);
+	dda.PrepareLeaf(vmin, gvdb->vdel[0]);
 	
-	for (int iter=0; iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++)
+	for (int iter=0; iter < MAX_ITER
+		&& dda.p.x >=0 && dda.p.y >=0 && dda.p.z >=0
+		&& dda.p.x < gvdb->res[0] && dda.p.y < gvdb->res[0] && dda.p.z < gvdb->res[0]; iter++)
 	{
-		if ( tex3D<float> ( gvdb->volIn[chan], p.x+o.x+.5, p.y+o.y+.5, p.z+o.z+.5 ) > SCN_THRESH) {		// test texture atlas
-			vmin += p * gvdb->vdel[0];		// voxel location in world
-			t = rayBoxIntersect ( pos, dir, vmin, vmin + 1 );
-			if (t.z == NOHIT) {
+		if ( tex3D<float> ( gvdb->volIn[chan], dda.p.x+o.x+.5, dda.p.y+o.y+.5, dda.p.z+o.z+.5 ) > SCN_THRESH) {		// test texture atlas
+			vmin += dda.p * gvdb->vdel[0];		// voxel location in world
+			dda.t = rayBoxIntersect ( pos, dir, vmin, vmin + 1 );
+			if (dda.t.z == NOHIT) {
 				hit.z = NOHIT;
 				continue;
 			}
-			hit = getRayPoint ( pos, dir, t.x );
+			hit = getRayPoint ( pos, dir, dda.t.x );
 
 			// Compute the normal of the voxel [vmin, vmin+gvdb->voxelsize] at the hit point
 			// Note: This is not normalized when the ray hits an edge of the voxel exactly
@@ -242,16 +326,30 @@ __device__ void raySurfaceVoxelBrick ( VDBInfo* gvdb, uchar chan, int nodeid, fl
 			norm.y = (fabsf(fromVoxelCenter.y) == maxCoordinate ? copysignf(1.0f, fromVoxelCenter.y) : 0.0f);
 			norm.z = (fabsf(fromVoxelCenter.z) == maxCoordinate ? copysignf(1.0f, fromVoxelCenter.z) : 0.0f);
 
-			if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, p+o );
+			if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, make_float3(dda.p)+o );
 			return;	
 		}
-		NEXT_DDA
-		STEP_DDA
+		dda.Next();
+		dda.Step();
 	}
 }
 
-// SurfaceTrilinearBrick - Trace brick to render surface with trilinear smoothing
-__device__ void raySurfaceTrilinearBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& hclr )
+// Traces a brick, rendering the surface with trilinear interpolation.
+// To find an intersection, this samples using increments of `SCN_PSTEP` in `t` and stops when it finds a point greater
+// than or equal to SCN_THRESH.
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to render
+//   `nodeid`: The index of the node at level 0
+//   `t`: The current parameter of the ray
+//   `pos`: The origin of the ray
+//   `dir`: The direction of the ray
+//   `pStep`: Unused
+// Outputs:
+//   `hit`: If hit.z == NOHIT, no intersection; otherwise, the coordinates of the intersection
+//   `norm`: The normal at the intersection
+//   `hclr`: The color of the color channel at the intersection point.
+__device__ void raySurfaceTrilinearBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, int3& pStep, float3& hit, float3& norm, float4& hclr )
 {
 	float3 vmin;
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
@@ -272,8 +370,22 @@ __device__ void raySurfaceTrilinearBrick ( VDBInfo* gvdb, uchar chan, int nodeid
 	}
 }
 
-// SurfaceTricubicBrick - Trace brick to render surface with tricubic smoothing
-__device__ void raySurfaceTricubicBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& hclr )
+// Traces a brick, rendering the surface with trcubic interpolation.
+// To find an intersection, this samples using increments of `SCN_PSTEP` in `t` and stops when it finds a point greater
+// than or equal to SCN_THRESH.
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to render
+//   `nodeid`: The index of the node at level 0
+//   `t`: The current parameter of the ray
+//   `pos`: The origin of the ray
+//   `dir`: The direction of the ray
+//   `pStep`: Unused
+// Outputs:
+//   `hit`: If hit.z == NOHIT, no intersection; otherwise, the coordinates of the intersection
+//   `norm`: The normal at the intersection
+//   `hclr`: The color of the color channel at the intersection point.
+__device__ void raySurfaceTricubicBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, int3& pStep, float3& hit, float3& norm, float4& hclr )
 {
 	float3 vmin;
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
@@ -299,6 +411,8 @@ __device__ void raySurfaceTricubicBrick ( VDBInfo* gvdb, uchar chan, int nodeid,
 	}
 }
 
+// Looks up the stored NDC value from a depth buffer (i.e. after perspective projection), and inverts this
+// to get the world-space depth of the stored fragment.
 inline __device__ float getLinearDepth(float* depthBufFloat)
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;					// Pixel coordinates
@@ -380,9 +494,22 @@ inline __device__ float getLinearDepth(float* depthBufFloat)
 	}
 }*/
 
-
-// LevelSet brick - Trace into brick to find level set surface
-__device__ void rayLevelSetBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& hclr )
+// Traces a brick, rendering the level set surface with trcubic interpolation.
+// To find an intersection, this samples using increments of `SCN_PSTEP` in `t` and stops when it finds a point less
+// than SCN_THRESH.
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to render
+//   `nodeid`: The index of the node at level 0
+//   `t`: The current parameter of the ray
+//   `pos`: The origin of the ray
+//   `dir`: The direction of the ray
+//   `pStep`: Unused
+// Outputs:
+//   `hit`: If hit.z == NOHIT, no intersection; otherwise, the coordinates of the intersection
+//   `norm`: The normal at the intersection
+//   `hclr`: The color of the color channel at the intersection point
+__device__ void rayLevelSetBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, int3& pStep, float3& hit, float3& norm, float4& hclr )
 {
 	float3 vmin;
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
@@ -405,8 +532,20 @@ __device__ void rayLevelSetBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3
 	}
 }
 
-// EmptySkip brick - Return brick itself (do not trace values)
-__device__ void rayEmptySkipBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& clr )
+// Empty intersector that simply reports a hit at the current position.
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: Unused
+//   `nodeid`: The index of the node at level 0
+//   `t`: The current parameter of the ray
+//   `pos`: The origin of the ray
+//   `dir`: The direction of the ray
+//   `pStep`: Unused
+// Outputs:
+//   `hit`: If hit.z == NOHIT, no intersection; otherwise, the coordinates of the intersection
+//   `norm`: Unused
+//   `hclr`: Unused
+__device__ void rayEmptySkipBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, int3& pStep, float3& hit, float3& norm, float4& clr )
 {
 	float3 vmin;
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
@@ -415,8 +554,24 @@ __device__ void rayEmptySkipBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float
 	hit = p * gvdb->vdel[0] + vmin;							// Return brick hit
 }
 
-// Shadow brick - Return deep shadow accumulation
-__device__ void rayShadowBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pStep, float3& hit, float3& norm, float4& clr )
+// Returns deep shadow accumulation along a ray. Each sample's value is mapped to a density value using the transfer
+// function. This sample density is then treated as an opaque layer with opacity
+//   exp( SCN_EXTINCT * density * SCN_SSTEP / (1.0 + t.x * 0.4) )
+// where t.x in the above equation increments in steps of SCN_SSTEP, while the parameter of the ray increments in steps
+// of SCN_PSTEP.
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to render
+//   `nodeid`: The index of the node at level 0
+//   `t`: The current parameter of the ray
+//   `pos`: The origin of the ray
+//   `dir`: The direction of the ray
+//   `pStep`: Unused
+// Outputs:
+//   `hit`: Unused
+//   `norm`: Unused
+//   `clr`: Accumulated color and transparency along the ray.
+__device__ void rayShadowBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, int3& pStep, float3& hit, float3& norm, float4& clr )
 {
 	float3 vmin;
 	VDBNode* node = getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
@@ -437,7 +592,27 @@ __device__ void rayShadowBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t
 }
 
 // DeepBrick - Sample into brick for deep volume raytracing
-__device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& pstep, float3& hit, float3& norm, float4& clr )
+// Accumulates colors in a volume. Handles depth buffer intersections.
+// This samples in increments of `SCN_PSTEP` in `t`.
+// Each sample's value is mapped to a density value using the transfer function. This sample density is then treated as
+// an opaque layer with opacity
+//    exp(SCN_EXTINCT * val.w * SCN_PSTEP).
+// Inputs:
+//   `gvdb`: The volume's `VDBInfo` object
+//   `chan`: The channel to render
+//   `nodeid`: The index of the node at level 0
+//   `t`: The current parameter of the ray
+//   `pos`: The origin of the ray
+//   `dir`: The direction of the ray
+//   `pStep`: Unused
+// Outputs:
+//   `hit.x`: Front brick intersection point, equal to t.x
+//   `hit.y`: Back intersection of brick (if hit.z = 0) or distance between ray origin and depth buffer intersection
+//     (if hit.z = 1)
+//   `hit.z`: 0 if ray passed through entire brick, 1 if intersected with depth buffer.
+//   `norm`: Unused
+//   `clr`: Accumulated color and transparency along the ray.
+__device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, int3& pstep, float3& hit, float3& norm, float4& clr )
 {
 	float3 vmin;
 	VDBNode* node = getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node		
@@ -510,64 +685,62 @@ __device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, flo
 	float3 vmin;	
 	int lev = gvdb->top_lev;
 	nodeid[lev]		= 0;		// rootid ndx
-	float3 t		= rayBoxIntersect ( pos, dir, gvdb->bmin, gvdb->bmax );	// intersect ray with bounding box	
+	float3 tStart	= rayBoxIntersect ( pos, dir, gvdb->bmin, gvdb->bmax );	// intersect ray with bounding box	
 	VDBNode* node	= getNode ( gvdb, lev, nodeid[lev], &vmin );			// get root VDB node	
-	if ( t.z == NOHIT ) return;	
+	if ( tStart.z == NOHIT ) return;	
 
 	// 3DDA variables		
-	t.x += gvdb->epsilon;
-	tMax[lev] = t.y -gvdb->epsilon;
-	float3 pStep	= make_float3(isign3(dir));
-	float3 p, tDel, tSide, mask;
+	tStart.x += gvdb->epsilon;
+	tMax[lev] = tStart.y -gvdb->epsilon;
 	int iter;
 
-	PREPARE_DDA	
+	HDDAState dda;
+	dda.SetFromRay(pos, dir, tStart);
+	dda.Prepare(vmin, gvdb->vdel[lev]);
 
-	for (iter=0; iter < MAX_ITER && lev > 0 && lev <= gvdb->top_lev && p.x >=0 && p.y >=0 && p.z >=0 && p.x <= gvdb->res[lev] && p.y <= gvdb->res[lev] && p.z <= gvdb->res[lev]; iter++ ) {
-
-		NEXT_DDA
+	for (iter=0; iter < MAX_ITER && lev > 0 && lev <= gvdb->top_lev && dda.p.x >=0 && dda.p.y >=0 && dda.p.z >=0 && dda.p.x <= gvdb->res[lev] && dda.p.y <= gvdb->res[lev] && dda.p.z <= gvdb->res[lev]; iter++ ) {
+		
+		dda.Next();
 
 		// depth buffer test [optional]
 		if (SCN_DBUF != 0x0) {
-			if (t.x > getLinearDepth(SCN_DBUF) ) {
+			if (dda.t.x > getLinearDepth(SCN_DBUF) ) {
 				hit.z = 0;
 				return;
 			}
 		}
 
 		// node active test
-		b = (((int(p.z) << gvdb->dim[lev]) + int(p.y)) << gvdb->dim[lev]) + int(p.x);	// bitmaskpos
-		if ( isBitOn ( gvdb, node, b ) ) {							// check vdb bitmask for voxel occupancy						
-			if ( lev == 1 ) {									// enter brick function..
+		b = (((int(dda.p.z) << gvdb->dim[lev]) + int(dda.p.y)) << gvdb->dim[lev]) + int(dda.p.x);	// bitmaskpos
+		if ( isBitOn ( gvdb, node, b ) ) {						// check vdb bitmask for voxel occupancy						
+			if ( lev == 1 ) {										// enter brick function..
 				nodeid[0] = getChild ( gvdb, node, b ); 
-				t.x += gvdb->epsilon;
-				(*brickFunc) (gvdb, chan, nodeid[0], t, pos, dir, pStep, hit, norm, clr);
+				dda.t.x += gvdb->epsilon;
+				(*brickFunc) (gvdb, chan, nodeid[0], dda.t, pos, dir, dda.pStep, hit, norm, clr);
 				if ( clr.w <= 0) {
 					clr.w = 0; 
 					return; 
-				}			// deep termination				
-				if (hit.z != NOHIT) return;						// surface termination												
-				
-				STEP_DDA										// leaf node empty, step DDA
-				//t.x = hit.y;				
-				//PREPARE_DDA
+				}														// deep termination				
+				if (hit.z != NOHIT) return;								// surface termination												
 
+				dda.Step();
 			} else {				
-				lev--;											// step down tree
+				lev--;													// step down tree
 				nodeid[lev]	= getChild ( gvdb, node, b );				// get child 
-				node		= getNode ( gvdb, lev, nodeid[lev], &vmin );	// child node
-				t.x += gvdb->epsilon;										// make sure we start inside child
-				tMax[lev] = t.y -gvdb->epsilon;							// t.x = entry point, t.y = exit point							
-				PREPARE_DDA										// start dda at next level down
+				node		= getNode ( gvdb, lev, nodeid[lev], &vmin );// child node
+				dda.t.x += gvdb->epsilon;								// make sure we start inside child
+				tMax[lev] = dda.t.y -gvdb->epsilon;						// t.x = entry point, t.y = exit point							
+				dda.Prepare(vmin, gvdb->vdel[lev]);						// start dda at next level down
 			}
-		} else {			
-			STEP_DDA											// empty voxel, step DDA
+		} else {
+			// empty voxel, step DDA
+			dda.Step();
 		}
-		while ( t.x > tMax[lev] && lev <= gvdb->top_lev ) {
+		while ( dda.t.x > tMax[lev] && lev <= gvdb->top_lev ) {
 			lev++;												// step up tree
 			if ( lev <= gvdb->top_lev ) {		
 				node	= getNode ( gvdb, lev, nodeid[lev], &vmin );
-				PREPARE_DDA										// restore dda at next level up
+				dda.Prepare(vmin, gvdb->vdel[lev]);				// restore dda at next level up
 			}
 		}
 	}	
