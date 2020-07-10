@@ -63,6 +63,7 @@ public:
 	int			m_shading;
 	bool		m_render_optix;
 	Vector3DF	m_translate;
+	bool		m_draw_topology = false;// Whether to draw topology
 
 	int			mat_surf1;				// material id for surface objects
 	int			mat_deep;				// material id for volumetric objects
@@ -142,7 +143,12 @@ bool Sample::init()
 	max_samples = 1024;
 	m_render_optix = true;
 	m_shading = SHADE_VOLUME;
-	m_translate.Set(150, 0, 100);
+	m_translate.Set(44, 0, 16);
+
+	// Initialize debug drawing if enabled
+	if (m_draw_topology) {
+		init2D("arial");
+	}
 
 	// Initialize Optix Scene
 	if (m_render_optix) 
@@ -182,8 +188,8 @@ bool Sample::init()
 	// Set volume params		
 	gvdb.SetTransform(Vector3DF(-125, -160, -125), Vector3DF(.25, .25, .25), Vector3DF(0, 0, 0), m_translate);
 	gvdb.SetEpsilon(0.001f, 256);
-	gvdb.getScene()->SetSteps ( 0.2f, 16, 0.2f );			// SCN_PSTEP, SCN_SSTEP, SCN_FSTEP - Raycasting steps
-	gvdb.getScene()->SetExtinct ( -1.0f, 1.0f, 0.0f );		// SCN_EXTINCT, SCN_ALBEDO - Volume extinction	
+	gvdb.getScene()->SetSteps ( 0.5f, 16, 0.5f );			// SCN_DIRECTSTEP, SCN_SHADOWSTEP, SCN_FINESTEP - Raycasting steps
+	gvdb.getScene()->SetExtinct ( -0.25f, 1.0f, 0.0f );		// SCN_EXTINCT, SCN_ALBEDO - Volume extinction	
 	gvdb.getScene()->SetVolumeRange(0.1f, 0.0f, 0.3f);		// Threshold: Isoval, Vmin, Vmax
 	gvdb.getScene()->SetCutoff(0.001f, 0.001f, 0.0f);		// SCN_MINVAL, SCN_ALPHACUT
 	gvdb.getScene()->SetBackgroundClr(0.1f, 0.2f, 0.4f, 1);
@@ -287,6 +293,11 @@ void Sample::display()
 	// This is a helper func in sample utils which 
 	// renders an opengl 2D texture to the screen.
 	renderScreenQuadGL ( gl_screen_tex );
+
+	if (m_draw_topology) {
+		draw_topology();
+		draw3D();
+	}
 
 	postRedisplay();
 }

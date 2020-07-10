@@ -466,7 +466,7 @@ bool Sample::init()
 	gvdb.getScene()->SetLight(0, lgt);
 
 	// Default volume params
-	gvdb.getScene()->SetSteps(0.1f, 16, 0.1f);			// Set raycasting steps
+	gvdb.getScene()->SetSteps(0.25f, 16, 0.25f);			// Set raycasting steps
 	gvdb.getScene()->SetExtinct(-1.0f, 1.1f, 0.0f);			// Set volume extinction
 	gvdb.getScene()->SetVolumeRange(0.0f, -1.0f, 3.0f);		// Set volume value range
 	gvdb.getScene()->SetCutoff(0.005f, 0.001f, 0.0f);

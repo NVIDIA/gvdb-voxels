@@ -53,7 +53,7 @@ int main (int argc, char* argv)
 	gvdb.LoadVBX ( scnpath );							// Load VBX
 
 	// Set volume params
-	gvdb.getScene()->SetSteps ( .25, 16, .25 );				// Set raycasting steps
+	gvdb.getScene()->SetSteps ( .25f, 16, .25f );			// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, .1f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );

@@ -106,7 +106,7 @@ inline __device__ float3 getRayPoint ( float3 pos, float3 dir, float t )
 inline __device__ float3 getViewRay ( float x, float y )
 {
   float3 v = x*scn.camu + y*scn.camv + scn.cams;
-  return mmult(SCN_INVXFORM, normalize(v));
+  return normalize(mmult(SCN_INVXROT, v));
 }
 
 

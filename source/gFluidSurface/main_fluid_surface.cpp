@@ -244,7 +244,7 @@ bool Sample::init()
 	gvdb.AddPath ( ASSET_PATH );
 	
 	// Set volume params
-	gvdb.getScene()->SetSteps ( 0.2f, 16, 0.2f );			// Set raycasting steps
+	gvdb.getScene()->SetSteps ( 0.25f, 16, 0.25f );			// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.0f, 3.0f, -1.0f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );

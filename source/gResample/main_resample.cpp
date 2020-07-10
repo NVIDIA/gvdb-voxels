@@ -203,7 +203,7 @@ bool Sample::init()
 	Rebuild ( m_VolMax, m_sparse, m_halo );
 
 	// Set volume params
-	gvdb.getScene()->SetSteps ( .5, 16, .5 );				// Set raycasting steps
+	gvdb.getScene()->SetSteps ( .5f, 16, .5f );				// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.05f, 0.0f, 1.f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.001f, 0.001f, 0.0f );

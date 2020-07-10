@@ -56,7 +56,7 @@ bool Sample::init()
 
 	// Set volume params
 	gvdb.SetTransform(m_pretrans, m_scale, m_angs, m_trans);
-	gvdb.getScene()->SetSteps ( .25, 16, .25 );				// Set raycasting steps
+	gvdb.getScene()->SetSteps ( .25f, 16, .25f );			// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.0f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, .5f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.005f, 0.0f );

@@ -82,7 +82,7 @@ bool Sample::init()
 	gvdb.UpdateApron();
 
 	// Set volume params
-	gvdb.getScene()->SetSteps ( .1f, 16, .1f );				// Set raycasting steps
+	gvdb.getScene()->SetSteps ( .5f, 16, .5f );				// Set raycasting steps
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.0f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.1f, 0.0f, 0.5f );	// Set volume value range
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.005f, 0.0f );

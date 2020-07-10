@@ -62,9 +62,14 @@ RT_PROGRAM void vol_intersect( int primIdx )
 	float t;
 
 	//-- Ray march		
-	
-	rayCast ( &gvdbObj, gvdbChan, ray.origin, ray.direction, hit, norm, hclr, raySurfaceTrilinearBrick );
+	// Transform from application space to GVDB's coordinate space
+	const float3 orig = mmult(SCN_INVXFORM, ray.origin);
+	const float3 dir = normalize(mmult(SCN_INVXROT, ray.direction));
+	rayCast(&gvdbObj, gvdbChan, orig, dir, hit, norm, hclr, raySurfaceTrilinearBrick);
 	if ( hit.z == NOHIT) return;	
+
+	// Transform from GVDB's coordinate space to application space
+	hit = mmult(SCN_XFORM, hit);
 	t = length ( hit - ray.origin );
 
 	// report intersection to optix
@@ -72,8 +77,9 @@ RT_PROGRAM void vol_intersect( int primIdx )
 
 		shading_normal = norm;		
 		geometric_normal = norm;
+		// Transform from GVDB's coordinate space to OptiX's coordinate space
 		front_hit_point = hit + shading_normal * 2;
-		back_hit_point  = hit - shading_normal * 4;
+		back_hit_point = hit - shading_normal * 4;
 		deep_color = hclr;
 		//if ( ray_info.rtype == SHADOW_RAY ) deep_color.w = (hit.x!=NOHIT) ? 0 : 1;
 
@@ -88,35 +94,41 @@ RT_PROGRAM void vol_deep( int primIdx )
 	float4 clr = make_float4(0,0,0,1);	
 	if (ray_info.rtype == MESH_RAY ) return;
 
-	//-- Volume grid transform 
+	// Transform from application space to GVDB's coordinate space
 	float3 orig = mmult(SCN_INVXFORM, ray.origin);
-	float3 dir = mmult(SCN_INVXROT, normalize(ray.direction));
+	float3 dir = normalize(mmult(SCN_INVXROT, ray.direction));
 
 	// ---- Debugging
 	// Uncomment this code to demonstrate tracing of the bounding box 
 	// surrounding the volume.
 	/*hit = rayBoxIntersect ( orig, dir, gvdbObj.bmin, gvdbObj.bmax );
 	if ( hit.z == NOHIT ) return;
-	if ( rtPotentialIntersection ( hit.x ) ) {
+	const float t2 = length(mmult(SCN_XFORM, orig + hit.x * dir) - ray.origin);
+	if ( rtPotentialIntersection ( t2 ) ) {
 		shading_normal = norm;		
 		geometric_normal = norm;
-		front_hit_point = ray.origin + hit.x * ray.direction;
-		back_hit_point  = ray.origin + hit.y * ray.direction;
+		front_hit_point = mmult(SCN_XFORM, orig + hit.x * dir);
+		back_hit_point  = mmult(SCN_XFORM, orig + hit.y * dir);
 		deep_color = make_float4( front_hit_point/200.0, 0.5);	
-		rtReportIntersection( 0 );		
+		rtReportIntersection( 0 );
 	}
-	return; */
+	return;*/
 
 	//-- Raycast		
 	rayCast ( &gvdbObj, gvdbChan, orig, dir, hit, norm, clr, rayDeepBrick );	
-	if ( hit.x==0 && hit.y == 0) return;		
+	if ( hit.x==0 && hit.y == 0) return;
 
-	if ( rtPotentialIntersection( hit.x ) ) {
+	// Note that rayDeepBrick sets hit.x and hit.y to the front and back brick intersection points in GVDB's coordinate
+	// system, in contrast to the other functions in this file.
+	const float t = length(mmult(SCN_XFORM, orig + hit.x * dir) - ray.origin);
+
+	if ( rtPotentialIntersection( t ) ) {
 
 		shading_normal = norm;		
-		geometric_normal = norm;		
-		front_hit_point = ray.origin + hit.x * ray.direction;
-		back_hit_point  = ray.origin + hit.y * ray.direction;
+		geometric_normal = norm;
+		// Transform from GVDB's coordinate space to the application's coordinate space
+		front_hit_point = mmult(SCN_XFORM, orig + hit.x * dir);
+		back_hit_point  = mmult(SCN_XFORM, orig + hit.y * dir);
 		deep_color = make_float4 ( fxyz(clr), 1.0-clr.w );		
 
 		rtReportIntersection( 0 );			
@@ -132,14 +144,21 @@ RT_PROGRAM void vol_levelset ( int primIdx )
 	
 	//if (ray_info.rtype == SHADOW_RAY && ray_info.depth >= 1) return;
 
+	// Transform from application space to GVDB's coordinate space
+	float3 orig = mmult(SCN_INVXFORM, ray.origin);
+	float3 dir = normalize(mmult(SCN_INVXROT, ray.direction));
+
 	//-- Ray march		
 	if (ray_info.rtype == REFRACT_RAY) {		
 		if (ray_info.depth == 2) return;
-		rayCast(&gvdbObj, gvdbChan, ray.origin, ray.direction, hit, norm, hclr, raySurfaceTrilinearBrick);
+		rayCast(&gvdbObj, gvdbChan, orig, dir, hit, norm, hclr, raySurfaceTrilinearBrick);
 	}	else {
-		rayCast(&gvdbObj, gvdbChan, ray.origin, ray.direction, hit, norm, hclr, rayLevelSetBrick);
+		rayCast(&gvdbObj, gvdbChan, orig, dir, hit, norm, hclr, rayLevelSetBrick);
 	}
-	if ( hit.z == NOHIT) return;	
+	if ( hit.z == NOHIT) return;
+
+	// Transform from GVDB's coordinate space to application space
+	hit = mmult(SCN_XFORM, hit);
 	t = length ( hit - ray.origin );
 
 	// report intersection to optix

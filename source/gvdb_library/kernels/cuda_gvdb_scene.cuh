@@ -103,9 +103,9 @@ struct ALIGN(16) ScnRay {
 #define SCN_SHADE			scn.shading
 #define SCN_EXTINCT			scn.extinct.x
 #define SCN_ALBEDO			scn.extinct.y
-#define SCN_PSTEP			scn.steps.x
-#define SCN_SSTEP			scn.steps.y
-#define SCN_FSTEP			scn.steps.z
+#define SCN_DIRECTSTEP		scn.steps.x
+#define SCN_SHADOWSTEP		scn.steps.y
+#define SCN_FINESTEP		scn.steps.z
 #define SCN_MINVAL			scn.cutoff.x
 #define SCN_ALPHACUT		scn.cutoff.y
 #define SCN_THRESH			scn.thresh.x

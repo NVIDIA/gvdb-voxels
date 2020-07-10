@@ -284,7 +284,13 @@ Matrix4F &Matrix4F::RotateTZYXS (const Vector3DF& angs, const Vector3DF& t, cons
 {
 	// Compute the matrix T Rz Ry Rx S.
 	RotateTZYX(angs, t);
-	return ScaleInPlace(s);
+	// Multiply on the right by diag(s.x, s.y, s.z, 1).
+	for (int i = 0; i < 3; i++) {
+		data[i + 0] *= s.x;
+		data[i + 4] *= s.y;
+		data[i + 8] *= s.z;
+	}
+	return *this;
 }
 
 Matrix4F &Matrix4F::RotateX (const double ang)

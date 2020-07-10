@@ -153,7 +153,8 @@
 		int getFilterMode()				{ return mFilterMode; }
 		int getDepthBuf()				{ return mDepthBuf; }
 		void SetExtinct ( float a, float b, float c )	{ mExtinct.Set(a,b,c); }
-		void SetSteps ( float a, float b, float c )		{ mSteps.Set(a,b,c); }
+		// Sets how far each iteration marches in voxel space when raymarching.
+		void SetSteps(float directStep, float shadowStep, float fineStep) { mSteps.Set(directStep, shadowStep, fineStep); }
 		void SetCutoff ( float a, float b, float c )	{ mCutoff.Set(a,b,c); }
 		void SetBackgroundClr ( float r, float g, float b, float a )	{ mBackgroundClr.Set(r,g,b,a); }
 		void SetCrossSection ( Vector3DF pos, Vector3DF norm )	{ mSectionPnt = pos; mSectionNorm = norm; }		
@@ -207,7 +208,7 @@
 		// Volume settings
 		Vector3DF				mVThreshold;
 		Vector3DF				mExtinct;
-		Vector3DF				mSteps;
+		Vector3DF				mSteps; // Direct step, shadow step, fine step
 		Vector3DF				mCutoff;
 		Vector4DF				mBackgroundClr;
 

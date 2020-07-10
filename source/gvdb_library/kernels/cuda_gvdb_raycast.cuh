@@ -183,7 +183,7 @@ inline __device__ float3 getGradientTricubic ( VDBInfo* gvdb, uchar chan, float3
 	return g;
 }
 
-// Marches along the ray p + o + rdir*t in atlas space in steps of SCN_FSTEP, using default interpolation.
+// Marches along the ray p + o + rdir*t in atlas space in steps of SCN_FINESTEP, using default interpolation.
 // If it samples a point less than SCN_THRESH, halts and returns:
 //	 `p`: The atlas-space coordinate of the intersection relative to `o`
 //   returned value: The index-space coordinate of the intersection
@@ -198,7 +198,7 @@ inline __device__ float3 getGradientTricubic ( VDBInfo* gvdb, uchar chan, float3
 //   `vmin`: The minimum AABB vertex of the brick in index-space
 __device__ float3 rayLevelSet ( VDBInfo* gvdb, uchar chan, float3& p, float3 o, float3 rpos, float3 rdir, float3 vmin )
 {
-	float dt = SCN_FSTEP;
+	float dt = SCN_FINESTEP;
 	float3 pt = dt*rdir;
 	
 	for ( int i=0; i < 512; i++ ) {
@@ -297,7 +297,7 @@ __device__ void raySurfaceTrilinearBrick ( VDBInfo* gvdb, uchar chan, int nodeid
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
 	float3  o = make_float3( node->mValue ) ;				// Atlas sub-volume to trace	
 	float3	p = pos + t.x*dir - vmin;					// sample point in index coords			
-	t.x = SCN_PSTEP * ceil ( t.x / SCN_PSTEP );
+	t.x = SCN_DIRECTSTEP * ceil ( t.x / SCN_DIRECTSTEP );
 
 	for (int iter=0; iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++) 
 	{	
@@ -307,8 +307,8 @@ __device__ void raySurfaceTrilinearBrick ( VDBInfo* gvdb, uchar chan, int nodeid
 			if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, p+o );
 			return;	
 		}	
-		p += SCN_PSTEP*dir;		
-		t.x += SCN_PSTEP;
+		p += SCN_DIRECTSTEP*dir;		
+		t.x += SCN_DIRECTSTEP;
 	}
 }
 
@@ -338,16 +338,16 @@ __device__ void raySurfaceTricubicBrick ( VDBInfo* gvdb, uchar chan, int nodeid,
 	{
 		v.z = getTricubic ( gvdb, chan, p, o );
 		if ( v.z >= SCN_THRESH) {
-			v.x = getTricubic ( gvdb, chan, p - SCN_FSTEP*dir, o );
+			v.x = getTricubic ( gvdb, chan, p - SCN_FINESTEP*dir, o );
 			v.y = (v.z - SCN_THRESH)/(v.z-v.x);
-			p += -v.y*SCN_FSTEP*dir;
+			p += -v.y*SCN_FINESTEP*dir;
 			hit = p + vmin;
 			norm = getGradientTricubic ( gvdb, chan, p, o );
 			if ( gvdb->clr_chan != CHAN_UNDEF ) hclr = getColorF ( gvdb, gvdb->clr_chan, p+o );
 			return;			
 		}	
-		p += SCN_PSTEP*dir;		
-		t.x += SCN_PSTEP;
+		p += SCN_DIRECTSTEP*dir;		
+		t.x += SCN_DIRECTSTEP;
 	}
 }
 
@@ -362,6 +362,24 @@ inline __device__ float getLinearDepth(float* depthBufFloat)
 	float n = scn.camnear;
 	float f = scn.camfar;
 	return (-n * f / (f - n)) / (z - (f / (f - n)));				// Return linear depth
+}
+
+// Get the value of t at which the ray starting at the camera position with direction `dir` intersects the depth buffer
+// at the current thread. INFINITY if there is no depth buffer.
+inline __device__ float getRayDepthBufferMax(const float3& rayDir) {
+	if (SCN_DBUF != 0x0) {
+		// Solve
+		//   t * (length of rayDir in app space) == getLinearDepth(SCN_DBUF)
+		// for t, where (length of rayDir in app space) is length((SCN_XFORM * float4(rayDir, 0)).xyz):
+		float3 rayInWorldSpace;
+		rayInWorldSpace.x = rayDir.x * SCN_XFORM[0] + rayDir.y * SCN_XFORM[4] + rayDir.z * SCN_XFORM[ 8];
+		rayInWorldSpace.y = rayDir.x * SCN_XFORM[1] + rayDir.y * SCN_XFORM[5] + rayDir.z * SCN_XFORM[ 9];
+		rayInWorldSpace.z = rayDir.x * SCN_XFORM[2] + rayDir.y * SCN_XFORM[6] + rayDir.z * SCN_XFORM[10];
+		return getLinearDepth(SCN_DBUF) / length(rayInWorldSpace);
+	}
+	else {
+		return INFINITY;
+	}
 }
 
 #define EPSTEST(a,b,c)	(a>b-c && a<b+c)
@@ -387,7 +405,7 @@ __device__ void rayLevelSetBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
 	float3  o = make_float3( node->mValue ) ;				// Atlas sub-volume to trace	
 	float3	p = pos + t.x*dir - vmin;					// sample point in index coords			
-	t.x = SCN_PSTEP * ceil ( t.x / SCN_PSTEP );
+	t.x = SCN_DIRECTSTEP * ceil ( t.x / SCN_DIRECTSTEP );
 
 	for (int iter=0; iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x <= gvdb->res[0] && p.y <= gvdb->res[0] && p.z <= gvdb->res[0]; iter++) {	
 
@@ -399,8 +417,8 @@ __device__ void rayLevelSetBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3
 				return;
 			}
 		}	
-		p += SCN_PSTEP*dir;
-		t.x += SCN_PSTEP;
+		p += SCN_DIRECTSTEP*dir;
+		t.x += SCN_DIRECTSTEP;
 	}
 }
 
@@ -423,9 +441,9 @@ __device__ void rayEmptySkipBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float
 
 // Returns deep shadow accumulation along a ray. Each sample's value is mapped to a density value using the transfer
 // function. This sample density is then treated as an opaque layer with opacity
-//   exp( SCN_EXTINCT * density * SCN_SSTEP / (1.0 + t.x * 0.4) )
-// where t.x in the above equation increments in steps of SCN_SSTEP, while the parameter of the ray increments in steps
-// of SCN_PSTEP.
+//   exp( SCN_EXTINCT * density * SCN_SHADOWSTEP / (1.0 + t.x * 0.4) )
+// where t.x in the above equation increments in steps of SCN_SHADOWSTEP, while the parameter of the ray increments in steps
+// of SCN_DIRECTSTEP.
 // Inputs:
 //   `gvdb`: The volume's `VDBInfo` object
 //   `chan`: The channel to render
@@ -445,15 +463,15 @@ __device__ void rayShadowBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t
 	t.y -= gvdb->epsilon;												// make sure we end insidoke	
 	float3 o = make_float3( node->mValue );					// atlas sub-volume to trace	
 	float3 p = pos + t.x*dir - vmin;		// sample point in index coords
-	float3 pt = SCN_PSTEP * dir;								// index increment	
+	float3 pt = SCN_DIRECTSTEP * dir;								// index increment	
 	float val = 0;
 
 	// accumulate remaining voxels	
 	for (; clr.w < 1 && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0];) {		
-		val = exp ( SCN_EXTINCT * transfer( gvdb, tex3D<float> ( gvdb->volIn[chan], p.x+o.x, p.y+o.y, p.z+o.z )).w * SCN_SSTEP/(1.0 + t.x * 0.4) );		// 0.4 = shadow gain
+		val = exp ( SCN_EXTINCT * transfer( gvdb, tex3D<float> ( gvdb->volIn[chan], p.x+o.x, p.y+o.y, p.z+o.z )).w * SCN_SHADOWSTEP/(1.0 + t.x * 0.4) );		// 0.4 = shadow gain
 		clr.w = 1.0 - (1.0-clr.w) * val;
 		p += pt;	
-		t.x += SCN_SSTEP;
+		t.x += SCN_SHADOWSTEP;
 	}	
 }
 
@@ -462,7 +480,7 @@ __device__ void rayShadowBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t
 // This samples in increments of `SCN_PSTEP` in `t`.
 // Each sample's value is mapped to a density value using the transfer function. This sample density is then treated as
 // an opaque layer with opacity
-//    exp(SCN_EXTINCT * val.w * SCN_PSTEP).
+//    exp(SCN_EXTINCT * val.w * SCN_DIRECTSTEP).
 // Inputs:
 //   `gvdb`: The volume's `VDBInfo` object
 //   `chan`: The channel to render
@@ -482,16 +500,17 @@ __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, 
 	float3 vmin;
 	VDBNode* node = getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node		
 	
-	//t.x = SCN_PSTEP * ceil( t.x / SCN_PSTEP );						// start on sampling wavefront	
+	//t.x = SCN_DIRECTSTEP * ceil( t.x / SCN_DIRECTSTEP );						// start on sampling wavefront	
 
 	float3 o = make_float3( node->mValue );					// atlas sub-volume to trace
 	float3 wp = pos + t.x*dir;	
 	float3 p = wp-vmin;					// sample point in index coords	
-	float3 wpt = SCN_PSTEP*dir;					// world increment
+	float3 wpt = SCN_DIRECTSTEP*dir;					// world increment
 	float4 val = make_float4(0,0,0,0);
 	float4 hclr;
 	int iter = 0;
-	float dt = length(SCN_PSTEP*dir);
+	float dt = length(SCN_DIRECTSTEP*dir);
+	const float tDepthIntersection = getRayDepthBufferMax(dir); // The t.x at which the ray intersects the depth buffer
 
 	// record front hit point at first significant voxel
 	if (hit.x == 0) hit.x = t.x; // length(wp - pos);
@@ -499,7 +518,7 @@ __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, 
 	// skip empty voxels
 	for (iter=0; val.w < SCN_MINVAL && iter < MAX_ITER && p.x >= 0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++) {		
 		val.w = transfer ( gvdb, tex3D<float> ( gvdb->volIn[chan], p.x+o.x, p.y+o.y, p.z+o.z ) ).w;
-		p += SCN_PSTEP*dir;
+		p += SCN_DIRECTSTEP*dir;
 		wp += wpt;
 		t.x += dt;
 	}	
@@ -507,24 +526,23 @@ __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, 
 	// accumulate remaining voxels
 	for (; clr.w > SCN_ALPHACUT && iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++) {			
 
-		// depth buffer test [optional]
-		if (SCN_DBUF != 0x0) {
-			if (t.x > getLinearDepth(SCN_DBUF) ) {
-				hit.y = length(wp - pos);
-				hit.z = 1;
-				clr = make_float4(fmin(clr.x, 1.f), fmin(clr.y, 1.f), fmin(clr.z, 1.f), fmax(clr.w, 0.f));
-				return;
-			}
+		// Test to see if we've intersected the depth buffer (if there is no depth buffer, then this will never happen):
+		if (t.x > tDepthIntersection) {
+			hit.y = length(wp - pos);
+			hit.z = 1;
+			clr = make_float4(fmin(clr.x, 1.f), fmin(clr.y, 1.f), fmin(clr.z, 1.f), fmax(clr.w, 0.f));
+			return;
 		}
+
 		val = transfer ( gvdb, tex3D<float> ( gvdb->volIn[chan], p.x+o.x, p.y+o.y, p.z+o.z ) );
-		val.w = exp ( SCN_EXTINCT * val.w * SCN_PSTEP );
+		val.w = exp ( SCN_EXTINCT * val.w * SCN_DIRECTSTEP );
 		hclr = (gvdb->clr_chan==CHAN_UNDEF) ? make_float4(1,1,1,1) : getColorF (gvdb, gvdb->clr_chan, p+o );
 		clr.x += val.x * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.x;
 		clr.y += val.y * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.y;
 		clr.z += val.z * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.z;
 		clr.w *= val.w;		
 
-		p += SCN_PSTEP*dir;		
+		p += SCN_DIRECTSTEP*dir;		
 		wp += wpt;		
 		t.x += dt;
 	}			
@@ -562,17 +580,16 @@ __device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, flo
 	HDDAState dda;
 	dda.SetFromRay(pos, dir, tStart);
 	dda.Prepare(vmin, gvdb->vdel[lev]);
+	const float tDepthIntersection = getRayDepthBufferMax(dir); // The t.x at which the ray intersects the depth buffer
 
 	for (iter=0; iter < MAX_ITER && lev > 0 && lev <= gvdb->top_lev && dda.p.x >=0 && dda.p.y >=0 && dda.p.z >=0 && dda.p.x <= gvdb->res[lev] && dda.p.y <= gvdb->res[lev] && dda.p.z <= gvdb->res[lev]; iter++ ) {
 		
 		dda.Next();
 
-		// depth buffer test [optional]
-		if (SCN_DBUF != 0x0) {
-			if (dda.t.x > getLinearDepth(SCN_DBUF) ) {
-				hit.z = 0;
-				return;
-			}
+		// Test to see if we've intersected the depth buffer (if there is no depth buffer, then this will never happen):
+		if (dda.t.x > tDepthIntersection) {
+			hit.z = 0;
+			return;
 		}
 
 		// node active test

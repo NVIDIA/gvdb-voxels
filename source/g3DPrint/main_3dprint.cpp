@@ -222,7 +222,7 @@ bool Sample::init ()
 
 	// Set volume params
 	printf ( "Volume params.\n" );
-	gvdb1.getScene()->SetSteps ( 0.25f, 16.f, 0.25f );			// Set raycasting steps
+	gvdb1.getScene()->SetSteps ( 0.5f, 16.f, 0.5f );			// Set raycasting steps
 	gvdb1.getScene()->SetVolumeRange ( 0.25f, 0.0f, 1.0f );		// Set volume value range
 	gvdb1.getScene()->SetExtinct ( -1.0f, 1.1f, 0.f );			// Set volume extinction	
 	gvdb1.getScene()->SetCutoff ( 0.005f, 0.005f, 0.f );
@@ -233,7 +233,7 @@ bool Sample::init ()
 	gvdb1.getScene()->SetBackgroundClr ( 0.1f, 0.2f, 0.4f, 1.0f );	
 
 #ifdef USE_GVDB2
-	gvdb2.getScene()->SetSteps(0.25f, 16.f, 0.25f);			// Set raycasting steps
+	gvdb2.getScene()->SetSteps(0.5f, 16.f, 0.5f);		// Set raycasting steps
 	gvdb2.getScene()->SetVolumeRange(0.5f, 0.0f, 1.0f);	// Set volume value range	
 	gvdb2.getScene()->SetExtinct(-1.0f, 1.5f, 0.f);		// Set volume extinction	
 	gvdb2.getScene()->SetCutoff(0.005f, 0.01f, 0.f);

@@ -68,7 +68,7 @@ int main (int argc, char* argv)
 	// Remainder of this sample demonstrates level set rendering to file.
 
 	// Set volume params
-	gvdb.getScene()->SetSteps ( 0.25*0.05f, 16*0.05f, 0.25*0.05f );	// Set raycasting steps (note that this is in world-space!)
+	gvdb.getScene()->SetSteps ( 0.25f, 16, 0.25f );			// Set raycasting steps per voxel
 	gvdb.getScene()->SetExtinct ( -1.0f, 1.5f, 0.0f );		// Set volume extinction
 	gvdb.getScene()->SetVolumeRange ( 0.0f, 1.0f, -1.0f );	// Set volume value range (for a level set)
 	gvdb.getScene()->SetCutoff ( 0.005f, 0.01f, 0.0f );

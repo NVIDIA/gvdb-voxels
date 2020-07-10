@@ -72,7 +72,7 @@ inline __device__ float3 getViewRay ( float x, float y )
   #else
 	float3 v = make_float3(0,0,0);
   #endif
-  return mmult(SCN_INVXROT, normalize(v));
+  return normalize(mmult(SCN_INVXROT, v));
 }
 
 
