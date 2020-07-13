@@ -108,8 +108,7 @@ void Sample::RebuildOptixGraph ( int shading )
 	}	
 	Vector3DF volmin = gvdb.getWorldMin ();
 	Vector3DF volmax = gvdb.getWorldMax ();
-	Matrix4F xform;	
-	xform.Identity();
+	Matrix4F xform = gvdb.getTransform();
 	int atlas_glid = gvdb.getAtlasGLID ( 0 );
 	optx.AddVolume ( atlas_glid, volmin, volmax, xform, matid, isect );
 

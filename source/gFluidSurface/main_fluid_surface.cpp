@@ -176,8 +176,7 @@ void Sample::RebuildOptixGraph ()
 	// are both 0).
 	Vector3DF volmin = fluid.GetGridMin();
 	Vector3DF volmax = fluid.GetGridMax();
-	Matrix4F xform;
-	xform.Identity();
+	Matrix4F xform = gvdb.getTransform();
 	int atlas_glid = gvdb.getAtlasGLID(0);
 	optx.AddVolume( atlas_glid, volmin, volmax, xform, m_mat_surf1, 'L' );		
 
