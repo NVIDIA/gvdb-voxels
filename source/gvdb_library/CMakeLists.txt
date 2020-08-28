@@ -128,11 +128,13 @@ elseif(UNIX)
                 ${X11_LIBRARIES})
 endif()
 
-macro(_gvdb_find variable path)
+macro(_gvdb_find variable path show_warning)
     if(NOT ${variable})
         file(GLOB _FOUND_FILES ${path})
         if(NOT _FOUND_FILES)
-            message(WARNING "_gvdb_find_shared_library: Unable to find any files corresponding to the glob specification ${path}!")
+            if({$show_warning})
+                message(WARNING "_gvdb_find_shared_library: Unable to find any files corresponding to the glob specification ${path}!")
+            endif()
         else()
             list(GET _FOUND_FILES 0 ${variable}) # Set variable to the first element of the list
         endif()
@@ -197,19 +199,19 @@ if(GVDB_BUILD_OPENVDB)
         endif()
         
         # Find the paths to our .lib files manually:
-        _gvdb_find(GVDB_OPENVDB_LIB_DEBUG ${GVDB_OPENVDB_LIB_DEBUG_DIR}/openvdb_d.lib)
-		# Compatibility for OpenVDB < 7.0
-		_gvdb_find(GVDB_OPENVDB_LIB_DEBUG ${GVDB_OPENVDB_LIB_DEBUG_DIR}/openvdb.lib)
-        _gvdb_find(GVDB_TBB_LIB_DEBUG     ${GVDB_OPENVDB_LIB_DEBUG_DIR}/tbb_debug.lib)
-        _gvdb_find(GVDB_BLOSC_LIB_DEBUG   ${GVDB_OPENVDB_LIB_DEBUG_DIR}/blosc.lib)
-        _gvdb_find(GVDB_ZLIB_LIB_DEBUG    ${GVDB_OPENVDB_LIB_DEBUG_DIR}/zlib*.lib)
-        _gvdb_find(GVDB_HALF_LIB_DEBUG    ${GVDB_OPENVDB_LIB_DEBUG_DIR}/Half-*.lib)
+        _gvdb_find(GVDB_OPENVDB_LIB_DEBUG ${GVDB_OPENVDB_LIB_DEBUG_DIR}/openvdb_d.lib OFF)
+        # Compatibility for OpenVDB < 7.0
+        _gvdb_find(GVDB_OPENVDB_LIB_DEBUG ${GVDB_OPENVDB_LIB_DEBUG_DIR}/openvdb.lib ON)
+        _gvdb_find(GVDB_TBB_LIB_DEBUG     ${GVDB_OPENVDB_LIB_DEBUG_DIR}/tbb_debug.lib ON)
+        _gvdb_find(GVDB_BLOSC_LIB_DEBUG   ${GVDB_OPENVDB_LIB_DEBUG_DIR}/blosc.lib ON)
+        _gvdb_find(GVDB_ZLIB_LIB_DEBUG    ${GVDB_OPENVDB_LIB_DEBUG_DIR}/zlib*.lib ON)
+        _gvdb_find(GVDB_HALF_LIB_DEBUG    ${GVDB_OPENVDB_LIB_DEBUG_DIR}/Half-*.lib ON)
         
-        _gvdb_find(GVDB_OPENVDB_LIB_RELEASE ${GVDB_OPENVDB_LIB_RELEASE_DIR}/openvdb.lib)
-        _gvdb_find(GVDB_TBB_LIB_RELEASE     ${GVDB_OPENVDB_LIB_RELEASE_DIR}/tbb.lib)
-        _gvdb_find(GVDB_BLOSC_LIB_RELEASE   ${GVDB_OPENVDB_LIB_RELEASE_DIR}/blosc.lib)
-        _gvdb_find(GVDB_ZLIB_LIB_RELEASE    ${GVDB_OPENVDB_LIB_RELEASE_DIR}/zlib*.lib)
-        _gvdb_find(GVDB_HALF_LIB_RELEASE    ${GVDB_OPENVDB_LIB_RELEASE_DIR}/Half-*.lib)
+        _gvdb_find(GVDB_OPENVDB_LIB_RELEASE ${GVDB_OPENVDB_LIB_RELEASE_DIR}/openvdb.lib ON)
+        _gvdb_find(GVDB_TBB_LIB_RELEASE     ${GVDB_OPENVDB_LIB_RELEASE_DIR}/tbb.lib ON)
+        _gvdb_find(GVDB_BLOSC_LIB_RELEASE   ${GVDB_OPENVDB_LIB_RELEASE_DIR}/blosc.lib ON)
+        _gvdb_find(GVDB_ZLIB_LIB_RELEASE    ${GVDB_OPENVDB_LIB_RELEASE_DIR}/zlib*.lib ON)
+        _gvdb_find(GVDB_HALF_LIB_RELEASE    ${GVDB_OPENVDB_LIB_RELEASE_DIR}/Half-*.lib ON)
         
         target_link_libraries(gvdb PRIVATE
             debug ${GVDB_OPENVDB_LIB_DEBUG}
@@ -230,8 +232,8 @@ if(GVDB_BUILD_OPENVDB)
         endif()
         
         # Include the release versions of Half and tbb.
-        _gvdb_find(GVDB_TBB_DLL_RELEASE ${GVDB_OPENVDB_DLL_RELEASE_DIR}/tbb.dll)
-        _gvdb_find(GVDB_HALF_DLL_RELEASE ${GVDB_OPENVDB_DLL_RELEASE_DIR}/Half-*.dll)
+        _gvdb_find(GVDB_TBB_DLL_RELEASE ${GVDB_OPENVDB_DLL_RELEASE_DIR}/tbb.dll ON)
+        _gvdb_find(GVDB_HALF_DLL_RELEASE ${GVDB_OPENVDB_DLL_RELEASE_DIR}/Half-*.dll ON)
         list(APPEND GVDB_OPENVDB_LIBRARIES_TO_COPY ${GVDB_TBB_DLL_RELEASE} ${GVDB_HALF_DLL_RELEASE})
     else()
         # On Linux systems, find_package(openvdb) should work, assuming OpenVDB has
@@ -251,6 +253,18 @@ if(GVDB_BUILD_OPENVDB)
         find_package(OpenVDB REQUIRED) # GVDB_BUILD_OPENVDB was specified!
         target_link_libraries(gvdb PUBLIC OpenVDB::openvdb)
     endif()
+endif()
+
+# Allow the developer to build with or without NanoVDB
+set(GVDB_BUILD_NANOVDB OFF CACHE BOOL "If ON, builds GVDB with NanoVDB and #defines BUILD_NANOVDB.")
+set(GVDB_NANOVDB_INCLUDE_DIR "" CACHE PATH "The path to NanoVDB (should be a folder that contains a nanovdb folder filled with include files")
+if(GVDB_BUILD_NANOVDB)
+  if(NOT GVDB_NANOVDB_INCLUDE_DIR)
+    message(WARNING "GVDB_NANOVDB_INCLUDE_DIR needs to be specified for GVDB to find NanoVDB! (You're seeing this message because GVDB_BUILD_NANOVDB was ON, but GVDB_NANOVDB_INCLUDE_DIR was unfilled).")
+  endif()
+  target_compile_definitions(gvdb PUBLIC BUILD_NANOVDB)
+  target_include_directories(gvdb PUBLIC ${GVDB_NANOVDB_INCLUDE_DIR})
+  target_include_directories(gvdbPTX PUBLIC ${GVDB_NANOVDB_INCLUDE_DIR})
 endif()
 
 # Enable definitions: build with OpenGL (required),

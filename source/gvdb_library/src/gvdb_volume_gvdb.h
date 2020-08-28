@@ -409,6 +409,7 @@
 			void FillChannel ( uchar chan, Vector4DF val );
 			void ClearAllChannels ();
 			void ClearChannel(uchar chan);
+			uchar GetChannelType(uchar channel); // Returns the type code (e.g. T_FLOAT) of the given channel.
 			slong Reparent ( int lev, slong prevroot_id, Vector3DI pos, bool& bNew );		// Reparent tree with new root			
 			slong ActivateSpace ( Vector3DF pos );
 			slong ActivateSpace ( slong nodeid, Vector3DI pos, bool& bNew, slong stopnode = ID_UNDEFL, int stoplev = 0 );	// Active leaf at given location
@@ -423,6 +424,8 @@
 			void UpdateApron ( uchar chan, float boundval = 0.0f, bool changeCtx = true );
 			void UpdateApronFaces(uchar chan);
 			void SetColorChannel ( uchar chan );
+			// API-facing version of Allocator::AtlasRetrieveBrickXYZ.
+			void AtlasRetrieveBrickXYZ(uchar channel, Vector3DI minimumCorner, DataPtr& dest);
 
 			void SetBounds(Vector3DF pMin, Vector3DF pMax);
 
@@ -466,8 +469,12 @@
 			nvdb::Node* getNode ( slong nodeid )		{ return (Node*) mPool->PoolData ( nodeid ); }			
 			// Get the `ndx`th child of the node `curr`.
 			nvdb::Node* getChild (Node* curr, uint ndx);
-			// Get the child that corresponds to bit `b`.
-			nvdb::Node* getChildAtBit ( Node* curr, uint b);			
+			// Get the child that corresponds to bit `b`. If there is no child at that bit, returns
+			// nullptr (0x0).
+			nvdb::Node* getChildAtBit ( Node* curr, uint b);
+			// Get the pool reference to the child that corresponds to bit `b`. If there is no child
+			// at that bit, or if curr's childList was undefined, returns ID_UNDEF64.
+			uint64 getChildRefAtBit(Node* curr, uint b);
 			bool  isActive(Vector3DI wpos);
 			bool  isActive(Vector3DI wpos, slong nodeid);	// recursive
 			// Returns true if the given pool reference is at level = 0.
@@ -539,6 +546,7 @@
 			void PrepareAux ( int id, int cnt, int stride, bool bZero, bool bCPU=false );
 			void PrepareV3D ( Vector3DI ires, uchar dtype );
 			void AllocData ( DataPtr& ptr, int cnt, int stride, bool bCPU=true );
+			void FreeData ( DataPtr& ptr );
 			void RetrieveData ( DataPtr ptr );			
 			void CommitData ( DataPtr ptr );			
 			void CommitData ( DataPtr& ptr, int cnt, char* cptr, int offs, int stride );

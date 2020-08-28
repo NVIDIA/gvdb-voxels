@@ -705,6 +705,10 @@ void VolumeGVDB::SetColorChannel ( uchar chan )
 	mVDBInfo.update = true;	
 }
 
+void VolumeGVDB::AtlasRetrieveBrickXYZ(uchar channel, Vector3DI minimumCorner, DataPtr& dest) {
+	mPool->AtlasRetrieveTexXYZ(channel, minimumCorner, dest);
+}
+
 // Clear device access to atlases
 void VolumeGVDB::ClearAtlasAccess ()
 {
@@ -1612,6 +1616,11 @@ void VolumeGVDB::ClearChannel (uchar chan)
 	PUSH_CTX
 	mPool->AtlasFill(chan);	
 	POP_CTX
+}
+
+
+uchar VolumeGVDB::GetChannelType(uchar channel) {
+	return mPool->getAtlas(channel).type;
 }
 
 
@@ -3066,6 +3075,18 @@ Node* VolumeGVDB::getChildAtBit (Node* curr, uint b)
 #endif
 	if (ch == ID_UNDEF64) return 0x0;
 	return getNode(ch);
+}
+
+uint64 VolumeGVDB::getChildRefAtBit(Node* curr, uint b)
+{
+	if (curr->mChildList == ID_UNDEFL) return ID_UNDEF64;
+	uint64* clist = mPool->PoolData64(curr->mChildList);
+#ifdef USE_BITMASKS
+	uint32 ndx = curr->countOn(b);
+	return *(clist + ndx);
+#else
+	return *(clist + b);
+#endif
 }
 
 // Get child node at bit position
@@ -4816,6 +4837,12 @@ void VolumeGVDB::AllocData ( DataPtr& ptr, int cnt, int stride, bool bCPU )
 	PUSH_CTX
 	if ( (ptr.cpu == 0 && bCPU) || ptr.gpu==0 || cnt > ptr.max || stride != ptr.stride )
 		mPool->CreateMemLinear ( ptr, 0x0, stride, cnt, bCPU );		// always reallocates	
+	POP_CTX
+}
+void VolumeGVDB::FreeData( DataPtr& ptr )
+{
+	PUSH_CTX
+	mPool->FreeMemLinear(ptr);
 	POP_CTX
 }
 void VolumeGVDB::CommitData ( DataPtr ptr )

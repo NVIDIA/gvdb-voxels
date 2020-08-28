@@ -34,3 +34,11 @@ set(GVDB_BUILD_OPENVDB_SAMPLES OFF CACHE BOOL "If ON, includes samples using Ope
 if(GVDB_BUILD_OPENVDB_SAMPLES)
     add_subdirectory("source/gImportVDB" "gImportVDB")
 endif()
+
+# GVDB samples using NanoVDB, not built by default.
+# To enable these samples, set GVDB_BUILD_NANOVDB and GVDB_BUILD_NANOVDB_SAMPLES to ON
+# before configuring CMake.
+set(GVDB_BUILD_NANOVDB_SAMPLES OFF CACHE BOOL "If ON, includes samples using NanoVDB in build.")
+if(GVDB_BUILD_NANOVDB_SAMPLES)
+    add_subdirectory("source/gNanoVDB" "gNanoVDB")
+endif()
