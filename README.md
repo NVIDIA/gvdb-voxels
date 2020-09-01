@@ -64,6 +64,7 @@ GVDB is released as a library with samples. The library and each sample can be b
       - **gImportVDB** - Loads and ray traces a volume stored in OpenVDB's .vdb format.
       - **gInteractiveGL** - Interactive rendering of a volume using GVDB and OpenGL.
       - **gInteractiveOptix** - Interactive ray tracing of a volume and a mesh, with light bouncing between the two.
+      - **gNanoVDB** - Exports a GVDB volume to a NanoVDB volume, then renders it using NanoVDB.
       - **gPointFusion** - Fuses points from a moving camera into a full 3D volume.
       - **gRenderKernel** - Rendering without OpenGL using a custom GVDB kernel.
       - **gRenderToFile** - Rendering a semitransparent object to a file without OpenGL using GVDB.
