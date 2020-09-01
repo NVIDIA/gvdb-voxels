@@ -19,6 +19,8 @@
 // Version 1.1.1: Neil Bickford, 8/12/2020
 //----------------------------------------------------------------------------------
 
+#include <algorithm> // For min/max
+
 #include "gvdb_export_nanovdb.h"
 
 namespace nvdb {

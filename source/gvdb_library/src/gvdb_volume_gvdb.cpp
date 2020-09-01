@@ -2491,7 +2491,9 @@ void VolumeGVDB::DestroyChannels ()
 {
 	PUSH_CTX
 
-	mPool->AtlasReleaseAll ();		
+	if (mPool) {
+		mPool->AtlasReleaseAll();
+	}
 	SetColorChannel ( -1 );
 
 	POP_CTX

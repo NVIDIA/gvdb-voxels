@@ -94,13 +94,12 @@ A few samples have on-screen GUIs with features that can be toggled by clicking 
 ### To build the samples and the library at the same time:
 
 3. In CMake, configure and generate the build system using gvdb-voxels/CMakeLists.txt, then build the `BUILD_ALL` target in your IDE (such as Visual Studio).
-   1. The OptiX samples are built by default; if you haven't installed OptiX, you can remove them from the build by setting the `GVDB_BUILD_OPTIX_SAMPLES` cache entry to OFF (you can do this in CMake's GUI by unchecking the box next to `GVDB_BUILD_OPTIX_SAMPLES` after configuration, or you can do this in the command line by adding `-DGVDB_BUILD_OPTIX_SAMPLES=OFF`.)
 
 That's it!
 
 You can also build a specific sample or the GVDB library this way by building its target in this project. Additionally, you can collect a build of GVDB and its samples into a redistributable package by building the `INSTALL` target.
 
-(Wondering what the `GVDB_BUILD_OPTIX_SAMPLES`, `GVDB_BUILD_OPENVDB`, and `GVDB_BUILD_OPENVDB_SAMPLES` checkboxes in the CMake GUI do? See "To build the OptiX samples" and "To build GVDB with OpenVDB" below.)
+(Wondering what the `GVDB_BUILD_OPTIX_SAMPLES`, `GVDB_BUILD_OPENVDB`, `GVDB_BUILD_OPENVDB_SAMPLES`, `GVDB_BUILD_NANOVDB`, and `GVDB_BUILD_NANOVDB` checkboxes in the CMake GUI do? See "To build the OptiX samples", "To build GVDB with OpenVDB", and "To build the NanoVDB sample" below.)
 
 ### To build the GVDB Library by itself:
 
@@ -145,11 +144,17 @@ Building a sample will also automatically build GVDB, so you no longer need to b
    2. If you're using the **CMake command line**, you can also do this by specifying `-DGVDB_BUILD_OPENVDB=ON -DGVDB_BUILD_OPENVDB_SAMPLES=ON`.
 3. Finally, generate and build the CMake project. Now you can run GVDB with OpenVDB!
 
+### To build the NanoVDB sample:
+
+1. Download NanoVDB from the OpenVDB repository at https://github.com/AcademySoftwareFoundation/openvdb/tree/feature/nanovdb/nanovdb. Since NanoVDB is a header-only library, there's no need to build OpenVDB.
+2. In CMake, set `GVDB_NANOVDB_INCLUDE_DIR` to the path to NanoVDB (this folder contains a `nanovdb` folder which contains `NanoVDB.h`), set `GVDB_BUILD_NANOVDB` to `ON`, and set `GVDB_BUILD_NANOVDB_SAMPLES` to `ON`.
+3. Finally, generate and build the CMake project. Now you can run the `gNanoVDB` sample!
+
 
 ## License
 
 ==========================
-  
+
 BSD 3-clause. Please refer to [LICENSE.txt](https://github.com/NVIDIA/gvdb-voxels/blob/master/LICENSE.txt).
 
 © 2020 NVIDIA
