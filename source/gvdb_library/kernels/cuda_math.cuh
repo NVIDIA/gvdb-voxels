@@ -1439,15 +1439,15 @@ inline __host__ __device__ float4 fmodf(float4 a, float4 b)
 // absolute value
 ////////////////////////////////////////////////////////////////////////////////
 
-inline __host__ __device__ float2 fabsf(float2 v)
+inline __host__ __device__ float2 fabs(float2 v)
 {
     return make_float2(fabsf(v.x), fabsf(v.y));
 }
-inline __host__ __device__ float3 fabsf(float3 v)
+inline __host__ __device__ float3 fabs(float3 v)
 {
     return make_float3(fabsf(v.x), fabsf(v.y), fabsf(v.z));
 }
-inline __host__ __device__ float4 fabsf(float4 v)
+inline __host__ __device__ float4 fabs(float4 v)
 {
     return make_float4(fabsf(v.x), fabsf(v.y), fabsf(v.z), fabsf(v.w));
 }
