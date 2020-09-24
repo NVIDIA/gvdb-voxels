@@ -693,7 +693,7 @@ void FluidSystem::Advance ()
 		// Wall barrier
 		if ( m_Toggle[PWALL_BARRIER] ) {
 			diff = 2 * radius - ( ppos->x - 0 )*ss;					
-			if (diff < 2*radius && diff > EPSILON && fabs(ppos->y) < 3 && ppos->z < 10) {
+			if (diff < 2*radius && diff > EPSILON && fabsf(ppos->y) < 3 && ppos->z < 10) {
 				norm.Set ( 1.0, 0, 0 );
 				adj = 2*stiff * diff - damp * (float) norm.Dot ( *pveleval ) ;	
 				accel.x += adj * norm.x; accel.y += adj * norm.y; accel.z += adj * norm.z;					
@@ -703,7 +703,7 @@ void FluidSystem::Advance ()
 		// Levy barrier
 		if ( m_Toggle[PLEVY_BARRIER] ) {
 			diff = 2 * radius - ( ppos->x - 0 )*ss;					
-			if (diff < 2*radius && diff > EPSILON && fabs(ppos->y) > 5 && ppos->z < 10) {
+			if (diff < 2*radius && diff > EPSILON && fabsf(ppos->y) > 5 && ppos->z < 10) {
 				norm.Set ( 1.0, 0, 0 );
 				adj = 2*stiff * diff - damp * (float) norm.Dot ( *pveleval ) ;	
 				accel.x += adj * norm.x; accel.y += adj * norm.y; accel.z += adj * norm.z;					
@@ -712,7 +712,7 @@ void FluidSystem::Advance ()
 		// Drain barrier
 		if ( m_Toggle[PDRAIN_BARRIER] ) {
 			diff = 2 * radius - ( ppos->z - bmin.z-15 )*ss;
-			if (diff < 2*radius && diff > EPSILON && (fabs(ppos->x)>3 || fabs(ppos->y)>3) ) {
+			if (diff < 2*radius && diff > EPSILON && (fabsf(ppos->x)>3 || fabsf(ppos->y)>3) ) {
 				norm.Set ( 0, 0, 1);
 				adj = stiff * diff - damp * (float) norm.Dot ( *pveleval );
 				accel.x += adj * norm.x; accel.y += adj * norm.y; accel.z += adj * norm.z;

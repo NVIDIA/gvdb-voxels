@@ -853,7 +853,7 @@ extern "C" __global__ void gvdbCheckVal (VDBInfo* gvdb, float slice, int3 res, i
 				int3 vox_pos = make_int3(fi+ii, pj+jj, fk+kk);
 				int3 tmp_vox = node->mValue + make_int3((vox_pos.x - vmin.x)/vdel.x, (vox_pos.y - vmin.y)/vdel.y, (vox_pos.z - vmin.z)/vdel.z);
 				float tmp_vel = surf3Dread<float>(gvdb->volOut[chanVy], tmp_vox.x * sizeof(float), tmp_vox.y, tmp_vox.z);
-				vel_y += tmp_vel * (1.0f - fabs(fi + ii + 0.5f - wpos.x)) * (1.0f - fabs(pj + jj - wpos.y)) * (1.0f - fabs(fk + kk + 0.5f - wpos.z));	
+				vel_y += tmp_vel * (1.0f - fabsf(fi + ii + 0.5f - wpos.x)) * (1.0f - fabsf(pj + jj - wpos.y)) * (1.0f - fabsf(fk + kk + 0.5f - wpos.z));	
 			}
 		}
 	} 

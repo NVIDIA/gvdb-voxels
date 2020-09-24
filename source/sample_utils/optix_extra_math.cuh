@@ -59,7 +59,7 @@ inline __host__ __device__ float3 operator*(int3 &a, float3 b)
 
 inline __host__ __device__ float3 fabs3 ( float3 a )
 {
-	return make_float3 ( fabs(a.x), fabs(a.y), fabs(a.z) );
+	return make_float3 ( fabsf(a.x), fabsf(a.y), fabsf(a.z) );
 }
 inline __host__ __device__ float3 floor3 ( float3 a )
 {

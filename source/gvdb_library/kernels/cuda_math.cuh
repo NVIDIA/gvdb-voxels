@@ -1439,17 +1439,17 @@ inline __host__ __device__ float4 fmodf(float4 a, float4 b)
 // absolute value
 ////////////////////////////////////////////////////////////////////////////////
 
-inline __host__ __device__ float2 fabs(float2 v)
+inline __host__ __device__ float2 fabsf(float2 v)
 {
-    return make_float2(fabs(v.x), fabs(v.y));
+    return make_float2(fabsf(v.x), fabsf(v.y));
 }
-inline __host__ __device__ float3 fabs(float3 v)
+inline __host__ __device__ float3 fabsf(float3 v)
 {
-    return make_float3(fabs(v.x), fabs(v.y), fabs(v.z));
+    return make_float3(fabsf(v.x), fabsf(v.y), fabsf(v.z));
 }
-inline __host__ __device__ float4 fabs(float4 v)
+inline __host__ __device__ float4 fabsf(float4 v)
 {
-    return make_float4(fabs(v.x), fabs(v.y), fabs(v.z), fabs(v.w));
+    return make_float4(fabsf(v.x), fabsf(v.y), fabsf(v.z), fabsf(v.w));
 }
 
 inline __host__ __device__ int2 abs(int2 v)
@@ -1533,7 +1533,7 @@ inline __device__ __host__ float4 smoothstep(float4 a, float4 b, float4 x)
 
 inline __host__ __device__ float3 fabs3 ( float3 a )
 {
-	return make_float3 ( fabs(a.x), fabs(a.y), fabs(a.z) );
+	return make_float3 ( fabsf(a.x), fabsf(a.y), fabsf(a.z) );
 }
 inline __host__ __device__ float3 floor3 ( float3 a )
 {
