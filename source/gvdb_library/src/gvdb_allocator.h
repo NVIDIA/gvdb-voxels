@@ -153,7 +153,7 @@
 		void	AllocateAtlasMap(int stride, Vector3DI axiscnt);
 		void	PoolCommitAtlasMap();
 		char*	getAtlasMapNode (uchar chan, Vector3DI val);
-		CUdeviceptr getAtlasMapGPU(uchar chan) { return (mAtlasMap.size()==0) ? NULL : mAtlasMap[chan].gpu; }
+		CUdeviceptr getAtlasMapGPU(uchar chan) { return (mAtlasMap.size()==0) ? 0 : mAtlasMap[chan].gpu; }
 
 		// Neighbor Table
 		void	AllocateNeighbors(uint64 cnt);		

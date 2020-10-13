@@ -535,19 +535,19 @@ namespace nvdb {
 
 		// Composing operations
 		// Sets this matrix `M` to `T*M`, where `T` translates by `translation`. Alias for `operator +=`.
-		Matrix4F& Matrix4F::TranslateInPlace(const Vector3DF& translation);
+		Matrix4F& TranslateInPlace(const Vector3DF& translation);
 		// Sets this matrix `M` to `mtx*M`.
-		Matrix4F& Matrix4F::LeftMultiplyInPlace(const Matrix4F& mtx);
+		Matrix4F& LeftMultiplyInPlace(const Matrix4F& mtx);
 		// Sets this matrix `M` to `S*M`, where S is the diagonal matrix with entries scale.x, scale.y, scale.z, and 1.
-		Matrix4F& Matrix4F::ScaleInPlace(const Vector3DF& scale);
+		Matrix4F& ScaleInPlace(const Vector3DF& scale);
 		// Sets this matrix `M` to `(T^-1)*M`, where `T` translates by `translation`. Equivalent to translating
 		// by `-translation`.
-		Matrix4F& Matrix4F::InvTranslateInPlace(const Vector3DF& translation);
+		Matrix4F& InvTranslateInPlace(const Vector3DF& translation);
 		// Sets this matrix `M` to `(mtx^-1)*M`.
-		Matrix4F& Matrix4F::InvLeftMultiplyInPlace(Matrix4F mtx);
+		Matrix4F& InvLeftMultiplyInPlace(Matrix4F mtx);
 		// Sets this matrix `M` to `(S^-1)*M`, where S is the diagonal matrix with entries scale.x, scale.y, scale.z,
 		// and 1. Equivalent to scaling by 1/scale.
-		Matrix4F& Matrix4F::InvScaleInPlace(const Vector3DF& scale);
+		Matrix4F& InvScaleInPlace(const Vector3DF& scale);
 
 
 		int GetX() { return 4; }

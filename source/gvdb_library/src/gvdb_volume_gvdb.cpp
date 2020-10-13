@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <float.h>
 #include <fstream>
 
 #if !defined(_WIN32)
