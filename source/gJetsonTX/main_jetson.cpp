@@ -85,7 +85,6 @@ public:
 	int			m_shade_style;
 
 	// 3D Printer settings
-    float		m_voxelsize;	// size of voxel 
     float       m_partsize;		// height of part in mm
     float       m_layerhgt;		// height of each layer in mm
     int         m_prn;			// handle to the printer device
@@ -247,7 +246,6 @@ bool Sample::init ()
 	setview2D ( w, h );
 
     m_offy = 20;
-	m_voxelsize = 0.25f;     // Voxel size (mm)   .12
 	m_partsize = 100.0f;	 // Part is 100 mm high (~4 inches)
 	m_layerhgt = 0.25f;      // 0.25 mm/layer
 	m_maxy = int(m_partsize / m_layerhgt);
@@ -261,7 +259,7 @@ bool Sample::init ()
 	gvdb.SetCudaDevice ( devid );
 	gvdb.Initialize ();								
 	gvdb.StartRasterGL ();			// Start GVDB Rasterizer. Requires an OpenGL context.
-	gvdb.AddPath ( std::string(ASSET_PATH) );
+	gvdb.AddPath ( ASSET_PATH );
 
 	// Load polygons
 	// This loads an obj file into scene memory on cpu.
@@ -281,21 +279,13 @@ bool Sample::init ()
 	// set the desired part size by scaling in millimeters (mm). 
 	// Translation has been added to position the part at (50,55,50).
 	Matrix4F xform;		
-	xform.SRT ( Vector3DF(1,0,0), Vector3DF(0,1,0), Vector3DF(0,0,1), Vector3DF(50,55,50), m_partsize );
+	xform.SRT ( Vector3DF(4.0f,0,0), Vector3DF(0,4.0f,0), Vector3DF(0,0,4.0f), Vector3DF(50,55,50), m_partsize );
 	
 	// The part can be oriented arbitrarily inside the target GVDB volume
 	// by applying a rotation, translation, or scale to the transform.
 	Matrix4F rot;
 	rot.RotateZYX( Vector3DF( 0, -10, 0 ) );
 	xform *= rot;								// Post-multiply to rotate part
-
-	// Set the voxel size
-	// We can specify the voxel size directly to GVDB. This is the size of a single voxel in world units.
-	// The voxel resolution of a rasterized part is the maximum number of voxels along each axis, 
-	// and is found by dividing the part size by the voxel size.
-	// To limit the resolution, one can invert the equation and find the voxel size for a given resolution.
-
-	gvdb.SetVoxelSize ( m_voxelsize, m_voxelsize, m_voxelsize );
 
 	// Poly-to-Voxels
 	// Converts polygons-to-voxels using the GPU graphics pipeline.	
@@ -349,7 +339,7 @@ void Sample::ExposeLayer ( int y, int oy )
 	gvdb.getScene()->SetCrossSection ( Vector3DF(50, ysec, 50), Vector3DF(50.0, 1, 50.0) );
 
 	// Render slice with GVDB
-	gvdb.Render ( 1, SHADE_SECTION2D, 0, 0, 1, 1, 1.0 );
+	gvdb.Render ( SHADE_SECTION2D, 0, 0 );
 
 	// Read back slice into OpenGL texture
 	gvdb.ReadRenderTexGL ( 1, gl_section_tex );
@@ -379,32 +369,21 @@ void Sample::display ()
 
 void Sample::draw_topology ()
 {
-	Vector3DF clrs[10];
-	clrs[0] = Vector3DF(0,0,1);			// blue
-	clrs[1] = Vector3DF(0,1,0);			// green
-	clrs[2] = Vector3DF(1,0,0);			// red
-	clrs[3] = Vector3DF(1,1,0);			// yellow
-	clrs[4] = Vector3DF(1,0,1);			// purple
-	clrs[5] = Vector3DF(0,1,1);			// aqua
-	clrs[6] = Vector3DF(1,0.5,0);		// orange
-	clrs[7] = Vector3DF(0,0.5,1);		// green-blue
-	clrs[8] = Vector3DF(0.7f,0.7f,0.7f);	// grey
+	start3D(gvdb.getScene()->getCamera());		// start 3D drawing
 
-	Camera3D* cam = gvdb.getScene()->getCamera();		
-	
-	start3D ( gvdb.getScene()->getCamera() );		// start 3D drawing
-	
-	Vector3DF bmin, bmax;
-	Node* node;
-	for (int lev=0; lev < 5; lev++ ) {				// draw all levels
-		int node_cnt = gvdb.getNumNodes(lev);				
-		for (int n=0; n < node_cnt; n++) {			// draw all nodes at this level
-			node = gvdb.getNodeAtLevel ( n, lev );
-			bmin = gvdb.getWorldMin ( node );		// get node bounding box
-			bmax = gvdb.getWorldMax ( node );		// draw node as a box
-			drawBox3D ( bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, clrs[lev].x, clrs[lev].y, clrs[lev].z, 1 );			
-		}		
+	for (int lev = 0; lev < 5; lev++) {				// draw all levels
+		int node_cnt = static_cast<int>(gvdb.getNumNodes(lev));
+		const Vector3DF& color = gvdb.getClrDim(lev);
+		const Matrix4F& xform = gvdb.getTransform();
+
+		for (int n = 0; n < node_cnt; n++) {			// draw all nodes at this level
+			Node* node = gvdb.getNodeAtLevel(n, lev);
+			Vector3DF bmin = gvdb.getWorldMin(node); // get node bounding box
+			Vector3DF bmax = gvdb.getWorldMax(node); // draw node as a box
+			drawBox3DXform(bmin, bmax, color, xform);
+		}
 	}
+
 	end3D();										// end 3D drawing
 }
 
@@ -477,7 +456,7 @@ void Sample::reshape (int w, int h)
 int sample_main ( int argc, const char** argv ) 
 {
 	Sample sample_obj;
-	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - g3DPrint", argc, argv, 1920, 1080, 4, 4 );
+	return sample_obj.run ( "NVIDIA(R) GVDB Voxels - gJetsonTX", "jetsontx", argc, argv, 1920, 1080, 4, 4 );
 }
 
 void sample_print( int argc, char const *argv)
