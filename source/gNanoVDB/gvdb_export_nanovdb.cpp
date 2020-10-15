@@ -348,8 +348,8 @@ print('};')
 		}
 
 		BBox<Vec3R> worldAABB(
-			{ FLT_MAX, FLT_MAX, FLT_MAX }, // Initial AABB min
-			{ -FLT_MAX, -FLT_MAX, -FLT_MAX } // Initial AABB max
+			Vec3R( FLT_MAX, FLT_MAX, FLT_MAX ), // Initial AABB min
+            Vec3R( -FLT_MAX, -FLT_MAX, -FLT_MAX ) // Initial AABB max
 		);
 
 		// Cast indexAABB to double-precision
@@ -642,8 +642,10 @@ print('};')
 			// However, for a different approximation, we could use something like sqrt(tr(A*A)/3),
 			// where A is the upper-left 3x3 block of xform; if A is normal, this gives the root mean
 			// square of the singular values of A.
-			gridData->mUniformScale = (gridData->applyMap(nanovdb::Vec3d(1, 0, 0))
-				- gridData->applyMap(nanovdb::Vec3d(0))).length();
+
+			//gridData->mUniformScale = (gridData->applyMap(nanovdb::Vec3d(1, 0, 0))
+			//	- gridData->applyMap(nanovdb::Vec3d(0))).length();
+            gridData->mVoxelSize = Vec3R(1.0, 0.0, 0.0);
 
 			gridData->mGridClass = gridClass;
 
@@ -658,7 +660,8 @@ print('};')
 				gridData->mGridType = nanovdb::GridType::Int32;
 			}
 
-			gridData->mBlindDataCount = 0;
+			//gridData->mBlindDataCount = 0;
+            gridData->mBlindMetadataCount = 0;
 		}
 		assert(gridData->memUsage() == dataSizes[R_GRID]); // Consistency check
 
