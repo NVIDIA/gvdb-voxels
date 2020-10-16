@@ -425,9 +425,9 @@ __device__ float4 transferFunction(float value) {
 	// Applying a linear transfer function:
 	const float4 keys[5] = {
 		make_float4(0.0f, 0.0f, 0.0f, 0.0f),
-		make_float4(1.0f, 1.0f, 0.0f, 0.1f),
-		make_float4(1.0f, 0.0f, 0.0f, 0.3f),
-		make_float4(0.2f, 0.2f, 0.2f, 0.1f),
+		make_float4(1.5f, 1.5f, 0.0f, 0.1f),
+		make_float4(1.5f, 0.0f, 0.0f, 0.3f),
+		make_float4(0.3f, 0.3f, 0.3f, 0.1f),
 		make_float4(0.0f, 0.0f, 0.0f, 0.0f)
 	};
 	const float t4 = t * 4;
