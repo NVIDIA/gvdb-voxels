@@ -325,8 +325,8 @@ print('};')
 
 		// Set the bounding box and min/max values for the whole volume:
 		rootData->mBBox = indexAABB;
-		rootData->mValueMin = valueMin;
-		rootData->mValueMax = valueMax;
+		rootData->mMinimum = valueMin;
+		rootData->mMaximum = valueMax;
 
 		// Sort the tiles so that their keys are in ascending order. This makes it so that
 		// RootNode::findTile can efficiently find them.
@@ -348,8 +348,8 @@ print('};')
 		}
 
 		BBox<Vec3R> worldAABB(
-			{ FLT_MAX, FLT_MAX, FLT_MAX }, // Initial AABB min
-			{ -FLT_MAX, -FLT_MAX, -FLT_MAX } // Initial AABB max
+			Vec3R( FLT_MAX, FLT_MAX, FLT_MAX ), // Initial AABB min
+			Vec3R( -FLT_MAX, -FLT_MAX, -FLT_MAX ) // Initial AABB max
 		);
 
 		// Cast indexAABB to double-precision
@@ -637,13 +637,17 @@ print('};')
 			// Skip over the world bounding box for now - we'll fill it in later.
 
 			// GridData would like a uniform scale, but that's not really possible to provide, since
-			// GVDB supports arbitrary voxel transforms (e.g. think of squished voxels).
-			// For now, we use the approach GridBuilder uses, which is ||map((1, 0, 0)) - map((0,0,0))||.
+			// GVDB supports arbitrary voxel transforms (e.g. think of skewed voxels).
+			// For now, we use the approach GridBuilder uses, which is scale_i = ||map(e_i) - map((0,0,0))||.
 			// However, for a different approximation, we could use something like sqrt(tr(A*A)/3),
 			// where A is the upper-left 3x3 block of xform; if A is normal, this gives the root mean
 			// square of the singular values of A.
-			gridData->mUniformScale = (gridData->applyMap(nanovdb::Vec3d(1, 0, 0))
-				- gridData->applyMap(nanovdb::Vec3d(0))).length();
+			const nanovdb::Vec3d mapAt0 = gridData->applyMap(nanovdb::Vec3d(0, 0, 0));
+			gridData->mVoxelSize = Vec3R(
+				(gridData->applyMap(nanovdb::Vec3d(1, 0, 0)) - mapAt0).length(),
+				(gridData->applyMap(nanovdb::Vec3d(0, 1, 0)) - mapAt0).length(),
+				(gridData->applyMap(nanovdb::Vec3d(0, 0, 1)) - mapAt0).length()
+			);
 
 			gridData->mGridClass = gridClass;
 
@@ -658,9 +662,10 @@ print('};')
 				gridData->mGridType = nanovdb::GridType::Int32;
 			}
 
-			gridData->mBlindDataCount = 0;
+			gridData->mBlindMetadataCount = 0;
+			gridData->mBlindMetadataOffset = 0;
 		}
-		assert(gridData->memUsage() == dataSizes[R_GRID]); // Consistency check
+		assert(sizeof(nanovdb::GridData) == dataSizes[R_GRID]); // Consistency check
 
 		//---------------------------------------------------------------------------------------------
 		// Tree (CPU)

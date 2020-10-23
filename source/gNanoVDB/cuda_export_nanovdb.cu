@@ -129,8 +129,10 @@ __device__ void ProcessLeaf(VDBInfo* gvdb, void* nanoVDBLeafNodes, cudaSurfaceOb
 		}
 	}
 
-	nodeData.mValueMin = minValue;
-	nodeData.mValueMax = maxValue;
+	nodeData.mMinimum = minValue;
+	nodeData.mMaximum = maxValue;
+	// Note that mAverage and mStdDevi currently aren't set.
+
 	// Since all voxels are active, the bounding box of active values of this node is the
 	// bounding box of the node itself:
 	nodeData.mBBoxMin = { gvdbNode->mPos.x, gvdbNode->mPos.y, gvdbNode->mPos.z };
@@ -353,8 +355,8 @@ template<class ValueT, int LOG2DIM> __device__ void ProcessInternalNode(
 		}
 	}
 
-	nodeData->mValueMin = valueMin;
-	nodeData->mValueMax = valueMax;
+	nodeData->mMinimum = valueMin;
+	nodeData->mMaximum = valueMax;
 	nodeData->mBBox.min() = aabbMin;
 	nodeData->mBBox.max() = aabbMax;
 }
@@ -466,7 +468,7 @@ extern "C" __global__ void gvdbExportNanoVDBRender(void* vPtrGrid,
 		camTopLeftWS.z + u * camRightWS.z + v * camDownWS.z
 	);
 	nanovdb::Ray<float> rayWS(eye, direction);
-	nanovdb::TrilinearSampler<AccT> sampler(acc);
+	nanovdb::SampleFromVoxels<AccT, 1, true> sampler(acc);
 	// Convert to index-space
 	nanovdb::Ray<float> iRay = rayWS.worldToIndexF(*grid);
 
@@ -479,7 +481,7 @@ extern "C" __global__ void gvdbExportNanoVDBRender(void* vPtrGrid,
 		// (e.g. using delta tracking)
 		const float dt = 0.25f; // Roughly, 1/(number of samples per voxel).
 		for (float t = iRay.t0(); t < iRay.t1(); t += dt) {
-			float sigma = sampler(iRay(t)); // acc.getValue(nanovdb::Coord::Floor(iRay(t)));
+			float sigma = sampler(iRay(t));
 			float4 value = transferFunction(sigma); // Color and opacity
 			value.w = exp(-dt * value.w);
 			color.x += value.x * transmittance * (1 - value.w);
