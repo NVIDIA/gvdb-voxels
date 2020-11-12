@@ -231,7 +231,7 @@ extern "C" __global__ void gvdbRaytrace ( VDBInfo* gvdb, uchar chan, int num_ray
 	// raytrace
 	rays[x].hit = make_float3(NOHIT, NOHIT, NOHIT);
 	float4 hclr = make_float4(1,1,1,1);
-	rayCast ( gvdb, chan,  rays[x].orig, rays[x].dir, rays[x].hit, rays[x].normal, hclr, raySurfaceTricubicBrick );
+	rayCast ( gvdb, chan,  rays[x].orig, rays[x].dir, rays[x].hit, rays[x].normal, hclr, raySurfaceTrilinearBrick );
 
 	if ( rays[x].hit.z != NOHIT ) rays[x].hit -= rays[x].dir * bias;
 }

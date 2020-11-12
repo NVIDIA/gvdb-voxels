@@ -40,6 +40,13 @@ inline __device__ float4 transfer(VDBInfo* gvdb, float v)
 // Essentially, we're always marching within a parent node, over the children of that node.
 // We can always prepare this state given a point and a node.
 // At each step, we advance to the next child node in the X, Y, or Z directions.
+//
+// This mainly gets used in cuda_gvdb_raycast.cuh.
+// Typically, a function will call SetFromRay once per ray, then call Prepare initially
+// and whenever the traversal level changes (this essentially performs some precomputation).
+// It'll then usually alternate between calling Next (determines next cell intersection)
+// and Step (moves to that next intersection).
+//
 // Reference: http://ramakarl.com/pdfs/2016_Hoetzlein_GVDB.pdf
 struct HDDAState {
 	// Constant per ray:
@@ -54,6 +61,8 @@ struct HDDAState {
 	float3 tSide; // Value of t.x that intersects the next plane in the x, y, and z direction.
 	int3 mask; // Which coordinates to move along next, each 1 or 0.
 
+	// Initializes the HDDA given an index-space point (startPos), direction (startDir), and
+	// a starting value of t (startT).
 	__device__ void SetFromRay(float3 startPos, float3 startDir, float3 startT) {
 		pos = startPos;
 		dir = startDir;

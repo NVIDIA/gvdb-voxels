@@ -148,6 +148,7 @@ bool Sample::init()
 	gvdb.getScene()->LinearTransferFunc ( 0.2f, 0.3f,   Vector4DF(1,1,1,0.05f), Vector4DF(1,1,1,0.05f) );	
 	gvdb.getScene()->LinearTransferFunc ( 0.3f, 1.0f,   Vector4DF(1,1,1,0.05f), Vector4DF(0,0,0,0.0) );	
 	gvdb.CommitTransferFunc (); 
+	gvdb.SetEpsilon(0.01f, 256); // Use a larger epsilon than default to avoid artifacts between bricks
 
 	// Configure a new GVDB volume
 	gvdb.Configure ( 3, 3, 3, 3, 5 );
@@ -291,7 +292,7 @@ void Sample::simulate()
 	// Returns the hit position and normal of each ray
 	gvdb.Raytrace ( m_rays, 0, SHADE_TRILINEAR, 0, -0.0001f);
 
-	// Insert Points into the GVDBb grid
+	// Insert Points into the GVDB grid
 	// This identifies a grid cell for each point. The SetPointStruct function accepts an arbitrary 
 	// structure, which must contain a vec3f position input, and uint node offset and index outputs.
 	// We can use the ray hit points as input directly from the ScnRay data structure.
@@ -307,7 +308,7 @@ void Sample::simulate()
 	gvdb.InsertPointsSubcell (subcell_size, m_numrays, radius, Vector3DF(0,0,0), scPntLen);
 	gvdb.GatherDensity (subcell_size, m_numrays, radius, Vector3DF(0,0,0), scPntLen, 0, 1, true ); // true = accumulate
 
-	gvdb.UpdateApron ( 0 );
+	gvdb.UpdateApron ();
 		
 	// Smooth the volume
 	// A smoothing effect simulates gradual erosion

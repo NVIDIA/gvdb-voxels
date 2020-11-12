@@ -294,10 +294,10 @@ __device__ void raySurfaceVoxelBrick ( VDBInfo* gvdb, uchar chan, int nodeid, fl
 __device__ void raySurfaceTrilinearBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& hit, float3& norm, float4& hclr )
 {
 	float3 vmin;
-	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
-	float3  o = make_float3( node->mValue ) ;				// Atlas sub-volume to trace	
-	float3	p = pos + t.x*dir - vmin;					// sample point in index coords			
-	t.x = SCN_DIRECTSTEP * ceil ( t.x / SCN_DIRECTSTEP );
+	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );	// Get the VDB leaf node	
+	float3  o = make_float3( node->mValue ) ;				// Atlas sub-volume to trace
+	t.x = SCN_DIRECTSTEP * ceil(t.x / SCN_DIRECTSTEP);		// Start on sampling wavefront (avoids subvoxel banding artifacts)
+	float3	p = pos + t.x*dir - vmin;						// sample point in index coords			
 
 	for (int iter=0; iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++) 
 	{	
@@ -498,34 +498,22 @@ __device__ void rayShadowBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t
 __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, float3 pos, float3 dir, float3& hit, float3& norm, float4& clr )
 {
 	float3 vmin;
-	VDBNode* node = getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node		
+	VDBNode* node = getNode ( gvdb, 0, nodeid, &vmin );		// Get the VDB leaf node		
 	
-	//t.x = SCN_DIRECTSTEP * ceil( t.x / SCN_DIRECTSTEP );						// start on sampling wavefront	
+	t.x = SCN_DIRECTSTEP * ceil( t.x / SCN_DIRECTSTEP );	// Start on sampling wavefront (avoids subvoxel banding artifacts)
 
-	float3 o = make_float3( node->mValue );					// atlas sub-volume to trace
-	float3 wp = pos + t.x*dir;	
-	float3 p = wp-vmin;					// sample point in index coords	
-	float3 wpt = SCN_DIRECTSTEP*dir;					// world increment
-	float4 val = make_float4(0,0,0,0);
-	float4 hclr;
-	int iter = 0;
-	float dt = length(SCN_DIRECTSTEP*dir);
+	float3 o = make_float3( node->mValue );	// Atlas sub-volume to trace
+	float3 wp = pos + t.x*dir;				// Sample position in index space
+	float3 p = wp - vmin;					// Sample point in sub-volume (in units of voxels)
+	const float3 wpt = SCN_DIRECTSTEP*dir;	// Increment in units of voxels
+	const float dt = length(wpt);			// Change in t-value per step
 	const float tDepthIntersection = getRayDepthBufferMax(dir); // The t.x at which the ray intersects the depth buffer
 
-	// record front hit point at first significant voxel
+	// Record front hit point at first significant voxel
 	if (hit.x == 0) hit.x = t.x; // length(wp - pos);
 
-	// skip empty voxels
-	for (iter=0; val.w < SCN_MINVAL && iter < MAX_ITER && p.x >= 0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++) {		
-		val.w = transfer ( gvdb, tex3D<float> ( gvdb->volIn[chan], p.x+o.x, p.y+o.y, p.z+o.z ) ).w;
-		p += SCN_DIRECTSTEP*dir;
-		wp += wpt;
-		t.x += dt;
-	}	
-
-	// accumulate remaining voxels
-	for (; clr.w > SCN_ALPHACUT && iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++) {			
-
+	// Accumulate remaining voxels
+	for (int iter = 0; clr.w > SCN_ALPHACUT && iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++) {			
 		// Test to see if we've intersected the depth buffer (if there is no depth buffer, then this will never happen):
 		if (t.x > tDepthIntersection) {
 			hit.y = length(wp - pos);
@@ -534,15 +522,22 @@ __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, 
 			return;
 		}
 
-		val = transfer ( gvdb, tex3D<float> ( gvdb->volIn[chan], p.x+o.x, p.y+o.y, p.z+o.z ) );
-		val.w = exp ( SCN_EXTINCT * val.w * SCN_DIRECTSTEP );
-		hclr = (gvdb->clr_chan==CHAN_UNDEF) ? make_float4(1,1,1,1) : getColorF (gvdb, gvdb->clr_chan, p+o );
-		clr.x += val.x * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.x;
-		clr.y += val.y * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.y;
-		clr.z += val.z * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.z;
-		clr.w *= val.w;		
+		// Get the value of the volume at this point. Only consider it if it's greater than SCN_MINVAL.
+		const float rawSample = tex3D<float>(gvdb->volIn[chan], p.x + o.x, p.y + o.y, p.z + o.z);
+		if (rawSample >= SCN_MINVAL) {
+			// Apply transfer function; integrate val.w to get transmittance according to the Beer-Lambert law:
+			float4 val = transfer(gvdb, rawSample);
+			val.w = exp(SCN_EXTINCT * val.w * SCN_DIRECTSTEP);
+			// RGB color from color channel (alpha component is unused):
+			const float4 hclr = (gvdb->clr_chan == CHAN_UNDEF) ? make_float4(1, 1, 1, 1) : getColorF(gvdb, gvdb->clr_chan, p + o);
+			clr.x += val.x * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.x;
+			clr.y += val.y * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.y;
+			clr.z += val.z * clr.w * (1 - val.w) * SCN_ALBEDO * hclr.z;
+			clr.w *= val.w;
+		}
 
-		p += SCN_DIRECTSTEP*dir;		
+		// Step forwards.
+		p += wpt;
 		wp += wpt;		
 		t.x += dt;
 	}			

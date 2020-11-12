@@ -214,6 +214,7 @@ bool Sample::init()
 	gvdb.getScene()->LinearTransferFunc ( 0.50f, 0.75f, Vector4DF(1,0,0,0.02f), Vector4DF(.2f,.2f,0.2f,0.02f) );
 	gvdb.getScene()->LinearTransferFunc ( 0.75f, 1.00f, Vector4DF(.2f,.2f,0.2f,0.02f), Vector4DF(.1f,.1f,.1f,.1f) );
 	gvdb.CommitTransferFunc ();
+	gvdb.SetEpsilon(0.01f, 256); // Use a larger value of epsilon than the default (0.001) to avoid artifacts between bricks
 
 	// Create Camera 
 	Camera3D* cam = new Camera3D;						
