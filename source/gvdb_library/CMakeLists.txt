@@ -115,11 +115,19 @@ target_include_directories(gvdb
                 $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/kernels>
                 $<INSTALL_INTERFACE:include>)
 
-# Make sure to link against CUDA and OpenGL
+# Make sure to link against CUDA (since we use the Driver API) and OpenGL
 target_link_libraries(gvdb
     PUBLIC ${OPENGL_LIBRARIES})
 if(WIN32)
-    target_link_libraries(gvdb PUBLIC cuda.lib)
+    # Get the absolute path to cuda.lib from CMAKE_CUDA_COMPILER if it exists.
+    # This avoids linking errors with Ninja and the samples.
+    set(_CUDA_LIB "cuda.lib")
+    if(CMAKE_CUDA_COMPILER)
+      get_filename_component(_CUDA_BIN_DIR "${CMAKE_CUDA_COMPILER}" DIRECTORY)
+      get_filename_component(_CUDA_DIR "${_CUDA_BIN_DIR}" DIRECTORY)
+      string(PREPEND _CUDA_LIB "${_CUDA_DIR}/lib/x64/")
+    endif()
+    target_link_libraries(gvdb PUBLIC "${_CUDA_LIB}")
 elseif(UNIX)
     find_package(X11 REQUIRED)
     target_link_libraries(gvdb

@@ -296,9 +296,6 @@ void VolumeGVDB::SetCudaDevice ( int devid, CUcontext ctx )
 	LoadFunction ( FUNC_FIND_ACTIV_BRICKS,	"gvdbFindActivBricks",			MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );	
 	LoadFunction ( FUNC_BITONIC_SORT,		"gvdbBitonicSort",				MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );	
 	LoadFunction ( FUNC_CALC_BRICK_ID,		"gvdbCalcBrickId",				MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );	
-	LoadFunction ( FUNC_RADIX_SUM,			"RadixSum",						MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );	
-	LoadFunction ( FUNC_RADIX_PREFIXSUM,	"RadixPrefixSum",				MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );
-	LoadFunction ( FUNC_RADIX_SHUFFLE,		"RadixAddOffsetsAndShuffle",	MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );
 	LoadFunction ( FUNC_FIND_UNIQUE,		"gvdbFindUnique",				MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );
 	LoadFunction ( FUNC_COMPACT_UNIQUE,		"gvdbCompactUnique",			MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );
 	LoadFunction ( FUNC_LINK_BRICKS,		"gvdbLinkBricks",				MODL_PRIMARY, CUDA_GVDB_MODULE_PTX );
