@@ -51,8 +51,7 @@ target_sources(gvdbPTX
             "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_particles.cuh"
             "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_raycast.cuh"
             "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_gvdb_scene.cuh"
-            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_math.cuh"
-            "${CMAKE_CURRENT_LIST_DIR}/kernels/radixsort_kernel.cuh")
+            "${CMAKE_CURRENT_LIST_DIR}/kernels/cuda_math.cuh")
 
 # Enable the --use_fast_math CUDA compiler flag.
 target_compile_options(gvdbPTX

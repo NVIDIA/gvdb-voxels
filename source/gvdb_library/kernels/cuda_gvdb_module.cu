@@ -41,7 +41,6 @@
 #include "cuda_gvdb_geom.cuh"		// GVDB Geom helpers
 #include "cuda_gvdb_dda.cuh"		// GVDB DDA 
 #include "cuda_gvdb_raycast.cuh"	// GVDB Raycasting   
-#include "radixsort_kernel.cuh"
 //----------------------------------------- 
    
 // Operator functions
