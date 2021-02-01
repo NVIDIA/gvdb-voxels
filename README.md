@@ -158,4 +158,6 @@ Building a sample will also automatically build GVDB, so you no longer need to b
 
 Apache 2.0. Please refer to [LICENSE.txt](https://github.com/NVIDIA/gvdb-voxels/blob/master/LICENSE.txt).
 
+Before commit [dfcaf6](https://github.com/NVIDIA/gvdb-voxels/commit/dfcaf6822982a78eeed87004b7e62856d34f590c) on February 1st, 2021, GVDB used 3-clause BSD. See [#111](https://github.com/NVIDIA/gvdb-voxels/issues/111) for more details.
+
 © 2021 NVIDIA Corporation
