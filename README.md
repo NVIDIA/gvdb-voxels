@@ -40,7 +40,7 @@ NVIDIA® GVDB Voxels is a new library and SDK for simulation, compute, and rende
 Created by Rama Hoetzlein, 2017
 
 - First public release
-- Open source (BSD 3-clause)
+- Open source (BSD 3-clause; changed on 2/1/2021 to Apache 2.0)
 - Samples: g3DPrint, gFluidSurface, gInteractiveGL, gInteractiveOptix,
   gJetsonTX, gRenderKernel, gRenderToFile, gSprayDeposit
 - Builds on Windows and Linux
@@ -156,6 +156,6 @@ Building a sample will also automatically build GVDB, so you no longer need to b
 
 ==========================
 
-BSD 3-clause. Please refer to [LICENSE.txt](https://github.com/NVIDIA/gvdb-voxels/blob/master/LICENSE.txt).
+Apache 2.0. Please refer to [LICENSE.txt](https://github.com/NVIDIA/gvdb-voxels/blob/master/LICENSE.txt).
 
-© 2020 NVIDIA
+© 2021 NVIDIA Corporation

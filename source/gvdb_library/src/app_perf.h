@@ -1,52 +1,31 @@
-//--------------------------------------------------------------------------------
-//
-// File:   app_perf.h
-// 
-// Copyright (c) 2015, NVIDIA. All rights reserved.
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of NVIDIA nor the
-//    names of its contributors may be used to endorse or promote products
-//    derived from this software without specific prior written permission.
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
-// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-//----------------------------------------------------------------------------------
-// Created: Rama Hoetzlein, rhoetzlein@nvidia.com, 2013
-//
-// This lightweight performance class provides additional
-// features for CPU and GPU profiling:
-// 1. By default, markers are disabled if nvToolsExt32_1.dll 
-//    is not found in the working path. Useful when shipping a product.
-// 2. Providing nvToolsExt32_1.dll automatically enables CPU and GPU markers.
-// 3. If nvToolsExt_32.dll is not present, you can still 
-//    enable CPU only markers by calling PERF_INIT(false);  // false = don't require dll
-// 4. Instrument code with single PERF_PUSH, PERF_POP markers 
-//    for both CPU and GPU output.
-// 5. Perform additional printing along with markers using PERF_PRINTF
-// 6. Output CPU markers to log file by specifing filename to PERF_SET
-// 7. Markers can be nested, with range output for both CPU and GPU
-// 8. Only app_perf.h and app_perf.cpp are needed. No need to link with nvToolsExt.h.
-// 9. CPU and GPU can be enabled selectively in different parts of the app.
-//    Call PERF_SET( CPUon?, CPUlevel, GPUon?, LogFilename ) at any time.
-// 10. CPU times reported in milliseconds, with sub-microsecond accuracy.
-// 11. CPU Level specifies maximum printf level for markers. Useful when
-//     your markers are inside an inner loop. You can keep them in code, but hide their output.
-// 12. GPU markers use NVIDIA's Perfmarkers for viewing in NVIDIA NSIGHT
-// 
+/*
+app_perf.h
+
+Created by Rama Hoetzlein, rhoetzlein@nvidia.com, 2013
+
+Copyright 2015 NVIDIA Corporation
+SPDX-License-Identifier: Apache-2.0
+
+This lightweight performance class provides additional
+features for CPU and GPU profiling:
+1. By default, markers are disabled if nvToolsExt32_1.dll 
+   is not found in the working path. Useful when shipping a product.
+2. Providing nvToolsExt32_1.dll automatically enables CPU and GPU markers.
+3. If nvToolsExt_32.dll is not present, you can still 
+   enable CPU only markers by calling PERF_INIT(false);  // false = don't require dll
+4. Instrument code with single PERF_PUSH, PERF_POP markers 
+   for both CPU and GPU output.
+5. Perform additional printing along with markers using PERF_PRINTF
+6. Output CPU markers to log file by specifing filename to PERF_SET
+7. Markers can be nested, with range output for both CPU and GPU
+8. Only app_perf.h and app_perf.cpp are needed. No need to link with nvToolsExt.h.
+9. CPU and GPU can be enabled selectively in different parts of the app.
+   Call PERF_SET( CPUon?, CPUlevel, GPUon?, LogFilename ) at any time.
+10. CPU times reported in milliseconds, with sub-microsecond accuracy.
+11. CPU Level specifies maximum printf level for markers. Useful when
+    your markers are inside an inner loop. You can keep them in code, but hide their output.
+12. GPU markers use NVIDIA's Perfmarkers for viewing in NVIDIA NSIGHT
+*/
 
 #ifndef APP_PERF
   #define APP_PERF

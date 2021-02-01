@@ -1,3 +1,8 @@
+//-----------------------------------------------------------------------------
+// NVIDIA(R) GVDB VOXELS
+// Copyright 2017 NVIDIA Corporation
+// SPDX-License-Identifier: Apache-2.0
+//-----------------------------------------------------------------------------
 #version 440
 
 #extension GL_ARB_shader_image_size : enable

@@ -1,4 +1,8 @@
-
+//-----------------------------------------------------------------------------
+// NVIDIA(R) GVDB VOXELS
+// Copyright 2017 NVIDIA Corporation
+// SPDX-License-Identifier: Apache-2.0
+//-----------------------------------------------------------------------------
 #version 440 core
 #extension GL_NV_gpu_shader5 : require
 

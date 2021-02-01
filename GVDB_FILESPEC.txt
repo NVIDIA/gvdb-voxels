@@ -1,9 +1,9 @@
-
-NVIDIA GVDB Sparse Volumes
-NVIDIA Corporation (c) 2016
+NVIDIA GVDB VOXELS
+Copyright 2016 NVIDIA Corporation
+SPDX-License-Identifier: Apache-2.0
 
 Created: Rama Hoetzlein, rhoetzlein@nvidia.com, 8/28/2016
-Last Revised: 3/3/2020
+Last Revised: 2/1/2021
 
 This file outlines the VBX file format specification.
 

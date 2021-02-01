@@ -1,3 +1,5 @@
+# Copyright 2017 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
 cmake_minimum_required(VERSION 3.10) # Use Modern CMake
 
 # Here's what the dependency graph of this project looks like:

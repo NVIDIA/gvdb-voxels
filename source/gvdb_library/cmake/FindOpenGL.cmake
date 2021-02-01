@@ -1,3 +1,6 @@
+# Copyright 2017 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 # - Try to find OpenGL
 # Once done this will define
 #

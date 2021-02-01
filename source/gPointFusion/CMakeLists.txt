@@ -1,3 +1,5 @@
+# Copyright 2018 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
 cmake_minimum_required(VERSION 3.10)
 
 # Here's what the dependency graph of this sample looks like:

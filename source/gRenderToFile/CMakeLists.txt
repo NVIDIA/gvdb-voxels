@@ -1,3 +1,5 @@
+# Copyright 2017 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
 cmake_minimum_required(VERSION 3.10)
 
 # Make sure to include CUDA, so that GVDB header files are processed correctly, and C, so that GLEW compiles correctly.

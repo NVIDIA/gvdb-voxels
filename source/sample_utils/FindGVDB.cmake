@@ -1,4 +1,6 @@
-#####################################################################################
+# Copyright 2017 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 # Find GVDB
 #
 unset(GVDB_FOUND CACHE)

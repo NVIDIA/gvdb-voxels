@@ -1,3 +1,6 @@
+# Copyright 2020 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 # This CMakeLists file builds the GVDB library and all of its samples.
 # If you'd like to build the GVDB library by itself, try running the
 # CMakeLists in source/gvdb_library.

@@ -1,4 +1,10 @@
-#include"gvdb_cutils.cuh"
+//-----------------------------------------------------------------------------
+// NVIDIA(R) GVDB VOXELS
+// Copyright 2020 NVIDIA Corporation
+// SPDX-License-Identifier: Apache-2.0
+//-----------------------------------------------------------------------------
+
+#include "gvdb_cutils.cuh"
 
 void gvdbDeviceRadixSort(CUdeviceptr inSource, const uint32_t inCount){
     thrust::device_ptr<uint64_t> d_keys = thrust::device_pointer_cast((uint64_t*)inSource);

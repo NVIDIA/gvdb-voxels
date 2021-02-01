@@ -1,4 +1,10 @@
-#include"gvdb_cutils.cuh"
+//-----------------------------------------------------------------------------
+// NVIDIA(R) GVDB VOXELS
+// Copyright 2020 NVIDIA Corporation
+// SPDX-License-Identifier: Apache-2.0
+//-----------------------------------------------------------------------------
+
+#include "gvdb_cutils.cuh"
 
 // Sorts inSource (an array of uint64_t elements of length inCount) in place
 // using radix sort.

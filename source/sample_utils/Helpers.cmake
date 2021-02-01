@@ -1,3 +1,7 @@
+# Helpers.cmake
+# Copyright 2017 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 #----- copy_cuda_bins
 # This macro copies all binaries for the CUDA library to the target executale location. 
 #

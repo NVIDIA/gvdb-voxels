@@ -1,8 +1,9 @@
-
-
-#####################################################################################
+# Copyright 2017 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
 # Find Sample Utils
 #
+
 unset( UTILS_FOUND CACHE)
 
 message ( STATUS "--> Find Sample Utils") 

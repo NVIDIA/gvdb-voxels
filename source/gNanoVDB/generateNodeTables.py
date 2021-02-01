@@ -1,3 +1,6 @@
+# Copyright 2020 NVIDIA Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 print('static const size_t nodeSizes[3][6] = {')
 for type in ['float', 'Vec3f', 'int']:
   print('{', end='')

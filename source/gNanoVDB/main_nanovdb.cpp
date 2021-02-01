@@ -1,36 +1,7 @@
-//--------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // NVIDIA(R) GVDB VOXELS
-// Copyright 2020, NVIDIA Corporation. 
-//
-// Redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-// 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer 
-//    in the documentation and/or  other materials provided with the distribution.
-// 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived 
-//    from this software without specific prior written permission.
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
-// BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
-// SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
-// OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
-// This sample shows how to export a GVDB volume to a NanoVDB volume.
-// It loads a GVDB volume from a VBX volume, then calls ExportToNanoVDB to allocate and create a
-// NanoVDB grid on the GPU. Finally, it renders this volume using a small NanoVDB kernel in
-// cuda_export_nanovdb.cu, mimicking how gRenderToFile renders a volume. It also shows how to
-// use a GVDB Camera class with NanoVDB rendering.
-//
-// Since NanoVDB is a header-only library, you don't need to compile any dependencies other than
-// GVDB in order to compile this sample - only add the correct NanoVDB folder to the list of
-// include directories.
-//
-// At the moment, GVDB-to-NanoVDB export is implemented entirely in this sample in
-// gvdb_export_nanovdb.h, gvdb_export_nanovdb.cpp, and cuda_export_nanovdb.cu, but the plan is to
-// move this to the core GVDB library in the future.
-//
-// In addition to this file, make sure to check out the rendering code in cuda_export_nanovdb.cu!
+// Copyright 2020 NVIDIA Corporation
+// SPDX-License-Identifier: Apache-2.0
 //
 // Version 1.1.1: Neil Bickford, 8/12/2020
 //----------------------------------------------------------------------------------

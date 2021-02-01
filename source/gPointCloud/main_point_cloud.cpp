@@ -1,3 +1,9 @@
+//-----------------------------------------------------------------------------
+// NVIDIA(R) GVDB VOXELS
+// Copyright 2018 NVIDIA Corporation
+// SPDX-License-Identifier: Apache-2.0
+//-----------------------------------------------------------------------------
+
 // GVDB library
 #include "gvdb.h"			
 using namespace nvdb;
