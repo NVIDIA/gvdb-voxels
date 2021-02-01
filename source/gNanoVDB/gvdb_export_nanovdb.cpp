@@ -363,10 +363,10 @@ print('};')
 		// This is to watch out for incompatibilities in CoordToKey, since we don't do partial
 		// specialization for it:
 		uint64_t testKey = RootData<InternalNode<InternalNode<LeafNode<float, Coord, Mask, 3>, 4>, 5>>
-			::CoordToKey({ 438603478, 101217144, 861900436 });
+			::CoordToKey<Coord>({ 438603478, 101217144, 861900436 });
 		assert(testKey == ((861900436ULL >> 12) | ((101217144ULL >> 12) << 21) | ((438603478ULL >> 12) << 42)));
 		testKey = RootData<InternalNode<InternalNode<LeafNode<float, Coord, Mask, 7>, 4>, 6>>
-			::CoordToKey({ 35463336, 183524282, 84996283 });
+			::CoordToKey<Coord>({ 35463336, 183524282, 84996283 });
 		assert(testKey == ((84996283ULL >> 17) | ((183524282ULL >> 17) << 21) | ((35463336ULL >> 17) << 42)));
 #endif
 	}
