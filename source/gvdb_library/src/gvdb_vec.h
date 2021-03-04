@@ -45,7 +45,7 @@ namespace nvdb {
 		Vector3D(const VTYPE xa, const VTYPE ya, const VTYPE za) { x = xa; y = ya; z = za; }
 		template<class OTHERVTYPE>
 		Vector3D(const Vector3D<OTHERVTYPE>& op) { x = (VTYPE)op.x; y = (VTYPE)op.y; z = (VTYPE)op.z; }
-		Vector3D(const Vector4DF& op) { x = (VTYPE)op.x; y = (VTYPE)op.y; z = (VTYPE)op.z; }
+		Vector3D(const Vector4DF& op);
 
 		// Set Functions
 		Vector3D<VTYPE>& Set(const VTYPE xa, const VTYPE ya, const VTYPE za) {
@@ -67,9 +67,7 @@ namespace nvdb {
 		Vector3D<VTYPE>& operator+= (const Vector3D<OTHERVTYPE>& op) {
 			return Set(x + static_cast<VTYPE>(op.x), y + static_cast<VTYPE>(op.y), z + static_cast<VTYPE>(op.z));
 		}
-		Vector3D<VTYPE>& operator+= (const Vector4DF& op) {
-			return Set(x + static_cast<VTYPE>(op.x), y + static_cast<VTYPE>(op.y), z + static_cast<VTYPE>(op.z));
-		}
+		Vector3D<VTYPE>& operator+= (const Vector4DF& op);
 
 		template<class T>
 		Vector3D<VTYPE>& operator-= (const T& op) {
@@ -79,9 +77,7 @@ namespace nvdb {
 		Vector3D<VTYPE>& operator-= (const Vector3D<OTHERVTYPE>& op) {
 			return Set(x - static_cast<VTYPE>(op.x), y - static_cast<VTYPE>(op.y), z - static_cast<VTYPE>(op.z));
 		}
-		Vector3D<VTYPE>& operator-= (const Vector4DF& op) {
-			return Set(x - static_cast<VTYPE>(op.x), y - static_cast<VTYPE>(op.y), z - static_cast<VTYPE>(op.z));
-		}
+		Vector3D<VTYPE>& operator-= (const Vector4DF& op);
 
 		template<class T>
 		Vector3D<VTYPE>& operator*= (const T& op) {
@@ -91,19 +87,12 @@ namespace nvdb {
 		Vector3D<VTYPE>& operator*= (const Vector3D<OTHERVTYPE>& op) {
 			return Set(x * static_cast<VTYPE>(op.x), y * static_cast<VTYPE>(op.y), z * static_cast<VTYPE>(op.z));
 		}
-		Vector3D<VTYPE>& operator*= (const Vector4DF& op) {
-			return Set(x * static_cast<VTYPE>(op.x), y * static_cast<VTYPE>(op.y), z * static_cast<VTYPE>(op.z));
-		}
+		Vector3D<VTYPE>& operator*= (const Vector4DF& op);
 
 		// For floating-point vectors, sets this vector to and returns the result of multiplying this vector by the
 		// matrix on the left. This vector is interpreted as a point (x, y, z, 1) when multiplying, and takes the first
 		// three components of the result.
-		Vector3D<VTYPE>& operator*= (const Matrix4F& op) {
-			float xa = (float)x * op.data[0] + (float)y * op.data[4] + (float)z * op.data[8] + op.data[12];
-			float ya = (float)x * op.data[1] + (float)y * op.data[5] + (float)z * op.data[9] + op.data[13];
-			float za = (float)x * op.data[2] + (float)y * op.data[6] + (float)z * op.data[10] + op.data[14];
-			return Set(static_cast<VTYPE>(xa), static_cast<VTYPE>(ya), static_cast<VTYPE>(za));
-		}
+		Vector3D<VTYPE>& operator*= (const Matrix4F& op);
 
 		template<class T>
 		Vector3D<VTYPE>& operator/= (const T& op) {
@@ -113,9 +102,7 @@ namespace nvdb {
 		Vector3D<VTYPE>& operator/= (const Vector3D<OTHERVTYPE>& op) {
 			return Set(x / static_cast<VTYPE>(op.x), y / static_cast<VTYPE>(op.y), z / static_cast<VTYPE>(op.z));
 		}
-		Vector3D<VTYPE>& operator/= (const Vector4DF& op) {
-			return Set(x / static_cast<VTYPE>(op.x), y / static_cast<VTYPE>(op.y), z / static_cast<VTYPE>(op.z));
-		}
+		Vector3D<VTYPE>& operator/= (const Vector4DF& op);
 
 		template<class T>
 		Vector3D<VTYPE> operator+ (const T op) const { return Vector3D(x + static_cast<VTYPE>(op), y + static_cast<VTYPE>(op), z + static_cast<VTYPE>(op)); }
@@ -288,7 +275,7 @@ namespace nvdb {
 		return *this;
 	}
 
-	// Explicit template instantiations anbd short names.
+	// Explicit template instantiations and short names.
 	// See https://anteru.net/blog/2008/c-tricks-6-explicit-template-instantiation/
 	template class GVDB_API Vector3D<int>;
 	template class GVDB_API Vector3D<float>;
@@ -557,6 +544,37 @@ namespace nvdb {
 	};
 #undef VTYPE
 
+	template<class VTYPE>
+	Vector3D<VTYPE>::Vector3D(const Vector4DF& op) { x = (VTYPE)op.x; y = (VTYPE)op.y; z = (VTYPE)op.z; }
+
+	template<class VTYPE>
+	Vector3D<VTYPE>& Vector3D<VTYPE>::operator+= (const Vector4DF& op) {
+		return Set(x + static_cast<VTYPE>(op.x), y + static_cast<VTYPE>(op.y), z + static_cast<VTYPE>(op.z));
+	}
+
+	template<class VTYPE>
+	Vector3D<VTYPE>& Vector3D<VTYPE>::operator-= (const Vector4DF& op) {
+		return Set(x - static_cast<VTYPE>(op.x), y - static_cast<VTYPE>(op.y), z - static_cast<VTYPE>(op.z));
+	}
+
+	template<class VTYPE>
+	Vector3D<VTYPE>& Vector3D<VTYPE>::operator*= (const Vector4DF& op) {
+		return Set(x * static_cast<VTYPE>(op.x), y * static_cast<VTYPE>(op.y), z * static_cast<VTYPE>(op.z));
+	}
+
+	template<class VTYPE>
+	Vector3D<VTYPE>& Vector3D<VTYPE>::operator*= (const Matrix4F& op) {
+		float xa = (float)x * op.data[0] + (float)y * op.data[4] + (float)z * op.data[8] + op.data[12];
+		float ya = (float)x * op.data[1] + (float)y * op.data[5] + (float)z * op.data[9] + op.data[13];
+		float za = (float)x * op.data[2] + (float)y * op.data[6] + (float)z * op.data[10] + op.data[14];
+		return Set(static_cast<VTYPE>(xa), static_cast<VTYPE>(ya), static_cast<VTYPE>(za));
+	}
+
+	template<class VTYPE>
+	Vector3D<VTYPE>& Vector3D<VTYPE>::operator/= (const Vector4DF& op) {
+			return Set(x / static_cast<VTYPE>(op.x), y / static_cast<VTYPE>(op.y), z / static_cast<VTYPE>(op.z));
+	}
+	
 }
 
 #endif // #ifndef DEF_GVDB_VEC
