@@ -75,9 +75,9 @@ inline __device__ int3 GetCoveringNode (float3 pos, int3 range)
 {
 	int3 nodepos;
 
-	nodepos.x = ceil(pos.x / range.x) * range.x;
-	nodepos.y = ceil(pos.y / range.y) * range.y;
-	nodepos.z = ceil(pos.z / range.z) * range.z;
+	nodepos.x = ceilf(pos.x / range.x) * range.x;
+	nodepos.y = ceilf(pos.y / range.y) * range.y;
+	nodepos.z = ceilf(pos.z / range.z) * range.z;
 	if ( pos.x < nodepos.x ) nodepos.x -= range.x;
 	if ( pos.y < nodepos.y ) nodepos.y -= range.y;
 	if ( pos.z < nodepos.z ) nodepos.z -= range.z;
@@ -89,9 +89,9 @@ inline __device__ int3 GetCoveringNode (float3 pos, int range)
 {
 	int3 nodepos;
 
-	nodepos.x = ceil(pos.x / range) * range;
-	nodepos.y = ceil(pos.y / range) * range;
-	nodepos.z = ceil(pos.z / range) * range;
+	nodepos.x = ceilf(pos.x / range) * range;
+	nodepos.y = ceilf(pos.y / range) * range;
+	nodepos.z = ceilf(pos.z / range) * range;
 	if ( pos.x < nodepos.x ) nodepos.x -= range;
 	if ( pos.y < nodepos.y ) nodepos.y -= range;
 	if ( pos.z < nodepos.z ) nodepos.z -= range;

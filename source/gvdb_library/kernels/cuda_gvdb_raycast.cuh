@@ -283,7 +283,7 @@ __device__ void raySurfaceTrilinearBrick ( VDBInfo* gvdb, uchar chan, int nodeid
 	float3 vmin;
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );	// Get the VDB leaf node	
 	float3  o = make_float3( node->mValue ) ;				// Atlas sub-volume to trace
-	t.x = SCN_DIRECTSTEP * ceil(t.x / SCN_DIRECTSTEP);		// Start on sampling wavefront (avoids subvoxel banding artifacts)
+	t.x = SCN_DIRECTSTEP * ceilf(t.x / SCN_DIRECTSTEP);		// Start on sampling wavefront (avoids subvoxel banding artifacts)
 	float3	p = pos + t.x*dir - vmin;						// sample point in index coords			
 
 	for (int iter=0; iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x < gvdb->res[0] && p.y < gvdb->res[0] && p.z < gvdb->res[0]; iter++) 
@@ -392,7 +392,7 @@ __device__ void rayLevelSetBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3
 	VDBNode* node	= getNode ( gvdb, 0, nodeid, &vmin );			// Get the VDB leaf node	
 	float3  o = make_float3( node->mValue ) ;				// Atlas sub-volume to trace	
 	float3	p = pos + t.x*dir - vmin;					// sample point in index coords			
-	t.x = SCN_DIRECTSTEP * ceil ( t.x / SCN_DIRECTSTEP );
+	t.x = SCN_DIRECTSTEP * ceilf( t.x / SCN_DIRECTSTEP );
 
 	for (int iter=0; iter < MAX_ITER && p.x >=0 && p.y >=0 && p.z >=0 && p.x <= gvdb->res[0] && p.y <= gvdb->res[0] && p.z <= gvdb->res[0]; iter++) {	
 
@@ -487,7 +487,7 @@ __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, 
 	float3 vmin;
 	VDBNode* node = getNode ( gvdb, 0, nodeid, &vmin );		// Get the VDB leaf node		
 	
-	t.x = SCN_DIRECTSTEP * ceil( t.x / SCN_DIRECTSTEP );	// Start on sampling wavefront (avoids subvoxel banding artifacts)
+	t.x = SCN_DIRECTSTEP * ceilf( t.x / SCN_DIRECTSTEP );	// Start on sampling wavefront (avoids subvoxel banding artifacts)
 
 	float3 o = make_float3( node->mValue );	// Atlas sub-volume to trace
 	float3 wp = pos + t.x*dir;				// Sample position in index space

@@ -154,19 +154,19 @@ static __device__ __inline__ optix::float3 offset( const optix::float3& hit_poin
   if( (__float_as_int( hit_point.x )&0x7fffffff)  < __float_as_int( epsilon ) ) {
     offset_point.x += epsilon * normal.x;
   } else {
-    offset_point.x = __int_as_float( __float_as_int( offset_point.x ) + int(copysign( offset, hit_point.x )*normal.x) );
+    offset_point.x = __int_as_float( __float_as_int( offset_point.x ) + int(copysignf( offset, hit_point.x )*normal.x) );
   }
 
   if( (__float_as_int( hit_point.y )&0x7fffffff) < __float_as_int( epsilon ) ) {
     offset_point.y += epsilon * normal.y;
   } else {
-    offset_point.y = __int_as_float( __float_as_int( offset_point.y ) + int(copysign( offset, hit_point.y )*normal.y) );
+    offset_point.y = __int_as_float( __float_as_int( offset_point.y ) + int(copysignf( offset, hit_point.y )*normal.y) );
   }
 
   if( (__float_as_int( hit_point.z )&0x7fffffff)  < __float_as_int( epsilon ) ) {
     offset_point.z += epsilon * normal.z;
   } else {
-    offset_point.z = __int_as_float( __float_as_int( offset_point.z ) + int(copysign( offset, hit_point.z )*normal.z) );
+    offset_point.z = __int_as_float( __float_as_int( offset_point.z ) + int(copysignf( offset, hit_point.z )*normal.z) );
   }
 
   return offset_point;

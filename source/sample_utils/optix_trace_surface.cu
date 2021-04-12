@@ -169,9 +169,8 @@ RT_PROGRAM void trace_surface ()
 		}
 	}
 	if (mat.env_color.x == 1) {
-		float chk = ((int(floor(fhp.x / mat.env_color.y) + floor(fhp.z / mat.env_color.y)) & 1) == 0) ? 1.0 : mat.env_color.z;
+		float chk = ((int(floorf(fhp.x / mat.env_color.y) + floorf(fhp.z / mat.env_color.y)) & 1) == 0) ? 1.0 : mat.env_color.z;
 		diffuse *= chk;
-
 	}
 
 	rayinfo.result = (diffuse*fxyz(deep_color) + spec + mat.amb_color)*shadowclr.x + (reflclr + refrclr)*(shadowclr.x*0.3+0.7);
