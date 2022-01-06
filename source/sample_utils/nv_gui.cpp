@@ -1665,14 +1665,6 @@ bool readword ( char *line, char *word, char delim )
     return true;                        // return word(s) copied
 }
 
-
-
-/*void save_png ( char* fname, unsigned char* img, int w, int h )
-{
-	unsigned error = lodepng::encode ( "test.png", img, w, h );	  
-	if (error) printf ( "png write error: %s\n", lodepng_error_text(error) );
-}*/
-
 nvImg::~nvImg() {
 	if (mData != nullptr) {
 		delete[] mData;

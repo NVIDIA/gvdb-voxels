@@ -151,6 +151,9 @@ Building a sample will also automatically build GVDB, so you no longer need to b
 2. In CMake, set `GVDB_NANOVDB_INCLUDE_DIR` to the path to NanoVDB (this folder contains a `nanovdb` folder which contains `NanoVDB.h`), set `GVDB_BUILD_NANOVDB` to `ON`, and set `GVDB_BUILD_NANOVDB_SAMPLES` to `ON`.
 3. Finally, generate and build the CMake project. Now you can run the `gNanoVDB` sample!
 
+## Dependencies
+
+GVDB uses [LodePNG](https://lodev.org/lodepng/) and [The OpenGL Extension Wranger Library](http://glew.sourceforge.net/) (GLEW). Their licenses can be found in source/sample_utils/lodepng.h and source/gvdb_library/glew/include/GL/glew.h, respectively.
 
 ## License
 
@@ -160,4 +163,5 @@ Apache 2.0. Please refer to [LICENSE.txt](https://github.com/NVIDIA/gvdb-voxels/
 
 Before commit [dfcaf6](https://github.com/NVIDIA/gvdb-voxels/commit/dfcaf6822982a78eeed87004b7e62856d34f590c) on February 1st, 2021, GVDB used 3-clause BSD. See [#111](https://github.com/NVIDIA/gvdb-voxels/issues/111) for more details.
 
-© 2021 NVIDIA Corporation
+© 2017-2022 NVIDIA Corporation
+
