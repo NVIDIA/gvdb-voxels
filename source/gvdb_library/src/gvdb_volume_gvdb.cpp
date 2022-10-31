@@ -3475,13 +3475,13 @@ int VolumeGVDB::VoxelizeNode ( Node* node, uchar chan, Matrix4F* xform, float bd
 }
 
 // SolidVoxelize - Voxelize a polygonal mesh to a sparse volume
-void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, float val_surf, float val_inside, float vthresh )
+void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, float val_surf, float val_inside, float vthresh, bool use_opengl )
 {
 	PUSH_CTX
 
 	//TimerStart();
 	
-	AuxGeometryMap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );					// Setup VBO for CUDA (interop)
+	if (use_opengl) AuxGeometryMap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );					// Setup VBO for CUDA (interop)
 	
 	// Prepare model geometry for use by CUDA
 	cudaCheck ( cuMemcpyHtoD ( cuXform, xform->GetDataF(), sizeof(float)*16), "VolumeGVDB", "SolidVoxelize", "cuMemcpyHtoD", "cuXform", mbDebug );	// Send transform
@@ -3533,7 +3533,7 @@ void VolumeGVDB::SolidVoxelize ( uchar chan, Model* model, Matrix4F* xform, floa
 		PrepareV3D ( Vector3DI(0,0,0), 0 );
 	#endif
 
-	AuxGeometryUnmap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );
+	if (use_opengl) AuxGeometryUnmap ( model, AUX_VERTEX_BUF, AUX_ELEM_BUF );
 
 	POP_CTX
 	//float msec = TimerStop();
