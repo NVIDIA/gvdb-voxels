@@ -65,8 +65,9 @@ void gprintf2(va_list &vlist, const char * fmt, int level)
     default:
         break;
     }
-    ::printf(prefix);
-    ::printf(fmt2);
+    ::fprintf(stderr, prefix);
+    ::fprintf(stderr, fmt2);
+
 }
 void gprintf(const char * fmt, ...)
 {
