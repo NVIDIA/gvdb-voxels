@@ -135,7 +135,7 @@ Platform define
 #   ifdef __CELLOS_LV2__
 #    define NV_PS3
 #        define NV_VMX
-#   elif defined(__arm__)
+#   elif defined(__arm__) || defined(__aarch64__)
 #        define NV_ARM
 #        if defined(__SNC__)
 #            define NV_PSP2
