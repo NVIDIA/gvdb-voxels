@@ -19,6 +19,7 @@
 
 // gvdbBrickFunc ( gvdb, channel, nodeid, t, pos, dir, hit, norm, clr )
 typedef void(*gvdbBrickFunc_t)( VDBInfo*, uchar, int, float3, float3, float3, float3&, float3&, float4& );
+typedef void(*gvdbMultiChanBrickFunc_t)( VDBInfo*, uchar*, int, float3, float3, float3, float3&, float3&, float4& );
 
 static const int MAXLEV = 5;
 static const int MAX_ITER = 256;
@@ -540,7 +541,9 @@ __device__ void rayDeepBrick ( VDBInfo* gvdb, uchar chan, int nodeid, float3 t, 
 // 3. Calls the specified 'brickFunc' when a brick is hit, for custom behavior
 // 4. Returns a color and/or surface hit and normal
 //
-__device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, float3& hit, float3& norm, float4& clr, gvdbBrickFunc_t brickFunc )
+
+template<typename T, typename K>
+__device__ void rayCastTemplate ( VDBInfo* gvdb, K chan, float3 pos, float3 dir, float3& hit, float3& norm, float4& clr, T brickFunc )
 {
 	int		nodeid[MAXLEV];					// level variables
 	float	tMax[MAXLEV];
@@ -610,3 +613,9 @@ __device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, flo
 	}	
 }
 
+__device__ void rayCast ( VDBInfo* gvdb, uchar chan, float3 pos, float3 dir, float3& hit, float3& norm, float4& clr, gvdbBrickFunc_t brickFunc ){
+       rayCastTemplate<gvdbBrickFunc_t,char>(gvdb, chan, pos, dir, hit, norm, clr, brickFunc );
+}
+__device__ void rayCast ( VDBInfo* gvdb, uchar* chan, float3 pos, float3 dir, float3& hit, float3& norm, float4& clr, gvdbMultiChanBrickFunc_t brickFunc ){
+       rayCastTemplate<gvdbMultiChanBrickFunc_t,uchar*>(gvdb, chan, pos, dir, hit, norm, clr, brickFunc );
+}
